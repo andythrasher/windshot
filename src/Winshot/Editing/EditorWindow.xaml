@@ -40,7 +40,22 @@
                     <FontIcon Glyph="&#xE8D2;" />
                 </AppBarToggleButton.Icon>
             </AppBarToggleButton>
+            <AppBarToggleButton x:Name="BlurButton" Label="Blur" Click="ToolButton_Click" Tag="Blur" ToolTipService.ToolTip="Blur (B)">
+                <AppBarToggleButton.Icon>
+                    <FontIcon Glyph="&#xE8B9;" />
+                </AppBarToggleButton.Icon>
+            </AppBarToggleButton>
             <AppBarSeparator />
+            <AppBarToggleButton
+                x:Name="PixelateButton"
+                Label="Pixelate"
+                Visibility="Collapsed"
+                Click="PixelateButton_Click"
+                ToolTipService.ToolTip="Pixelate (P). Safer than a smooth blur for hiding text.">
+                <AppBarToggleButton.Icon>
+                    <FontIcon Glyph="&#xF0E2;" />
+                </AppBarToggleButton.Icon>
+            </AppBarToggleButton>
             <AppBarElementContainer VerticalContentAlignment="Center" ToolTipService.ToolTip="Size ([ and ])">
                 <StackPanel Orientation="Horizontal" Spacing="8" Margin="12,0">
                     <TextBlock Text="Size" VerticalAlignment="Center" />

@@ -90,7 +90,7 @@ internal abstract class TwoPointAnnotation : Annotation
     }
 }
 
-internal sealed class RectangleAnnotation : TwoPointAnnotation
+internal sealed class RectangleAnnotation : BoxAnnotation
 {
     public RectangleAnnotation(Vector2 start, Color color, int weight, float unit)
         : base(start, color, weight, unit)
@@ -99,9 +99,31 @@ internal sealed class RectangleAnnotation : TwoPointAnnotation
 
     public float Thickness => (1 + Weight) * Unit;
 
-    public Rect Shape => new(Start.ToPoint(), End.ToPoint());
-
     public override Rect Bounds => Shape.Inflate(Thickness / 2);
+
+    public override void Draw(CanvasDrawingSession ds) =>
+        ds.DrawRoundedRectangle(Shape, Thickness / 2, Thickness / 2, Color, Thickness);
+
+    public override bool HitTest(Vector2 point, float tolerance)
+    {
+        // Only the stroke is grabbable, so you can still click things inside the rectangle.
+        float reach = Thickness / 2 + tolerance;
+        var outer = Shape.Inflate(reach);
+        var inner = Shape.Inflate(-reach);
+        var p = point.ToPoint();
+        return outer.Contains(p) && (inner.IsEmpty || !inner.Contains(p));
+    }
+}
+
+/// <summary>A two-point annotation that is an axis-aligned box, resizable from any corner.</summary>
+internal abstract class BoxAnnotation : TwoPointAnnotation
+{
+    protected BoxAnnotation(Vector2 start, Color color, int weight, float unit)
+        : base(start, color, weight, unit)
+    {
+    }
+
+    public Rect Shape => new(Start.ToPoint(), End.ToPoint());
 
     /// <summary>All four corners: Start, End, then the two mixed corners.</summary>
     public override IReadOnlyList<Vector2> Handles =>
@@ -116,18 +138,5 @@ internal sealed class RectangleAnnotation : TwoPointAnnotation
             case 2: Start = new Vector2(position.X, Start.Y); End = new Vector2(End.X, position.Y); break;
             case 3: End = new Vector2(position.X, End.Y); Start = new Vector2(Start.X, position.Y); break;
         }
-    }
-
-    public override void Draw(CanvasDrawingSession ds) =>
-        ds.DrawRoundedRectangle(Shape, Thickness / 2, Thickness / 2, Color, Thickness);
-
-    public override bool HitTest(Vector2 point, float tolerance)
-    {
-        // Only the stroke is grabbable, so you can still click things inside the rectangle.
-        float reach = Thickness / 2 + tolerance;
-        var outer = Shape.Inflate(reach);
-        var inner = Shape.Inflate(-reach);
-        var p = point.ToPoint();
-        return outer.Contains(p) && (inner.IsEmpty || !inner.Contains(p));
     }
 }

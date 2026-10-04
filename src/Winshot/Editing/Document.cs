@@ -59,19 +59,30 @@ internal sealed class Document : IDisposable
     public void Render(CanvasDrawingSession ds, Annotation? skip = null)
     {
         ds.DrawImage(Image, 0, 0);
-        foreach (var annotation in Annotations)
+        foreach (var annotation in InPaintOrder())
         {
             if (annotation != skip)
                 annotation.Draw(ds);
         }
     }
 
-    public Annotation? HitTest(Vector2 point, float tolerance)
+    /// <summary>
+    /// Blurs are part of the picture, so they paint right after the image and under every
+    /// other annotation, whatever order they were drawn in.
+    /// </summary>
+    private IEnumerable<Annotation> InPaintOrder() =>
+        Annotations.Where(a => a is BlurAnnotation).Concat(Annotations.Where(a => a is not BlurAnnotation));
+
+    /// <param name="includeBlurs">
+    /// Blurs fill their whole area; leaving them out lets you start an arrow on a blurred region
+    /// instead of accidentally grabbing the blur.
+    /// </param>
+    public Annotation? HitTest(Vector2 point, float tolerance, bool includeBlurs)
     {
-        for (int i = Annotations.Count - 1; i >= 0; i--)
+        foreach (var annotation in InPaintOrder().Reverse())
         {
-            if (Annotations[i].HitTest(point, tolerance))
-                return Annotations[i];
+            if ((includeBlurs || annotation is not BlurAnnotation) && annotation.HitTest(point, tolerance))
+                return annotation;
         }
         return null;
     }

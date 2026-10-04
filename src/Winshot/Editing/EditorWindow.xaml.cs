@@ -28,6 +28,7 @@ internal enum Tool
     Arrow,
     Rectangle,
     Text,
+    Blur,
 }
 
 public sealed partial class EditorWindow : Window
@@ -47,7 +48,9 @@ public sealed partial class EditorWindow : Window
         [Tool.Arrow] = 4,
         [Tool.Rectangle] = 3,
         [Tool.Text] = 4,
+        [Tool.Blur] = 4,
     };
+    private bool _pixelate = true;
 
     private Tool _tool;
     private Annotation? _selected;
@@ -113,11 +116,17 @@ public sealed partial class EditorWindow : Window
         ArrowButton.IsChecked = tool == Tool.Arrow;
         RectangleButton.IsChecked = tool == Tool.Rectangle;
         TextButton.IsChecked = tool == Tool.Text;
+        BlurButton.IsChecked = tool == Tool.Blur;
 
         if (tool != Tool.Select)
+        {
             Select(null);
+        }
         else
+        {
             SyncSlider();
+            SyncPixelate();
+        }
     }
 
     private void ToolButton_Click(object sender, RoutedEventArgs e) =>
@@ -127,16 +136,40 @@ public sealed partial class EditorWindow : Window
     {
         ArrowAnnotation => Tool.Arrow,
         TextAnnotation => Tool.Text,
+        BlurAnnotation => Tool.Blur,
         _ => Tool.Rectangle,
     };
 
     private void Select(Annotation? annotation)
     {
         _selected = annotation;
-        if (annotation is not null)
+        if (annotation is not null and not BlurAnnotation)
             _color = annotation.Color; // picking up an object's color makes it easy to match
         SyncSlider();
         SyncColor();
+        SyncPixelate();
+        Canvas.Invalidate();
+    }
+
+    /// <summary>The Pixelate toggle only appears for the blur tool or a selected blur.</summary>
+    private void SyncPixelate()
+    {
+        var blur = _selected as BlurAnnotation;
+        PixelateButton.Visibility = blur is not null || _tool == Tool.Blur ? Visibility.Visible : Visibility.Collapsed;
+        PixelateButton.IsChecked = blur?.Pixelate ?? _pixelate;
+    }
+
+    private void PixelateButton_Click(object sender, RoutedEventArgs e) => SetPixelate(PixelateButton.IsChecked == true);
+
+    private void SetPixelate(bool pixelate)
+    {
+        _pixelate = pixelate;
+        if (_selected is BlurAnnotation blur && blur.Pixelate != pixelate)
+        {
+            blur.Pixelate = pixelate;
+            Commit();
+        }
+        SyncPixelate();
         Canvas.Invalidate();
     }
 
@@ -214,7 +247,7 @@ public sealed partial class EditorWindow : Window
     {
         CommitTextEdit();
         _color = color;
-        if (_selected is not null && _selected.Color != color)
+        if (_selected is not null and not BlurAnnotation && _selected.Color != color)
         {
             _selected.Color = color;
             Commit(coalesceKey: ("color", _selected));
@@ -286,6 +319,10 @@ public sealed partial class EditorWindow : Window
             case VirtualKey.A when !ctrl: SetTool(Tool.Arrow); break;
             case VirtualKey.R when !ctrl: SetTool(Tool.Rectangle); break;
             case VirtualKey.T when !ctrl: SetTool(Tool.Text); break;
+            case VirtualKey.B when !ctrl: SetTool(Tool.Blur); break;
+            case VirtualKey.P when !ctrl && PixelateButton.Visibility == Visibility.Visible:
+                SetPixelate(PixelateButton.IsChecked != true);
+                break;
             case (VirtualKey)219: SetWeight((int)WeightSlider.Value - 1); break; // [
             case (VirtualKey)221: SetWeight((int)WeightSlider.Value + 1); break; // ]
             case VirtualKey.Delete or VirtualKey.Back when _selected is not null:
@@ -342,11 +379,11 @@ public sealed partial class EditorWindow : Window
     private void DrawSelection(CanvasDrawingSession ds, Annotation annotation)
     {
         float px = 1 / _view.M11;
-        if (annotation.Handles.Count == 0)
+        // Text has no handles, and a blur has no visible edge; outline both so the extent is clear.
+        if (annotation.Handles.Count == 0 || annotation is BlurAnnotation)
         {
             using var dashed = new CanvasStrokeStyle { DashStyle = CanvasDashStyle.Dash };
             ds.DrawRectangle(annotation.Bounds.Inflate(2 * px), AccentColor, 1.5f * px, dashed);
-            return;
         }
 
         foreach (var handle in annotation.Handles)
@@ -403,7 +440,7 @@ public sealed partial class EditorWindow : Window
         {
             StartDrag(e, _selected, handle, creating: false, p);
         }
-        else if (_document.HitTest(p, tolerance) is Annotation hit)
+        else if (_document.HitTest(p, tolerance, includeBlurs: _tool is Tool.Select or Tool.Blur) is Annotation hit)
         {
             // Clicking an existing object grabs it, whichever tool is active.
             Select(hit);
@@ -438,9 +475,12 @@ public sealed partial class EditorWindow : Window
             return;
         }
 
-        TwoPointAnnotation shape = _tool == Tool.Arrow
-            ? new ArrowAnnotation(p, _color, weight, Unit)
-            : new RectangleAnnotation(p, _color, weight, Unit);
+        TwoPointAnnotation shape = _tool switch
+        {
+            Tool.Arrow => new ArrowAnnotation(p, _color, weight, Unit),
+            Tool.Blur => new BlurAnnotation(p, _document.Image, _document.ImageBounds, _pixelate, weight, Unit),
+            _ => new RectangleAnnotation(p, _color, weight, Unit),
+        };
         _document.Annotations.Add(shape);
         Select(shape);
         StartDrag(e, shape, TwoPointAnnotation.EndHandle, creating: true, p);
@@ -508,7 +548,7 @@ public sealed partial class EditorWindow : Window
     private void Canvas_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
     {
         var p = ToDocument(e.GetPosition(Canvas).ToVector2());
-        if (_document.HitTest(p, HitTolerance / _view.M11) is TextAnnotation text)
+        if (_document.HitTest(p, HitTolerance / _view.M11, includeBlurs: false) is TextAnnotation text)
         {
             Select(text);
             BeginTextEdit(text, isNew: false);
