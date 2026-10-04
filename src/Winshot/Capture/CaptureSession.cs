@@ -10,7 +10,8 @@ internal static class CaptureSession
 {
     private static List<SelectionOverlay>? _overlays;
 
-    public static void Begin(Action<CapturedImage> onCaptured)
+    /// <param name="hint">Optional instruction shown at the top of each monitor, e.g. for OCR.</param>
+    public static void Begin(Action<CapturedImage> onCaptured, string? hint = null)
     {
         if (_overlays is not null)
             return;
@@ -35,7 +36,7 @@ internal static class CaptureSession
 
         foreach (var screen in Screen.AllScreens)
         {
-            var overlay = new SelectionOverlay(snapshot, screen.Bounds);
+            var overlay = new SelectionOverlay(snapshot, screen.Bounds, hint);
             overlay.Selected += (source, desktopRect) =>
             {
                 Log.Write($"Selected {desktopRect} at scale {source.MonitorScale}");

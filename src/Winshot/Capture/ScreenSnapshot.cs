@@ -7,7 +7,8 @@ namespace Winshot.Capture;
 
 /// <summary>Straight BGRA pixels handed from the capture side to the editor.</summary>
 /// <param name="Scale">Device pixels per DIP on the monitor the region came from.</param>
-internal sealed record CapturedImage(byte[] Pixels, int Width, int Height, double Scale);
+/// <param name="DesktopBounds">Where the region was on screen, in physical pixels.</param>
+internal sealed record CapturedImage(byte[] Pixels, int Width, int Height, double Scale, Rectangle DesktopBounds);
 
 /// <summary>A frozen copy of the entire virtual desktop, in physical pixels.</summary>
 internal sealed class ScreenSnapshot : IDisposable
@@ -61,7 +62,9 @@ internal sealed class ScreenSnapshot : IDisposable
             Bitmap.UnlockBits(data);
         }
 
-        return new CapturedImage(pixels, local.Width, local.Height, scale);
+        var desktop = local;
+        desktop.Offset(VirtualBounds.Location);
+        return new CapturedImage(pixels, local.Width, local.Height, scale, desktop);
     }
 
     public void Dispose() => Bitmap.Dispose();

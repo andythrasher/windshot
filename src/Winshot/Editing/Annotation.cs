@@ -36,6 +36,9 @@ internal abstract class Annotation
     /// </summary>
     public virtual bool IsAreaEffect => false;
 
+    /// <summary>Whether sticking out past the image grows the canvas (the "reverse crop").</summary>
+    public virtual bool ExtendsCanvas => !IsAreaEffect;
+
     public abstract Rect Bounds { get; }
 
     public abstract void Draw(CanvasDrawingSession ds);

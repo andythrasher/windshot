@@ -45,7 +45,7 @@ internal sealed class Document : IDisposable
 
             var image = ImageBounds;
             var bounds = image;
-            foreach (var annotation in Annotations)
+            foreach (var annotation in Annotations.Where(a => a.ExtendsCanvas))
             {
                 var a = annotation.Bounds;
                 if (!image.ContainsRect(a))
@@ -57,8 +57,9 @@ internal sealed class Document : IDisposable
 
     /// <param name="skip">An annotation the editor is showing some other way, e.g. text being typed.</param>
     /// <summary>
-    /// Paints in layers: the image, then area effects (blurs, then the spotlight dimming),
-    /// then every other annotation on top, so arrows and text stay crisp and bright.
+    /// Paints in layers: the image, then what marks the image itself (blurs, highlights, then
+    /// the spotlight dimming), then every other annotation on top, so arrows and text stay
+    /// crisp and bright.
     /// </summary>
     public void Render(CanvasDrawingSession ds, Annotation? skip = null)
     {
@@ -66,10 +67,12 @@ internal sealed class Document : IDisposable
 
         foreach (var blur in Annotations.OfType<BlurAnnotation>())
             blur.Draw(ds);
+        foreach (var highlight in Annotations.OfType<HighlighterAnnotation>())
+            highlight.Draw(ds);
         SpotlightAnnotation.DrawDimming(ds, ImageBounds, Annotations.OfType<SpotlightAnnotation>().ToList());
 
         int step = 0;
-        foreach (var annotation in Annotations.Where(a => !a.IsAreaEffect))
+        foreach (var annotation in Annotations.Where(a => a is { IsAreaEffect: false } and not HighlighterAnnotation))
         {
             if (annotation is StepAnnotation marker)
                 marker.Number = ++step;

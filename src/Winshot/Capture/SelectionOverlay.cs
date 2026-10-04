@@ -21,13 +21,18 @@ internal sealed class SelectionOverlay : Form
     private readonly Rectangle _monitorBounds;
     private readonly Bitmap _bright;
     private readonly Bitmap _dim;
+    private readonly string? _hint;
+    private readonly Font? _hintFont;
     private Point? _dragStart;
     private Rectangle _selection;
 
-    public SelectionOverlay(ScreenSnapshot snapshot, Rectangle monitorBounds)
+    public SelectionOverlay(ScreenSnapshot snapshot, Rectangle monitorBounds, string? hint)
     {
         _monitorBounds = monitorBounds;
         MonitorScale = GetMonitorScale(monitorBounds);
+        _hint = hint;
+        if (hint is not null)
+            _hintFont = new Font("Segoe UI", (float)(15 * MonitorScale), FontStyle.Regular, GraphicsUnit.Pixel);
 
         // Pre-render both layers once so painting during a drag is just two blits.
         _bright = snapshot.Bitmap.Clone(snapshot.ToLocal(monitorBounds), PixelFormat.Format32bppPArgb);
@@ -86,6 +91,7 @@ internal sealed class SelectionOverlay : Form
         g.InterpolationMode = InterpolationMode.NearestNeighbor;
 
         g.DrawImage(_dim, e.ClipRectangle, e.ClipRectangle, GraphicsUnit.Pixel);
+        DrawHint(g);
 
         if (_selection.Width <= 0 || _selection.Height <= 0)
             return;
@@ -104,6 +110,25 @@ internal sealed class SelectionOverlay : Form
             g.FillRectangle(bg, labelRect);
         TextRenderer.DrawText(g, label, LabelFont, labelRect, Color.White,
             TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+    }
+
+    private void DrawHint(Graphics g)
+    {
+        if (_hint is null || _hintFont is null)
+            return;
+
+        var text = TextRenderer.MeasureText(_hint, _hintFont);
+        int padX = (int)(16 * MonitorScale), padY = (int)(8 * MonitorScale);
+        var rect = new Rectangle((ClientSize.Width - text.Width) / 2 - padX, (int)(24 * MonitorScale),
+            text.Width + padX * 2, text.Height + padY * 2);
+
+        var old = g.CompositingMode;
+        g.CompositingMode = CompositingMode.SourceOver;
+        using (var bg = new SolidBrush(Color.FromArgb(220, 32, 32, 32)))
+            g.FillRectangle(bg, rect);
+        TextRenderer.DrawText(g, _hint, _hintFont, rect, Color.White,
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
+        g.CompositingMode = old;
     }
 
     protected override void OnMouseDown(MouseEventArgs e)
@@ -170,6 +195,7 @@ internal sealed class SelectionOverlay : Form
         {
             _bright.Dispose();
             _dim.Dispose();
+            _hintFont?.Dispose();
         }
         base.Dispose(disposing);
     }

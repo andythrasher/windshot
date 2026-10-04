@@ -43,9 +43,34 @@ public partial class App : Application
         DispatcherShutdownMode = DispatcherShutdownMode.OnExplicitShutdown;
 
         _hotkeys = new HotkeyWindow();
-        bool registered = _hotkeys.TryRegister(HotkeyModifiers.Control | HotkeyModifiers.Shift, Keys.D2, StartCapture);
-        Log.Write(registered ? "Started; hotkey Ctrl+Shift+2 registered" : "Started; hotkey Ctrl+Shift+2 is taken by another app");
-        _tray = new TrayIcon(StartCapture, Quit, registered ? "Ctrl+Shift+2" : null);
+        string? captureHotkey = Register(Keys.D2, "Ctrl+Shift+2", StartCapture);
+        string? copyTextHotkey = Register(Keys.D3, "Ctrl+Shift+3", StartTextCapture);
+        _tray = new TrayIcon(StartCapture, StartTextCapture, Quit, captureHotkey, copyTextHotkey);
+        Log.Write($"Started; hotkeys capture={captureHotkey ?? "taken"} text={copyTextHotkey ?? "taken"}");
+    }
+
+    /// <returns>The shortcut's label, or null if another app already owns it.</returns>
+    private string? Register(Keys key, string label, Action handler) =>
+        _hotkeys!.TryRegister(HotkeyModifiers.Control | HotkeyModifiers.Shift, key, handler) ? label : null;
+
+    /// <summary>Select a region and copy its text, without opening the editor.</summary>
+    private void StartTextCapture()
+    {
+        try
+        {
+            CaptureSession.Begin(image => _ = CopyTextAsync(image), hint: "Select text to copy");
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Text capture failed: {ex}");
+        }
+    }
+
+    private static async Task CopyTextAsync(CapturedImage image)
+    {
+        string message = await TextRecognizer.CopyToClipboardAsync(image.Pixels, image.Width, image.Height, image.Scale);
+        Log.Write($"OCR: {message}");
+        Hud.Show(message, image.DesktopBounds, image.Scale);
     }
 
     private void StartCapture()

@@ -31,6 +31,7 @@ internal enum Tool
     Blur,
     Step,
     Spotlight,
+    Highlighter,
 }
 
 public sealed partial class EditorWindow : Window
@@ -45,6 +46,8 @@ public sealed partial class EditorWindow : Window
     private readonly History _history;
     private readonly List<Microsoft.UI.Xaml.Controls.Button> _swatches = new();
     private Color _color = Palette.Colors[0].Color;
+    // The highlighter keeps its own color: yellow highlights shouldn't turn your arrows yellow.
+    private Color _highlightColor = Palette.Colors[2].Color;
     private readonly Dictionary<Tool, int> _toolWeights = new()
     {
         [Tool.Arrow] = 4,
@@ -53,6 +56,7 @@ public sealed partial class EditorWindow : Window
         [Tool.Blur] = 4,
         [Tool.Step] = 4,
         [Tool.Spotlight] = 4,
+        [Tool.Highlighter] = 4,
     };
     private bool _pixelate = true;
 
@@ -103,7 +107,7 @@ public sealed partial class EditorWindow : Window
         int chromeWidth = (int)(2 * ViewPadding * capture.Scale + 120);
         int chromeHeight = (int)((2 * ViewPadding + 90) * capture.Scale);
         // The minimum keeps the whole toolbar visible.
-        int width = Math.Clamp(capture.Width + chromeWidth, (int)(860 * capture.Scale), (int)(workArea.Width * 0.85));
+        int width = Math.Clamp(capture.Width + chromeWidth, (int)(960 * capture.Scale), (int)(workArea.Width * 0.85));
         int height = Math.Clamp(capture.Height + chromeHeight, (int)(360 * capture.Scale), (int)(workArea.Height * 0.85));
         AppWindow.Resize(new SizeInt32(width, height));
         AppWindow.Move(new PointInt32(
@@ -132,6 +136,7 @@ public sealed partial class EditorWindow : Window
         {
             SyncSlider();
             SyncPixelate();
+            SyncColor();
         }
     }
 
@@ -145,6 +150,7 @@ public sealed partial class EditorWindow : Window
         BlurAnnotation => Tool.Blur,
         StepAnnotation => Tool.Step,
         SpotlightAnnotation => Tool.Spotlight,
+        HighlighterAnnotation => Tool.Highlighter,
         _ => Tool.Rectangle,
     };
 
@@ -152,7 +158,7 @@ public sealed partial class EditorWindow : Window
     {
         _selected = annotation;
         if (annotation is { IsAreaEffect: false })
-            _color = annotation.Color; // picking up an object's color makes it easy to match
+            ActiveColor = annotation.Color; // picking up an object's color makes it easy to match
         SyncSlider();
         SyncColor();
         SyncPixelate();
@@ -254,7 +260,7 @@ public sealed partial class EditorWindow : Window
     private void SetColor(Color color)
     {
         CommitTextEdit();
-        _color = color;
+        ActiveColor = color;
         if (_selected is { IsAreaEffect: false } && _selected.Color != color)
         {
             _selected.Color = color;
@@ -266,10 +272,30 @@ public sealed partial class EditorWindow : Window
 
     private void SyncColor()
     {
-        ColorSwatch.Fill = new SolidColorBrush(_color);
+        var color = ActiveColor;
+        ColorSwatch.Fill = new SolidColorBrush(color);
         for (int i = 0; i < _swatches.Count; i++)
-            _swatches[i].BorderThickness = new Thickness(Palette.Colors[i].Color == _color ? 3 : 1);
+            _swatches[i].BorderThickness = new Thickness(Palette.Colors[i].Color == color ? 3 : 1);
     }
+
+    /// <summary>
+    /// The color the palette shows and edits: the highlighter's own color when a highlight is
+    /// selected or about to be drawn, otherwise the color shared by every other tool.
+    /// </summary>
+    private Color ActiveColor
+    {
+        get => UsesHighlightColor ? _highlightColor : _color;
+        set
+        {
+            if (UsesHighlightColor)
+                _highlightColor = value;
+            else
+                _color = value;
+        }
+    }
+
+    private bool UsesHighlightColor =>
+        _selected is HighlighterAnnotation || (_selected is null && _tool == Tool.Highlighter);
 
     // ---- Undo / redo -------------------------------------------------------------------
 
@@ -321,6 +347,7 @@ public sealed partial class EditorWindow : Window
             case VirtualKey.Z when ctrl: StepHistory(undo: !shift); break;
             case VirtualKey.Y when ctrl: StepHistory(undo: false); break;
             case var _ when colorIndex >= 0 && !ctrl: SetColor(Palette.Colors[colorIndex].Color); break;
+            case VirtualKey.C when ctrl && shift: CopyText_Click(this, new RoutedEventArgs()); break;
             case VirtualKey.C when ctrl: Copy_Click(this, new RoutedEventArgs()); break;
             case VirtualKey.S when ctrl: Save_Click(this, new RoutedEventArgs()); break;
             case VirtualKey.V when !ctrl: SetTool(Tool.Select); break;
@@ -330,6 +357,7 @@ public sealed partial class EditorWindow : Window
             case VirtualKey.B when !ctrl: SetTool(Tool.Blur); break;
             case VirtualKey.N when !ctrl: SetTool(Tool.Step); break;
             case VirtualKey.S when !ctrl: SetTool(Tool.Spotlight); break;
+            case VirtualKey.H when !ctrl: SetTool(Tool.Highlighter); break;
             case VirtualKey.P when !ctrl && PixelateButton.Visibility == Visibility.Visible:
                 SetPixelate(PixelateButton.IsChecked != true);
                 break;
@@ -500,6 +528,7 @@ public sealed partial class EditorWindow : Window
             Tool.Arrow => new ArrowAnnotation(p, _color, weight, Unit),
             Tool.Blur => new BlurAnnotation(p, _document.Image, _document.ImageBounds, _pixelate, weight, Unit),
             Tool.Spotlight => new SpotlightAnnotation(p, _document.ImageBounds, weight, Unit),
+            Tool.Highlighter => new HighlighterAnnotation(p, _document.ImageBounds, _highlightColor, weight, Unit),
             _ => new RectangleAnnotation(p, _color, weight, Unit),
         };
         _document.Annotations.Add(shape);
@@ -677,6 +706,18 @@ public sealed partial class EditorWindow : Window
         package.SetBitmap(RandomAccessStreamReference.CreateFromStream(png));
         Clipboard.SetContent(package);
         Clipboard.Flush();
+    }
+
+    /// <summary>Reads the text in the original screenshot (annotations ignored) and copies it.</summary>
+    private async void CopyText_Click(object sender, RoutedEventArgs e)
+    {
+        CommitTextEdit();
+        var size = _document.Image.SizeInPixels;
+        string message = await TextRecognizer.CopyToClipboardAsync(
+            _document.Image.GetPixelBytes(), (int)size.Width, (int)size.Height, _document.SourceScale);
+
+        var window = new System.Drawing.Rectangle(AppWindow.Position.X, AppWindow.Position.Y, AppWindow.Size.Width, AppWindow.Size.Height);
+        Shell.Hud.Show(message, window, Content.XamlRoot.RasterizationScale);
     }
 
     private async void Save_Click(object sender, RoutedEventArgs e)

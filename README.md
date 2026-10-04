@@ -13,11 +13,14 @@ src/Winshot/bin/Debug/net10.0-windows10.0.26100.0/win-x64/Winshot.exe
 ```
 
 The app lives in the tray. **Ctrl+Shift+2** captures a region (or left-click the tray icon,
-or launch the exe again while it's running).
+or launch the exe again while it's running). **Ctrl+Shift+3** copies the text in a region
+straight to the clipboard (offline Windows OCR); in the editor, **Ctrl+Shift+C** does the same
+for the whole capture.
 
 In the editor: **A** arrow, **R** rectangle, **T** text, **B** blur (**P** toggles pixelate,
 the default and the safer choice for hiding text), **N** numbered steps (they renumber when
-one is deleted), **S** spotlight (dims everything else), **V** select. **[** and **]** (or the
+one is deleted), **S** spotlight (dims everything else), **H** highlighter (keeps its own color, yellow by
+default), **V** select. **[** and **]** (or the
 Size slider) and **1–8** (colors) change the selected object, or the next one drawn. Drag
 handles to reshape arrows and rectangles; double-click text to edit it. **Ctrl+Z** /
 **Ctrl+Y** undo and redo, **Delete** removes, **Ctrl+C** copies, **Ctrl+S** saves.
