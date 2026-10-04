@@ -14,6 +14,7 @@ internal sealed class TrayIcon : IDisposable
         var menu = new ContextMenuStrip();
         menu.Items.Add(WithShortcut("Capture region", captureHotkey), null, (_, _) => capture());
         menu.Items.Add(WithShortcut("Copy text from region", copyTextHotkey), null, (_, _) => copyText());
+        menu.Items.Add("Close all pins", null, (_, _) => PinWindow.CloseAll());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Quit Winshot", null, (_, _) => quit());
 

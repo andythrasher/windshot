@@ -115,7 +115,30 @@
                     </DropDownButton.Flyout>
                 </DropDownButton>
             </AppBarElementContainer>
+            <AppBarElementContainer VerticalContentAlignment="Center">
+                <!-- Toggle on the left part; the arrow opens backdrop presets and padding. -->
+                <ToggleSplitButton
+                    x:Name="BeautifyButton"
+                    Margin="4,0"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    IsCheckedChanged="BeautifyButton_IsCheckedChanged"
+                    ToolTipService.ToolTip="Beautify: gradient backdrop, rounded corners and shadow">
+                    <FontIcon FontSize="16" Glyph="&#xE790;" />
+                    <ToggleSplitButton.Flyout>
+                        <Flyout Placement="Bottom">
+                            <StackPanel Width="236" Spacing="8">
+                                <TextBlock Text="Backdrop" Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                                <VariableSizedWrapGrid x:Name="BackdropSwatches" Orientation="Horizontal" MaximumRowsOrColumns="4" />
+                                <TextBlock Text="Padding" />
+                                <Slider x:Name="PaddingSlider" Minimum="16" Maximum="160" StepFrequency="8" />
+                            </StackPanel>
+                        </Flyout>
+                    </ToggleSplitButton.Flyout>
+                </ToggleSplitButton>
+            </AppBarElementContainer>
             <AppBarSeparator />
+            <AppBarButton Icon="Pin" Label="Pin" Click="Pin_Click" ToolTipService.ToolTip="Pin to screen (Ctrl+P)" />
             <AppBarButton Label="Copy text" Click="CopyText_Click" ToolTipService.ToolTip="Copy text (Ctrl+Shift+C)">
                 <AppBarButton.Icon>
                     <!-- Scan corners around lines of text. -->

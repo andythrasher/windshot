@@ -85,9 +85,9 @@ public partial class App : Application
         }
     }
 
-    private static void OpenEditor(CapturedImage image)
+    internal static void OpenEditor(CapturedImage image)
     {
-        // Runs inside a WinForms mouse handler, which would otherwise swallow exceptions.
+        // Often runs inside a WinForms mouse handler, which would otherwise swallow exceptions.
         try
         {
             new EditorWindow(image).Activate();

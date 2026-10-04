@@ -1,5 +1,7 @@
 using System.Numerics;
 using Microsoft.Graphics.Canvas;
+using Microsoft.Graphics.Canvas.Brushes;
+using Microsoft.Graphics.Canvas.Effects;
 using Windows.Foundation;
 using Windows.Graphics.DirectX;
 using Winshot.Capture;
@@ -36,7 +38,20 @@ internal sealed class Document : IDisposable
     /// <summary>Explicit crop. When null, the canvas auto-fits the image and all annotations.</summary>
     public Rect? CropOverride { get; set; }
 
-    public Rect Bounds
+    /// <summary>Optional "beautify" style. When set, it's part of what you see and export.</summary>
+    public Backdrop? Backdrop { get; set; }
+
+    private float Unit => (float)SourceScale;
+
+    private float CornerRadius => Backdrop is null ? 0 : Backdrop.CornerRadius * Unit;
+
+    /// <summary>The whole canvas: content plus backdrop padding, if any. This is what's exported.</summary>
+    public Rect Bounds => Backdrop is null
+        ? ContentBounds
+        : ContentBounds.Inflate(Backdrop.Padding * Unit).RoundOut();
+
+    /// <summary>The image plus any annotations that stick out past it.</summary>
+    public Rect ContentBounds
     {
         get
         {
@@ -55,21 +70,23 @@ internal sealed class Document : IDisposable
         }
     }
 
-    /// <param name="skip">An annotation the editor is showing some other way, e.g. text being typed.</param>
     /// <summary>
-    /// Paints in layers: the image, then what marks the image itself (blurs, highlights, then
-    /// the spotlight dimming), then every other annotation on top, so arrows and text stay
-    /// crisp and bright.
+    /// Paints in layers: the backdrop if any, the image, then what marks the image itself
+    /// (blurs, highlights, then the spotlight dimming), then every other annotation on top,
+    /// so arrows and text stay crisp and bright.
     /// </summary>
+    /// <param name="skip">An annotation the editor is showing some other way, e.g. text being typed.</param>
     public void Render(CanvasDrawingSession ds, Annotation? skip = null)
     {
-        ds.DrawImage(Image, 0, 0);
+        if (Backdrop is not null)
+            DrawBackdrop(ds, Backdrop);
+        DrawImage(ds);
 
         foreach (var blur in Annotations.OfType<BlurAnnotation>())
             blur.Draw(ds);
         foreach (var highlight in Annotations.OfType<HighlighterAnnotation>())
             highlight.Draw(ds);
-        SpotlightAnnotation.DrawDimming(ds, ImageBounds, Annotations.OfType<SpotlightAnnotation>().ToList());
+        SpotlightAnnotation.DrawDimming(ds, ImageBounds, CornerRadius, Annotations.OfType<SpotlightAnnotation>().ToList());
 
         int step = 0;
         foreach (var annotation in Annotations.Where(a => a is { IsAreaEffect: false } and not HighlighterAnnotation))
@@ -79,6 +96,42 @@ internal sealed class Document : IDisposable
             if (annotation != skip)
                 annotation.Draw(ds);
         }
+    }
+
+    private void DrawBackdrop(CanvasDrawingSession ds, Backdrop backdrop)
+    {
+        var bounds = Bounds;
+        using (var gradient = new CanvasLinearGradientBrush(ds, backdrop.From, backdrop.To)
+        {
+            StartPoint = new Vector2((float)bounds.Left, (float)bounds.Top),
+            EndPoint = new Vector2((float)bounds.Right, (float)bounds.Bottom),
+        })
+        {
+            ds.FillRectangle(bounds, gradient);
+        }
+
+        // A soft shadow under the screenshot itself, cast slightly downward.
+        using var shape = new CanvasCommandList(ds);
+        using (var s = shape.CreateDrawingSession())
+            s.FillRoundedRectangle(ImageBounds, CornerRadius, CornerRadius, Microsoft.UI.Colors.Black);
+        using var shadow = new ShadowEffect
+        {
+            Source = shape,
+            BlurAmount = 12 * Unit,
+            ShadowColor = Windows.UI.Color.FromArgb(110, 0, 0, 0),
+        };
+        ds.DrawImage(shadow, 0, 6 * Unit);
+    }
+
+    private void DrawImage(CanvasDrawingSession ds)
+    {
+        if (CornerRadius <= 0)
+        {
+            ds.DrawImage(Image, 0, 0);
+            return;
+        }
+        using var brush = new CanvasImageBrush(ds, Image);
+        ds.FillRoundedRectangle(ImageBounds, CornerRadius, CornerRadius, brush);
     }
 
     /// <param name="includeAreaEffects">
@@ -93,7 +146,7 @@ internal sealed class Document : IDisposable
         return ordered.FirstOrDefault(a => a.HitTest(point, tolerance));
     }
 
-    /// <summary>Renders the full canvas to a PNG. Area outside the image is transparent.</summary>
+    /// <summary>Renders the full canvas to a PNG. Without a backdrop, area outside the image is transparent.</summary>
     public async Task<Windows.Storage.Streams.InMemoryRandomAccessStream> EncodePngAsync()
     {
         var bounds = Bounds;

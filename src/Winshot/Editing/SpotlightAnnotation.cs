@@ -52,12 +52,13 @@ internal sealed class SpotlightAnnotation : BoxAnnotation
     /// Dims the image everywhere outside the given spotlights. Only the image is dimmed:
     /// canvas added around it stays transparent rather than turning grey on export.
     /// </summary>
-    public static void DrawDimming(CanvasDrawingSession ds, Rect imageBounds, IReadOnlyList<SpotlightAnnotation> spotlights)
+    /// <param name="imageCornerRadius">Matches the image's rounded corners when beautified.</param>
+    public static void DrawDimming(CanvasDrawingSession ds, Rect imageBounds, float imageCornerRadius, IReadOnlyList<SpotlightAnnotation> spotlights)
     {
         if (spotlights.Count == 0)
             return;
 
-        var dimmed = CanvasGeometry.CreateRectangle(ds, imageBounds);
+        var dimmed = CanvasGeometry.CreateRoundedRectangle(ds, imageBounds, imageCornerRadius, imageCornerRadius);
         foreach (var spot in spotlights)
         {
             var region = spot.Region;

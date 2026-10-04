@@ -42,7 +42,14 @@ public sealed partial class EditorWindow : Window
     private const float MinShapeSize = 3;
     private static readonly Color AccentColor = Color.FromArgb(255, 0, 120, 212);
 
+    // Beautify settings carry over to the next capture (for this session).
+    private static bool s_beautify;
+    private static int s_backdropPreset;
+    private static double s_backdropPadding = 64;
+
     private readonly Document _document;
+    private readonly System.Drawing.Rectangle _desktopBounds;
+    private readonly List<Microsoft.UI.Xaml.Controls.Button> _backdropSwatches = new();
     private readonly History _history;
     private readonly List<Microsoft.UI.Xaml.Controls.Button> _swatches = new();
     private Color _color = Palette.Colors[0].Color;
@@ -87,12 +94,14 @@ public sealed partial class EditorWindow : Window
     {
         InitializeComponent();
         _document = new Document(capture);
+        _desktopBounds = capture.DesktopBounds;
         _history = new History(_document);
 
         // Hooked up here rather than in XAML: setting Minimum during load fires ValueChanged
         // before the rest of the window exists.
         WeightSlider.ValueChanged += WeightSlider_ValueChanged;
         BuildSwatches();
+        BuildBackdropControls();
         SizeToCapture(capture);
         SetTool(Tool.Arrow);
         Closed += (_, _) => _document.Dispose();
@@ -107,7 +116,7 @@ public sealed partial class EditorWindow : Window
         int chromeWidth = (int)(2 * ViewPadding * capture.Scale + 120);
         int chromeHeight = (int)((2 * ViewPadding + 90) * capture.Scale);
         // The minimum keeps the whole toolbar visible.
-        int width = Math.Clamp(capture.Width + chromeWidth, (int)(960 * capture.Scale), (int)(workArea.Width * 0.85));
+        int width = Math.Clamp(capture.Width + chromeWidth, (int)(1060 * capture.Scale), (int)(workArea.Width * 0.85));
         int height = Math.Clamp(capture.Height + chromeHeight, (int)(360 * capture.Scale), (int)(workArea.Height * 0.85));
         AppWindow.Resize(new SizeInt32(width, height));
         AppWindow.Move(new PointInt32(
@@ -348,6 +357,7 @@ public sealed partial class EditorWindow : Window
             case VirtualKey.Y when ctrl: StepHistory(undo: false); break;
             case var _ when colorIndex >= 0 && !ctrl: SetColor(Palette.Colors[colorIndex].Color); break;
             case VirtualKey.C when ctrl && shift: CopyText_Click(this, new RoutedEventArgs()); break;
+            case VirtualKey.P when ctrl: Pin_Click(this, new RoutedEventArgs()); break;
             case VirtualKey.C when ctrl: Copy_Click(this, new RoutedEventArgs()); break;
             case VirtualKey.S when ctrl: Save_Click(this, new RoutedEventArgs()); break;
             case VirtualKey.V when !ctrl: SetTool(Tool.Select); break;
@@ -718,6 +728,93 @@ public sealed partial class EditorWindow : Window
 
         var window = new System.Drawing.Rectangle(AppWindow.Position.X, AppWindow.Position.Y, AppWindow.Size.Width, AppWindow.Size.Height);
         Shell.Hud.Show(message, window, Content.XamlRoot.RasterizationScale);
+    }
+
+    /// <summary>
+    /// Floats the finished image above other windows, exactly where it was captured, and
+    /// closes the editor.
+    /// </summary>
+    private async void Pin_Click(object sender, RoutedEventArgs e)
+    {
+        CommitTextEdit();
+        using var png = await _document.EncodePngAsync();
+        using var stream = png.AsStreamForRead();
+        System.Drawing.Bitmap image;
+        using (var decoded = new System.Drawing.Bitmap(stream))
+            image = new System.Drawing.Bitmap(decoded); // detach from the stream
+
+        // The canvas can extend past the capture (annotations, backdrop); offset so the
+        // screenshot itself lands back on the pixels it came from.
+        var bounds = _document.Bounds;
+        var location = new System.Drawing.Point(_desktopBounds.X + (int)bounds.X, _desktopBounds.Y + (int)bounds.Y);
+        new Shell.PinWindow(image, location, _document.SourceScale, App.OpenEditor).Show();
+        Close();
+    }
+
+    // ---- Beautify ----------------------------------------------------------------------
+
+    private void BuildBackdropControls()
+    {
+        for (int i = 0; i < BackdropPresets.All.Length; i++)
+        {
+            int index = i;
+            var (name, from, to) = BackdropPresets.All[i];
+            var swatch = new Microsoft.UI.Xaml.Controls.Button
+            {
+                Width = 52,
+                Height = 36,
+                Margin = new Thickness(0, 0, 6, 6),
+                Padding = new Thickness(0),
+                CornerRadius = new CornerRadius(6),
+                Background = new LinearGradientBrush
+                {
+                    StartPoint = new Windows.Foundation.Point(0, 0),
+                    EndPoint = new Windows.Foundation.Point(1, 1),
+                    GradientStops =
+                    {
+                        new GradientStop { Color = from, Offset = 0 },
+                        new GradientStop { Color = to, Offset = 1 },
+                    },
+                },
+                BorderBrush = (Brush)Application.Current.Resources["TextFillColorPrimaryBrush"],
+            };
+            swatch.Resources["ButtonBackgroundPointerOver"] = swatch.Background;
+            swatch.Resources["ButtonBackgroundPressed"] = swatch.Background;
+            ToolTipService.SetToolTip(swatch, name);
+            swatch.Click += (_, _) =>
+            {
+                s_backdropPreset = index;
+                BeautifyButton.IsChecked = true; // turns beautify on if it was off
+                ApplyBackdrop();
+            };
+            _backdropSwatches.Add(swatch);
+            BackdropSwatches.Children.Add(swatch);
+        }
+
+        PaddingSlider.Value = s_backdropPadding;
+        // Hooked up after setting the initial value, so loading doesn't count as a change.
+        PaddingSlider.ValueChanged += (_, e) =>
+        {
+            s_backdropPadding = e.NewValue;
+            ApplyBackdrop();
+        };
+        BeautifyButton.IsChecked = s_beautify;
+        ApplyBackdrop();
+    }
+
+    private void BeautifyButton_IsCheckedChanged(ToggleSplitButton sender, ToggleSplitButtonIsCheckedChangedEventArgs args)
+    {
+        s_beautify = sender.IsChecked;
+        ApplyBackdrop();
+    }
+
+    private void ApplyBackdrop()
+    {
+        var (_, from, to) = BackdropPresets.All[s_backdropPreset];
+        _document.Backdrop = s_beautify ? new Backdrop(from, to, (float)s_backdropPadding) : null;
+        for (int i = 0; i < _backdropSwatches.Count; i++)
+            _backdropSwatches[i].BorderThickness = new Thickness(i == s_backdropPreset ? 2 : 0);
+        Canvas.Invalidate();
     }
 
     private async void Save_Click(object sender, RoutedEventArgs e)
