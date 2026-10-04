@@ -17,7 +17,8 @@ or launch the exe again while it's running). **Ctrl+Shift+3** copies the text in
 straight to the clipboard (offline Windows OCR); in the editor, **Ctrl+Shift+C** does the same
 for the whole capture.
 
-In the editor: **A** arrow, **R** rectangle, **T** text, **B** blur (**P** toggles pixelate,
+In the editor: **A** arrow, **R** rectangle, **T** text (click, or drag a box to set the size
+and wrapping width; the toolbar's text background toggle sets it on a colored box), **B** blur (**P** toggles pixelate,
 the default and the safer choice for hiding text), **N** numbered steps (they renumber when
 one is deleted), **S** spotlight (dims everything else), **H** highlighter (keeps its own color, yellow by
 default), **V** select. **[** and **]** (or the
@@ -36,7 +37,9 @@ Log: `%LOCALAPPDATA%\Winshot\winshot.log`.
 
 - **Unbounded canvas.** `Editing/Document.cs` treats the screenshot as one layer at (0,0).
   Canvas bounds are the image plus any annotation that sticks out (with a margin), so
-  "reverse crop" falls out of the model. Export renders those bounds; the extra area is transparent.
+  "reverse crop" falls out of the model. Export renders those bounds. Added area is filled
+  per side with the dominant color of the image edge beside it (`EdgeColors`), preferring the
+  stretch next to whatever overhangs; sides without a clear background color stay transparent.
 - **Physical pixels everywhere on the capture side.** The process is Per-Monitor-V2 DPI aware,
   the desktop is snapshotted once, and each monitor gets its own overlay window in its own
   pixel space, which keeps mixed-DPI setups from breaking.

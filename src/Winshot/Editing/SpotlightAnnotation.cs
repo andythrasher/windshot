@@ -49,16 +49,16 @@ internal sealed class SpotlightAnnotation : BoxAnnotation
         Region.Inflate(tolerance).Contains(point.ToPoint());
 
     /// <summary>
-    /// Dims the image everywhere outside the given spotlights. Only the image is dimmed:
-    /// canvas added around it stays transparent rather than turning grey on export.
+    /// Dims the screenshot (<paramref name="card"/>: the image plus any filled expansion)
+    /// everywhere outside the given spotlights. Transparent canvas outside the card stays
+    /// transparent rather than turning grey on export.
     /// </summary>
-    /// <param name="imageCornerRadius">Matches the image's rounded corners when beautified.</param>
-    public static void DrawDimming(CanvasDrawingSession ds, Rect imageBounds, float imageCornerRadius, IReadOnlyList<SpotlightAnnotation> spotlights)
+    public static void DrawDimming(CanvasDrawingSession ds, Rect card, IReadOnlyList<SpotlightAnnotation> spotlights)
     {
         if (spotlights.Count == 0)
             return;
 
-        var dimmed = CanvasGeometry.CreateRoundedRectangle(ds, imageBounds, imageCornerRadius, imageCornerRadius);
+        var dimmed = CanvasGeometry.CreateRectangle(ds, card);
         foreach (var spot in spotlights)
         {
             var region = spot.Region;

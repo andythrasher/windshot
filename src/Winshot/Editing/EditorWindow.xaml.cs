@@ -42,8 +42,7 @@ public sealed partial class EditorWindow : Window
     private const float MinShapeSize = 3;
     private static readonly Color AccentColor = Color.FromArgb(255, 0, 120, 212);
 
-    // Beautify settings carry over to the next capture (for this session).
-    private static bool s_beautify;
+    // Beautify starts off for every capture; the chosen gradient and padding carry over (for this session).
     private static int s_backdropPreset;
     private static double s_backdropPadding = 64;
 
@@ -66,6 +65,8 @@ public sealed partial class EditorWindow : Window
         [Tool.Highlighter] = 4,
     };
     private bool _pixelate = true;
+    private bool _textBoxed;
+    private bool _beautify;
 
     private Tool _tool;
     private Annotation? _selected;
@@ -76,6 +77,7 @@ public sealed partial class EditorWindow : Window
     // the canvas doesn't shift under the cursor as it expands; it re-fits afterwards.
     private Matrix3x2 _view = Matrix3x2.Identity;
     private DragState? _drag;
+    private TextDrag? _textDrag;
     private TextAnnotation? _editingText;
     private TextBox? _textBox;
     private bool _editingIsNew;
@@ -88,6 +90,12 @@ public sealed partial class EditorWindow : Window
 
         /// <summary>Whether anything changed; a click that only selects shouldn't add an undo step.</summary>
         public bool Moved { get; set; }
+    }
+
+    /// <summary>A text box being dragged out with the text tool (document coordinates).</summary>
+    private sealed record TextDrag(uint PointerId, Vector2 Start)
+    {
+        public Vector2 End { get; set; }
     }
 
     internal EditorWindow(CapturedImage capture)
@@ -145,8 +153,10 @@ public sealed partial class EditorWindow : Window
         {
             SyncSlider();
             SyncPixelate();
+            SyncTextBackground();
             SyncColor();
         }
+        UpdateCursor(null);
     }
 
     private void ToolButton_Click(object sender, RoutedEventArgs e) =>
@@ -171,6 +181,28 @@ public sealed partial class EditorWindow : Window
         SyncSlider();
         SyncColor();
         SyncPixelate();
+        SyncTextBackground();
+        Canvas.Invalidate();
+    }
+
+    /// <summary>The text background toggle only appears for the text tool or selected text.</summary>
+    private void SyncTextBackground()
+    {
+        var text = _selected as TextAnnotation;
+        TextBackgroundButton.Visibility = text is not null || _tool == Tool.Text ? Visibility.Visible : Visibility.Collapsed;
+        TextBackgroundButton.IsChecked = text?.Boxed ?? _textBoxed;
+    }
+
+    private void TextBackgroundButton_Click(object sender, RoutedEventArgs e)
+    {
+        CommitTextEdit();
+        _textBoxed = TextBackgroundButton.IsChecked == true;
+        if (_selected is TextAnnotation text && text.Boxed != _textBoxed)
+        {
+            text.Boxed = _textBoxed;
+            Commit();
+        }
+        SyncTextBackground();
         Canvas.Invalidate();
     }
 
@@ -199,7 +231,13 @@ public sealed partial class EditorWindow : Window
     /// <summary>The slider shows the selected object's size, or the size the current tool will draw at.</summary>
     private void SyncSlider()
     {
-        int? weight = _selected?.Weight ?? (_toolWeights.TryGetValue(_tool, out int w) ? w : null);
+        int? weight = _selected switch
+        {
+            // Text sized by dragging a box shows the nearest slider step.
+            TextAnnotation { FontSizeOverride: float size } => Math.Clamp((int)Math.Round((size / Unit - 10) / 4), Annotation.MinWeight, Annotation.MaxWeight),
+            not null => _selected.Weight,
+            null => _toolWeights.TryGetValue(_tool, out int w) ? w : null,
+        };
         _syncingSlider = true;
         WeightSlider.IsEnabled = weight is not null;
         if (weight is int value)
@@ -221,9 +259,12 @@ public sealed partial class EditorWindow : Window
         if (_selected is not null)
         {
             _toolWeights[ToolFor(_selected)] = weight; // the next one drawn matches
-            if (_selected.Weight != weight)
+            // Using the slider on text sized by dragging a box switches it back to slider sizes.
+            if (_selected.Weight != weight || _selected is TextAnnotation { FontSizeOverride: not null })
             {
                 _selected.Weight = weight;
+                if (_selected is TextAnnotation text)
+                    text.FontSizeOverride = null;
                 Commit(coalesceKey: ("weight", _selected));
             }
         }
@@ -418,10 +459,17 @@ public sealed partial class EditorWindow : Window
             ds.FillRectangle(_document.Bounds, _checkerBrush);
 
         _document.Render(ds, skip: _editingText);
-        _editingText?.Draw(ds, outlineOnly: true); // the text box draws the fill on top
+        _editingText?.Draw(ds, chromeOnly: true); // the text box draws the letters on top
 
         if (_selected is not null && _selected != _editingText)
             DrawSelection(ds, _selected);
+
+        if (_textDrag is not null)
+        {
+            float px = 1 / _view.M11;
+            using var dashed = new CanvasStrokeStyle { DashStyle = CanvasDashStyle.Dash };
+            ds.DrawRectangle(new Windows.Foundation.Rect(_textDrag.Start.ToPoint(), _textDrag.End.ToPoint()), AccentColor, 1.5f * px, dashed);
+        }
     }
 
     private void DrawSelection(CanvasDrawingSession ds, Annotation annotation)
@@ -488,7 +536,7 @@ public sealed partial class EditorWindow : Window
         {
             StartDrag(e, _selected, handle, creating: false, p);
         }
-        else if (_document.HitTest(p, tolerance, includeAreaEffects: _tool is Tool.Select or Tool.Blur or Tool.Spotlight) is Annotation hit)
+        else if (_document.HitTest(p, tolerance, GrabsAreaEffects) is Annotation hit)
         {
             // Clicking an existing object grabs it, whichever tool is active.
             Select(hit);
@@ -514,12 +562,10 @@ public sealed partial class EditorWindow : Window
         int weight = _toolWeights[_tool];
         if (_tool == Tool.Text)
         {
-            var text = new TextAnnotation(p, _color, weight, Unit);
-            // Put the click at the middle of the first line, where the caret appears.
-            text.Position -= new Vector2(0, text.FontSize * 0.65f);
-            _document.Annotations.Add(text);
-            Select(text);
-            BeginTextEdit(text, isNew: true);
+            // Text is created on release: a click places it at the default size, while a
+            // dragged box sets the size and wrapping width.
+            _textDrag = new TextDrag(e.Pointer.PointerId, p) { End = p };
+            CanvasHost.CapturePointer(e.Pointer);
             return;
         }
 
@@ -546,6 +592,34 @@ public sealed partial class EditorWindow : Window
         StartDrag(e, shape, TwoPointAnnotation.EndHandle, creating: true, p);
     }
 
+    private void CreateText(TextDrag drag)
+    {
+        var text = new TextAnnotation(drag.Start, _color, _toolWeights[Tool.Text], Unit) { Boxed = _textBoxed };
+        var box = new Windows.Foundation.Rect(drag.Start.ToPoint(), drag.End.ToPoint());
+        float minBox = 12 / _view.M11; // a few screen pixels of wobble still counts as a click
+
+        if (box.Width >= minBox && box.Height >= minBox)
+        {
+            // Size the font so one line fills the box's height, including the background
+            // box's padding when there is one, and wrap at its width.
+            float lineRatio = TextAnnotation.LineHeightRatio + (text.Boxed ? 0.3f : 0);
+            float size = Math.Clamp((float)box.Height / lineRatio, 6 * Unit, 400 * Unit);
+            text.FontSizeOverride = size;
+            var pad = text.Boxed ? new Vector2(size * 0.35f, size * 0.15f) : Vector2.Zero;
+            text.Position = new Vector2((float)box.X, (float)box.Y) + pad;
+            text.WrapWidth = Math.Max(size, (float)box.Width - pad.X * 2);
+        }
+        else
+        {
+            // Put the click at the middle of the first line, where the caret appears.
+            text.Position -= new Vector2(0, text.FontSize * 0.65f);
+        }
+
+        _document.Annotations.Add(text);
+        Select(text);
+        BeginTextEdit(text, isNew: true);
+    }
+
     private int? HitHandle(Annotation annotation, Vector2 p)
     {
         float reach = (HandleRadius + HitTolerance) / _view.M11;
@@ -567,10 +641,22 @@ public sealed partial class EditorWindow : Window
 
     private void Canvas_PointerMoved(object sender, PointerRoutedEventArgs e)
     {
-        if (_drag is null || e.Pointer.PointerId != _drag.PointerId)
-            return;
-
         var p = ToDocument(e.GetCurrentPoint(Canvas).Position.ToVector2());
+
+        if (_textDrag is not null && e.Pointer.PointerId == _textDrag.PointerId)
+        {
+            _textDrag.End = p;
+            Canvas.Invalidate();
+            e.Handled = true;
+            return;
+        }
+
+        if (_drag is null || e.Pointer.PointerId != _drag.PointerId)
+        {
+            UpdateCursor(p);
+            return;
+        }
+
         if (_drag.Handle >= 0)
             _drag.Target.MoveHandle(_drag.Handle, p);
         else
@@ -584,6 +670,16 @@ public sealed partial class EditorWindow : Window
 
     private void Canvas_PointerReleased(object sender, PointerRoutedEventArgs e)
     {
+        if (_textDrag is not null && e.Pointer.PointerId == _textDrag.PointerId)
+        {
+            var drag = _textDrag;
+            _textDrag = null;
+            CanvasHost.ReleasePointerCapture(e.Pointer);
+            CreateText(drag);
+            e.Handled = true;
+            return;
+        }
+
         if (_drag is null || e.Pointer.PointerId != _drag.PointerId)
             return;
 
@@ -616,6 +712,41 @@ public sealed partial class EditorWindow : Window
         }
     }
 
+    // ---- Cursor ------------------------------------------------------------------------
+
+    private readonly InputCursor _arrowCursor = InputSystemCursor.Create(InputSystemCursorShape.Arrow);
+    private readonly InputCursor _crossCursor = InputSystemCursor.Create(InputSystemCursorShape.Cross);
+    private readonly InputCursor _textCursor = InputSystemCursor.Create(InputSystemCursorShape.IBeam);
+    private readonly InputCursor _moveCursor = InputSystemCursor.Create(InputSystemCursorShape.SizeAll);
+    private readonly InputCursor _handleCursor = InputSystemCursor.Create(InputSystemCursorShape.Hand);
+
+    /// <summary>Blur and spotlight can only be grabbed with Select or their own tool.</summary>
+    private bool GrabsAreaEffects => _tool is Tool.Select or Tool.Blur or Tool.Spotlight;
+
+    /// <summary>
+    /// Crosshair for drawing tools, I-beam for text, arrow for select; over something that
+    /// can be grabbed, a move cursor (or a hand over a resize handle).
+    /// </summary>
+    /// <param name="point">The pointer in document space, or null if unknown.</param>
+    private void UpdateCursor(Vector2? point)
+    {
+        var cursor = _tool switch
+        {
+            Tool.Select => _arrowCursor,
+            Tool.Text => _textCursor,
+            _ => _crossCursor,
+        };
+
+        if (point is Vector2 p)
+        {
+            if (_selected is not null && HitHandle(_selected, p) is not null)
+                cursor = _handleCursor;
+            else if (_document.HitTest(p, HitTolerance / _view.M11, GrabsAreaEffects) is Annotation hit)
+                cursor = hit is TextAnnotation && _tool == Tool.Text ? _textCursor : _moveCursor;
+        }
+        CanvasHost.Cursor = cursor;
+    }
+
     // ---- Inline text editing -----------------------------------------------------------
 
     private void BeginTextEdit(TextAnnotation text, bool isNew)
@@ -626,7 +757,7 @@ public sealed partial class EditorWindow : Window
         _textBeforeEdit = text.Text;
 
         float scale = _view.M11;
-        var color = new SolidColorBrush(text.Color);
+        var color = new SolidColorBrush(text.TextColor);
         var clear = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
         var box = new TextBox
         {
@@ -640,6 +771,11 @@ public sealed partial class EditorWindow : Window
             MinWidth = 24,
             MinHeight = 0,
         };
+        if (text.WrapWidth is float wrap)
+        {
+            box.Width = wrap * scale;
+            box.TextWrapping = TextWrapping.Wrap;
+        }
         // Strip the default chrome in every visual state so it reads as text on the canvas.
         foreach (string state in new[] { "", "PointerOver", "Focused", "Disabled" })
         {
@@ -798,20 +934,20 @@ public sealed partial class EditorWindow : Window
             s_backdropPadding = e.NewValue;
             ApplyBackdrop();
         };
-        BeautifyButton.IsChecked = s_beautify;
+        BeautifyButton.IsChecked = false;
         ApplyBackdrop();
     }
 
     private void BeautifyButton_IsCheckedChanged(ToggleSplitButton sender, ToggleSplitButtonIsCheckedChangedEventArgs args)
     {
-        s_beautify = sender.IsChecked;
+        _beautify = sender.IsChecked;
         ApplyBackdrop();
     }
 
     private void ApplyBackdrop()
     {
         var (_, from, to) = BackdropPresets.All[s_backdropPreset];
-        _document.Backdrop = s_beautify ? new Backdrop(from, to, (float)s_backdropPadding) : null;
+        _document.Backdrop = _beautify ? new Backdrop(from, to, (float)s_backdropPadding) : null;
         for (int i = 0; i < _backdropSwatches.Count; i++)
             _backdropSwatches[i].BorderThickness = new Thickness(i == s_backdropPreset ? 2 : 0);
         Canvas.Invalidate();

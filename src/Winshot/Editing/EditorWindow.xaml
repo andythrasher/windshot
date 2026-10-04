@@ -4,6 +4,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:canvas="using:Microsoft.Graphics.Canvas.UI.Xaml"
+    xmlns:local="using:Winshot.Editing"
     Title="Winshot">
 
     <Window.SystemBackdrop>
@@ -27,6 +28,9 @@
                     <Setter Property="Width" Value="44" />
                 </Style>
             </CommandBar.Resources>
+            <AppBarButton Icon="Save" Label="Save" Click="Save_Click" ToolTipService.ToolTip="Save (Ctrl+S)" />
+            <AppBarButton Icon="Copy" Label="Copy" Click="Copy_Click" ToolTipService.ToolTip="Copy image (Ctrl+C)" />
+            <AppBarSeparator />
             <AppBarButton x:Name="UndoButton" Icon="Undo" Click="Undo_Click" IsEnabled="False" ToolTipService.ToolTip="Undo (Ctrl+Z)" />
             <AppBarButton x:Name="RedoButton" Icon="Redo" Click="Redo_Click" IsEnabled="False" ToolTipService.ToolTip="Redo (Ctrl+Y)" />
             <AppBarSeparator />
@@ -80,6 +84,17 @@
                 ToolTipService.ToolTip="Pixelate (P). Safer than a smooth blur for hiding text.">
                 <AppBarToggleButton.Icon>
                     <FontIcon Glyph="&#xF0E2;" />
+                </AppBarToggleButton.Icon>
+            </AppBarToggleButton>
+            <AppBarToggleButton
+                x:Name="TextBackgroundButton"
+                Label="Text background"
+                Visibility="Collapsed"
+                Click="TextBackgroundButton_Click"
+                ToolTipService.ToolTip="Text background: set the text on a box of the current color">
+                <AppBarToggleButton.Icon>
+                    <!-- A filled box with a "T" cut out of it. -->
+                    <PathIcon Data="F0 M1,2.5 H15 V13.5 H1 Z M5,5 H11 V6.5 H8.75 V11 H7.25 V6.5 H5 Z" />
                 </AppBarToggleButton.Icon>
             </AppBarToggleButton>
             <AppBarElementContainer VerticalContentAlignment="Center" ToolTipService.ToolTip="Size ([ and ])">
@@ -145,12 +160,10 @@
                     <PathIcon Data="M1,1 H5 V2 H2 V5 H1 Z M11,1 H15 V5 H14 V2 H11 Z M1,11 H2 V14 H5 V15 H1 Z M14,11 H15 V15 H11 V14 H14 Z M4,4.6 H12 V5.8 H4 Z M4,7.4 H12 V8.6 H4 Z M4,10.2 H9.5 V11.4 H4 Z" />
                 </AppBarButton.Icon>
             </AppBarButton>
-            <AppBarButton Icon="Copy" Label="Copy" Click="Copy_Click" ToolTipService.ToolTip="Copy image (Ctrl+C)" />
-            <AppBarButton Icon="Save" Label="Save" Click="Save_Click" ToolTipService.ToolTip="Save (Ctrl+S)" />
         </CommandBar>
 
         <!-- Transparent background makes the whole area hit-testable, not just drawn pixels. -->
-        <Grid
+        <local:CursorHost
             x:Name="CanvasHost"
             Grid.Row="1"
             Background="Transparent"
@@ -165,6 +178,6 @@
                 Draw="Canvas_Draw" />
             <!-- Hosts the inline text box while a text annotation is being typed. -->
             <Canvas x:Name="TextLayer" />
-        </Grid>
+        </local:CursorHost>
     </Grid>
 </Window>
