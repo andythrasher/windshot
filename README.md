@@ -80,8 +80,14 @@ put across restarts (and crashes) until you close them; they're kept in
 
 ## Settings
 
-`%LOCALAPPDATA%\Windshot\settings.json` (tray menu → Settings…). Hand-editable; comments and
-trailing commas are fine, and changes apply when you save, with no restart needed.
+Tray menu → **Settings…** (or `Windshot.exe --settings`) opens the settings window: click a
+shortcut and press new keys to change it (Esc cancels, Backspace turns it off; shortcuts need
+Ctrl, Alt or Win unless they're a function key or Print Screen, and ones already taken are
+refused), plus Start with Windows, the magnifier, closing after copy or save, and Beautify.
+Changes apply immediately.
+
+Everything is stored in `%LOCALAPPDATA%\Windshot\settings.json` (linked from the window), which is
+also hand-editable; comments and trailing commas are fine, and changes apply when you save.
 
 - `Hotkeys`: `Capture`, `CopyText` and `ScrollingCapture`, written like `"Ctrl+Shift+2"`, `"Alt+S"` or `"PrintScreen"`
   (for Print Screen, first turn off "Use the Print screen key to open screen capture" in

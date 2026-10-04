@@ -51,7 +51,12 @@ internal sealed class TrayIcon : IDisposable
         _captureItem.ShortcutKeyDisplayString = capture ?? "unavailable";
         _copyTextItem.ShortcutKeyDisplayString = copyText ?? "unavailable";
         _scrollingItem.ShortcutKeyDisplayString = scrolling ?? "unavailable";
-        _icon.Text = capture is null ? "Windshot (capture hotkey unavailable)" : $"Windshot - {capture}";
+        _icon.Text = capture switch
+        {
+            null => "Windshot (capture hotkey unavailable)",
+            "" => "Windshot",
+            _ => $"Windshot - {capture}",
+        };
     }
 
     /// <summary>The app icon at the tray's size for this DPI (e.g. 24 px at 150%), so it stays crisp.</summary>

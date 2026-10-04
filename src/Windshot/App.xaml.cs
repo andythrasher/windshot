@@ -13,6 +13,9 @@ namespace Windshot;
 public partial class App : Application
 {
     private static EventWaitHandle? _captureSignal;
+    private static EventWaitHandle? _settingsSignal;
+    /// <summary>Opens the settings window; in a second launch, asks the running copy to.</summary>
+    private const string SettingsArgument = "--settings";
     private HotkeyWindow? _hotkeys;
     private TrayIcon? _tray;
 
@@ -26,11 +29,15 @@ public partial class App : Application
     {
         // Single instance: launching again just asks the running instance to capture,
         // so a pinned taskbar icon or a shortcut works as a capture button.
+        var commandLine = Environment.GetCommandLineArgs();
         _captureSignal = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\Windshot.Capture", out bool isFirstInstance);
+        _settingsSignal = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\Windshot.Settings");
         if (!isFirstInstance)
         {
+            if (commandLine.Contains(SettingsArgument))
+                _settingsSignal.Set();
             // Launched at sign-in while already running: nothing to do (and no surprise capture).
-            if (!Environment.GetCommandLineArgs().Contains(Shell.Autostart.Argument))
+            else if (!commandLine.Contains(Shell.Autostart.Argument))
                 _captureSignal.Set();
             Exit();
             return;
@@ -39,6 +46,8 @@ public partial class App : Application
         var dispatcher = DispatcherQueue.GetForCurrentThread();
         ThreadPool.RegisterWaitForSingleObject(_captureSignal,
             (_, _) => dispatcher.TryEnqueue(StartCapture), null, Timeout.Infinite, executeOnlyOnce: false);
+        ThreadPool.RegisterWaitForSingleObject(_settingsSignal,
+            (_, _) => dispatcher.TryEnqueue(OpenSettings), null, Timeout.Infinite, executeOnlyOnce: false);
 
         // Stay alive with zero windows open; we only exit from the tray menu.
         DispatcherShutdownMode = DispatcherShutdownMode.OnExplicitShutdown;
@@ -46,27 +55,39 @@ public partial class App : Application
         Settings.Load();
         _hotkeys = new HotkeyWindow();
         _tray = new TrayIcon(StartCapture, StartTextCapture, StartScrollingCapture, OpenSettings, Quit);
-        string hotkeys = ApplyHotkeys();
+        string hotkeys = ApplyHotkeys().Summary;
         WatchSettingsFile(dispatcher);
         int pins = PinStore.RestoreAll(OpenEditor);
         Autostart.Repair();
         bool atSignIn = Environment.GetCommandLineArgs().Contains(Autostart.Argument);
         Log.Write($"Started{(atSignIn ? " at sign-in" : "")}; {hotkeys}" + (pins > 0 ? $"; restored {pins} pins" : ""));
+        if (commandLine.Contains(SettingsArgument))
+            OpenSettings();
     }
 
+    /// <summary>Which shortcuts registered. An empty shortcut is off, which isn't a failure.</summary>
+    internal sealed record HotkeyStatus(bool Capture, bool CopyText, bool ScrollingCapture, string Summary);
+
+    internal static App Instance => (App)Current;
+
     /// <summary>(Re)registers the hotkeys from settings and shows them in the tray menu.</summary>
-    /// <returns>A summary for the log.</returns>
-    private string ApplyHotkeys()
+    internal HotkeyStatus ApplyHotkeys()
     {
         var keys = Settings.Current.Hotkeys;
         _hotkeys!.UnregisterAll();
-        string? capture = _hotkeys.TryRegister(keys.Capture, StartCapture) ? keys.Capture : null;
-        string? copyText = _hotkeys.TryRegister(keys.CopyText, StartTextCapture) ? keys.CopyText : null;
-        string? scrolling = _hotkeys.TryRegister(keys.ScrollingCapture, StartScrollingCapture) ? keys.ScrollingCapture : null;
-        _tray!.SetShortcuts(capture, copyText, scrolling);
-        return $"hotkeys capture={capture ?? $"'{keys.Capture}' unavailable"} text={copyText ?? $"'{keys.CopyText}' unavailable"}"
-            + $" scrolling={scrolling ?? $"'{keys.ScrollingCapture}' unavailable"}";
+        bool Register(string shortcut, Action action) => string.IsNullOrWhiteSpace(shortcut) || _hotkeys.TryRegister(shortcut, action);
+        bool capture = Register(keys.Capture, StartCapture);
+        bool copyText = Register(keys.CopyText, StartTextCapture);
+        bool scrolling = Register(keys.ScrollingCapture, StartScrollingCapture);
+        string? Label(string shortcut, bool ok) => ok ? shortcut : null;
+        _tray!.SetShortcuts(Label(keys.Capture, capture), Label(keys.CopyText, copyText), Label(keys.ScrollingCapture, scrolling));
+        string Describe(string shortcut, bool ok) => ok ? (shortcut is "" ? "off" : shortcut) : $"'{shortcut}' unavailable";
+        return new HotkeyStatus(capture, copyText, scrolling,
+            $"hotkeys capture={Describe(keys.Capture, capture)} text={Describe(keys.CopyText, copyText)} scrolling={Describe(keys.ScrollingCapture, scrolling)}");
     }
+
+    /// <summary>Lets go of every hotkey, so the settings window can record any combination (call ApplyHotkeys after).</summary>
+    internal void SuspendHotkeys() => _hotkeys!.UnregisterAll();
 
     private FileSystemWatcher? _settingsWatcher;
     private DispatcherQueueTimer? _settingsReload;
@@ -105,12 +126,16 @@ public partial class App : Application
         Settings.Load();
         var after = Settings.Current.Hotkeys;
         if (before.Capture != after.Capture || before.CopyText != after.CopyText || before.ScrollingCapture != after.ScrollingCapture)
-            Log.Write($"Settings reloaded; {ApplyHotkeys()}");
+            Log.Write($"Settings reloaded; {ApplyHotkeys().Summary}");
         else
             Log.Write("Settings reloaded");
+        SettingsWindow.Refresh(); // show the hand edit if the window is open
     }
 
-    private static void OpenSettings()
+    private static void OpenSettings() => SettingsWindow.ShowOrActivate();
+
+    /// <summary>Opens settings.json in the default editor (Notepad if .json has none), for anything the window doesn't cover.</summary>
+    internal static void OpenSettingsFile()
     {
         if (!File.Exists(Settings.FilePath))
             Settings.Save();

@@ -17,6 +17,10 @@ internal static class Autostart
 
     private static string Command => $"\"{Environment.ProcessPath}\" {Argument}";
 
+    /// <summary>The exe in a Run command like <c>"C:\path\Windshot.exe" --autostart</c>.</summary>
+    private static string ExePath(string command) =>
+        command.StartsWith('"') && command.IndexOf('"', 1) is int end and > 0 ? command[1..end] : command.Split(' ')[0];
+
     /// <summary>On, and not switched off in Task Manager or Settings.</summary>
     public static bool IsEnabled
     {
@@ -51,13 +55,17 @@ internal static class Autostart
         }
     }
 
-    /// <summary>If it's on but points at another copy of the exe (a moved or rebuilt app), point it here.</summary>
+    /// <summary>
+    /// If it's on but its exe is gone (the app was moved or deleted), point it here. An entry
+    /// for another copy that still exists is left alone, so running a dev build doesn't take
+    /// over from the installed one.
+    /// </summary>
     public static void Repair()
     {
         try
         {
             using var run = Registry.CurrentUser.OpenSubKey(RunKey, writable: true);
-            if (run?.GetValue(Name) is string command && command != Command)
+            if (run?.GetValue(Name) is string command && command != Command && !File.Exists(ExePath(command)))
             {
                 run.SetValue(Name, Command);
                 Log.Write($"Start with Windows now points at {Environment.ProcessPath}");

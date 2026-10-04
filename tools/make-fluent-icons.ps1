@@ -14,7 +14,7 @@ $icons = @(
     'save', 'copy', 'arrow_undo', 'arrow_redo',
     'cursor', 'arrow_up_right', 'rectangle_landscape', 'text_t', 'blur',
     'number_circle_1', 'highlight', 'flashlight',
-    'crop', 'grid_dots', 'color_background', 'sparkle', 'pin', 'scan_text'
+    'crop', 'arrow_reset', 'grid_dots', 'color_background', 'sparkle', 'pin', 'scan_text'
 )
 
 New-Item -ItemType Directory -Force $FontDir | Out-Null
