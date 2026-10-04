@@ -28,75 +28,34 @@
                     <Setter Property="Width" Value="44" />
                 </Style>
             </CommandBar.Resources>
-            <AppBarButton Icon="Save" Label="Save" Click="Save_Click" ToolTipService.ToolTip="Save (Ctrl+S)" />
-            <AppBarButton Icon="Copy" Label="Copy" Click="Copy_Click" ToolTipService.ToolTip="Copy image (Ctrl+C)" />
+            <!-- Icons are Fluent System Icons, assigned in code (see InitializeIcons). -->
+            <AppBarButton x:Name="SaveButton" Label="Save" Click="Save_Click" ToolTipService.ToolTip="Save (Ctrl+S)" />
+            <AppBarButton x:Name="CopyButton" Label="Copy" Click="Copy_Click" ToolTipService.ToolTip="Copy image (Ctrl+C)" />
             <AppBarSeparator />
-            <AppBarButton x:Name="UndoButton" Icon="Undo" Click="Undo_Click" IsEnabled="False" ToolTipService.ToolTip="Undo (Ctrl+Z)" />
-            <AppBarButton x:Name="RedoButton" Icon="Redo" Click="Redo_Click" IsEnabled="False" ToolTipService.ToolTip="Redo (Ctrl+Y)" />
+            <AppBarButton x:Name="UndoButton" Label="Undo" Click="Undo_Click" IsEnabled="False" ToolTipService.ToolTip="Undo (Ctrl+Z)" />
+            <AppBarButton x:Name="RedoButton" Label="Redo" Click="Redo_Click" IsEnabled="False" ToolTipService.ToolTip="Redo (Ctrl+Y)" />
             <AppBarSeparator />
-            <AppBarToggleButton x:Name="SelectButton" Label="Select" Click="ToolButton_Click" Tag="Select" ToolTipService.ToolTip="Select (V)">
-                <AppBarToggleButton.Icon>
-                    <FontIcon Glyph="&#xE7C9;" />
-                </AppBarToggleButton.Icon>
-            </AppBarToggleButton>
-            <AppBarToggleButton x:Name="ArrowButton" Label="Arrow" Click="ToolButton_Click" Tag="Arrow" ToolTipService.ToolTip="Arrow (A)">
-                <AppBarToggleButton.Icon>
-                    <FontIcon Glyph="&#xE72A;" />
-                </AppBarToggleButton.Icon>
-            </AppBarToggleButton>
-            <AppBarToggleButton x:Name="RectangleButton" Label="Rectangle" Click="ToolButton_Click" Tag="Rectangle" ToolTipService.ToolTip="Rectangle (R)">
-                <AppBarToggleButton.Icon>
-                    <FontIcon Glyph="&#xE739;" />
-                </AppBarToggleButton.Icon>
-            </AppBarToggleButton>
-            <AppBarToggleButton x:Name="TextButton" Label="Text" Click="ToolButton_Click" Tag="Text" ToolTipService.ToolTip="Text (T)">
-                <AppBarToggleButton.Icon>
-                    <FontIcon Glyph="&#xE8D2;" />
-                </AppBarToggleButton.Icon>
-            </AppBarToggleButton>
-            <AppBarToggleButton x:Name="BlurButton" Label="Blur" Click="ToolButton_Click" Tag="Blur" ToolTipService.ToolTip="Blur (B)">
-                <AppBarToggleButton.Icon>
-                    <FontIcon Glyph="&#xE8B9;" />
-                </AppBarToggleButton.Icon>
-            </AppBarToggleButton>
-            <AppBarToggleButton Label="Step" Click="ToolButton_Click" Tag="Step" ToolTipService.ToolTip="Numbered step (N)">
-                <AppBarToggleButton.Icon>
-                    <!-- A "1" inside a ring (even-odd fill makes the ring). -->
-                    <PathIcon Data="F0 M8,0.5 A7.5,7.5 0 1 1 8,15.5 A7.5,7.5 0 1 1 8,0.5 Z M8,1.9 A6.1,6.1 0 1 0 8,14.1 A6.1,6.1 0 1 0 8,1.9 Z M7.3,4.3 L8.7,4.3 L8.7,11.7 L7.3,11.7 Z M7.3,4.3 L5.4,5.9 L5.4,7.3 L7.3,5.8 Z" />
-                </AppBarToggleButton.Icon>
-            </AppBarToggleButton>
-            <AppBarToggleButton Label="Highlighter" Click="ToolButton_Click" Tag="Highlighter" ToolTipService.ToolTip="Highlighter (H)">
-                <AppBarToggleButton.Icon>
-                    <FontIcon Glyph="&#xE7E6;" />
-                </AppBarToggleButton.Icon>
-            </AppBarToggleButton>
-            <AppBarToggleButton Label="Spotlight" Click="ToolButton_Click" Tag="Spotlight" ToolTipService.ToolTip="Spotlight (S)">
-                <AppBarToggleButton.Icon>
-                    <FontIcon Glyph="&#xE706;" />
-                </AppBarToggleButton.Icon>
-            </AppBarToggleButton>
+            <AppBarToggleButton Label="Select" Click="ToolButton_Click" Tag="Select" ToolTipService.ToolTip="Select (V)" />
+            <AppBarToggleButton Label="Arrow" Click="ToolButton_Click" Tag="Arrow" ToolTipService.ToolTip="Arrow (A)" />
+            <AppBarToggleButton Label="Rectangle" Click="ToolButton_Click" Tag="Rectangle" ToolTipService.ToolTip="Rectangle (R)" />
+            <AppBarToggleButton Label="Text" Click="ToolButton_Click" Tag="Text" ToolTipService.ToolTip="Text (T)" />
+            <AppBarToggleButton Label="Blur" Click="ToolButton_Click" Tag="Blur" ToolTipService.ToolTip="Blur (B)" />
+            <AppBarToggleButton Label="Step" Click="ToolButton_Click" Tag="Step" ToolTipService.ToolTip="Numbered step (N)" />
+            <AppBarToggleButton Label="Highlighter" Click="ToolButton_Click" Tag="Highlighter" ToolTipService.ToolTip="Highlighter (H)" />
+            <AppBarToggleButton Label="Spotlight" Click="ToolButton_Click" Tag="Spotlight" ToolTipService.ToolTip="Spotlight (S)" />
             <AppBarSeparator />
             <AppBarToggleButton
                 x:Name="PixelateButton"
                 Label="Pixelate"
                 Visibility="Collapsed"
                 Click="PixelateButton_Click"
-                ToolTipService.ToolTip="Pixelate (P). Safer than a smooth blur for hiding text.">
-                <AppBarToggleButton.Icon>
-                    <FontIcon Glyph="&#xF0E2;" />
-                </AppBarToggleButton.Icon>
-            </AppBarToggleButton>
+                ToolTipService.ToolTip="Pixelate (P). Safer than a smooth blur for hiding text." />
             <AppBarToggleButton
                 x:Name="TextBackgroundButton"
                 Label="Text background"
                 Visibility="Collapsed"
                 Click="TextBackgroundButton_Click"
-                ToolTipService.ToolTip="Text background: set the text on a box of the current color">
-                <AppBarToggleButton.Icon>
-                    <!-- A filled box with a "T" cut out of it. -->
-                    <PathIcon Data="F0 M1,2.5 H15 V13.5 H1 Z M5,5 H11 V6.5 H8.75 V11 H7.25 V6.5 H5 Z" />
-                </AppBarToggleButton.Icon>
-            </AppBarToggleButton>
+                ToolTipService.ToolTip="Text background: set the text on a box of the current color" />
             <AppBarElementContainer VerticalContentAlignment="Center" ToolTipService.ToolTip="Size ([ and ])">
                 <StackPanel Orientation="Horizontal" Spacing="8" Margin="12,0">
                     <TextBlock Text="Size" VerticalAlignment="Center" />
@@ -139,7 +98,6 @@
                     BorderThickness="0"
                     IsCheckedChanged="BeautifyButton_IsCheckedChanged"
                     ToolTipService.ToolTip="Beautify: gradient backdrop, rounded corners and shadow">
-                    <FontIcon FontSize="16" Glyph="&#xE790;" />
                     <ToggleSplitButton.Flyout>
                         <Flyout Placement="Bottom">
                             <StackPanel Width="236" Spacing="8">
@@ -153,13 +111,8 @@
                 </ToggleSplitButton>
             </AppBarElementContainer>
             <AppBarSeparator />
-            <AppBarButton Icon="Pin" Label="Pin" Click="Pin_Click" ToolTipService.ToolTip="Pin to screen (Ctrl+P)" />
-            <AppBarButton Label="Copy text" Click="CopyText_Click" ToolTipService.ToolTip="Copy text (Ctrl+Shift+C)">
-                <AppBarButton.Icon>
-                    <!-- Scan corners around lines of text. -->
-                    <PathIcon Data="M1,1 H5 V2 H2 V5 H1 Z M11,1 H15 V5 H14 V2 H11 Z M1,11 H2 V14 H5 V15 H1 Z M14,11 H15 V15 H11 V14 H14 Z M4,4.6 H12 V5.8 H4 Z M4,7.4 H12 V8.6 H4 Z M4,10.2 H9.5 V11.4 H4 Z" />
-                </AppBarButton.Icon>
-            </AppBarButton>
+            <AppBarButton x:Name="PinButton" Label="Pin" Click="Pin_Click" ToolTipService.ToolTip="Pin to screen (Ctrl+P)" />
+            <AppBarButton x:Name="CopyTextButton" Label="Copy text" Click="CopyText_Click" ToolTipService.ToolTip="Copy text (Ctrl+Shift+C)" />
         </CommandBar>
 
         <!-- Transparent background makes the whole area hit-testable, not just drawn pixels. -->

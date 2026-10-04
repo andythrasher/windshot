@@ -92,6 +92,7 @@ public sealed partial class EditorWindow : Window
     internal EditorWindow(CapturedImage capture)
     {
         InitializeComponent();
+        InitializeIcons();
         _document = new Document(capture);
         _desktopBounds = capture.DesktopBounds;
         _history = new History(_document);
@@ -964,7 +965,62 @@ public sealed partial class EditorWindow : Window
     private void BeautifyButton_IsCheckedChanged(ToggleSplitButton sender, ToggleSplitButtonIsCheckedChangedEventArgs args)
     {
         _beautify = sender.IsChecked;
+        sender.Content = Shell.FluentIcons.Create("sparkle", filled: sender.IsChecked);
         ApplyBackdrop();
+    }
+
+    // ---- Toolbar icons -----------------------------------------------------------------
+
+    private static readonly Dictionary<string, string> ToolIcons = new()
+    {
+        [nameof(Tool.Select)] = "cursor",
+        [nameof(Tool.Arrow)] = "arrow_up_right",
+        [nameof(Tool.Rectangle)] = "rectangle_landscape",
+        [nameof(Tool.Text)] = "text_t",
+        [nameof(Tool.Blur)] = "blur",
+        [nameof(Tool.Step)] = "number_circle_1",
+        [nameof(Tool.Highlighter)] = "highlight",
+        [nameof(Tool.Spotlight)] = "flashlight",
+    };
+
+    /// <summary>
+    /// Gives every toolbar button its Fluent icon. Like Windows 11's own toolbars, icons are
+    /// outlined normally and filled for the active tool or toggle, and while hovered.
+    /// </summary>
+    private void InitializeIcons()
+    {
+        BindIcon(SaveButton, "save");
+        BindIcon(CopyButton, "copy");
+        BindIcon(UndoButton, "arrow_undo");
+        BindIcon(RedoButton, "arrow_redo");
+        foreach (var button in Toolbar.PrimaryCommands.OfType<AppBarToggleButton>())
+        {
+            if (button.Tag is string tool && ToolIcons.TryGetValue(tool, out var icon))
+                BindIcon(button, icon);
+        }
+        BindIcon(PixelateButton, "grid_dots");
+        BindIcon(TextBackgroundButton, "color_background");
+        BindIcon(PinButton, "pin");
+        BindIcon(CopyTextButton, "scan_text");
+        BeautifyButton.Content = Shell.FluentIcons.Create("sparkle", filled: false);
+    }
+
+    private void BindIcon(AppBarButton button, string icon)
+    {
+        button.Icon = Shell.FluentIcons.Create(icon, filled: false);
+        button.PointerEntered += (_, _) => button.Icon = Shell.FluentIcons.Create(icon, filled: button.IsEnabled);
+        button.PointerExited += (_, _) => button.Icon = Shell.FluentIcons.Create(icon, filled: false);
+    }
+
+    private void BindIcon(AppBarToggleButton button, string icon)
+    {
+        bool hovered = false;
+        void Refresh() => button.Icon = Shell.FluentIcons.Create(icon, filled: hovered || button.IsChecked == true);
+        button.PointerEntered += (_, _) => { hovered = true; Refresh(); };
+        button.PointerExited += (_, _) => { hovered = false; Refresh(); };
+        button.Checked += (_, _) => Refresh();
+        button.Unchecked += (_, _) => Refresh();
+        Refresh();
     }
 
     private void ApplyBackdrop()
