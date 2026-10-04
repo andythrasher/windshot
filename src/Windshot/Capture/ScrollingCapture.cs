@@ -101,7 +101,7 @@ internal sealed class ScrollingCapture
                 {
                     long started = clock.ElapsedMilliseconds;
                     var frame = grabber.Grab();
-                    bool still = previous is not null && frame.AsSpan().SequenceEqual(previous);
+                    bool still = previous is not null && IsStill(previous, frame);
                     previous = frame;
                     var result = stitcher.Add(frame);
                     int height = stitcher.TotalHeight;
@@ -161,6 +161,21 @@ internal sealed class ScrollingCapture
         }
     }
 
+    /// <summary>
+    /// Whether the content has stopped moving: at most a few rows changed. A spinner or a
+    /// blinking caret somewhere in the area changes a few rows forever; scrolling changes nearly all.
+    /// </summary>
+    private bool IsStill(int[] previous, int[] frame)
+    {
+        int width = _area.Width, changed = 0, allowed = Math.Max(2, _area.Height / 33);
+        for (int y = 0; y < _area.Height; y++)
+        {
+            if (!frame.AsSpan(y * width, width).SequenceEqual(previous.AsSpan(y * width, width)) && ++changed > allowed)
+                return false;
+        }
+        return true;
+    }
+
     private void Finish()
     {
         if (!Stop())
@@ -168,7 +183,7 @@ internal sealed class ScrollingCapture
         if (_stitcher is null)
             return;
         var image = _stitcher.Build(_scale, _area);
-        Log.Write($"Scrolling capture finished: {image.Width} x {image.Height}");
+        Log.Write($"Scrolling capture finished: {image.Width} x {image.Height}, footer {_stitcher.Footer}");
         _onCaptured(image);
     }
 

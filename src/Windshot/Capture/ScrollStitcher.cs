@@ -43,12 +43,16 @@ internal sealed class ScrollStitcher
     private const double MaxRival = 0.7;
     /// <summary>Candidate offsets from the quick pass that get the full comparison.</summary>
     private const int Candidates = 8;
+    /// <summary>A footer row may still have this share of its pixels change.</summary>
+    private const double MostlyStayed = 0.05;
 
     private readonly int _width;
     private readonly int _height;
     private readonly int _maxHeight;
     private readonly int[] _first;
     private readonly List<int[]> _slices = new();
+    /// <summary>Per column: positive when it mostly stayed put while the content scrolled.</summary>
+    private readonly int[] _fixedVotes;
     private int[] _reference;
     /// <summary>Height of the sticky footer, once the first scroll has shown what stays put.</summary>
     private int? _footer;
@@ -61,6 +65,7 @@ internal sealed class ScrollStitcher
         _maxHeight = Math.Max(maxHeight, height);
         _first = first;
         _reference = first;
+        _fixedVotes = new int[width];
     }
 
     public int Width => _width;
@@ -71,8 +76,9 @@ internal sealed class ScrollStitcher
     public StitchResult Add(int[] frame)
     {
         var a = _reference;
-        var moving = MovingColumns(a, frame);
-        if (moving.Count == 0)
+        var moving = MovingColumns(a, frame, out int changedRows);
+        // A spinner or blinking caret changes a few rows forever; scrolling changes nearly all of them.
+        if (changedRows <= Math.Max(2, _height / 33))
             return StitchResult.Unchanged;
 
         int columns = moving.Sum(r => r.End - r.Start);
@@ -132,11 +138,12 @@ internal sealed class ScrollStitcher
         if (offset < 0)
             return StitchResult.ScrolledBack;
 
-        _footer ??= FindFooter(stayed);
+        _footer ??= FindFooter(a, frame, moving);
         footer = _footer.Value;
         body = _height - footer;
         if (offset >= body)
             return StitchResult.Lost;
+        VoteColumns(a, frame, offset, body, stayed);
 
         // The rows that scrolled into view at the bottom of the scrolling part.
         int added = Math.Min(offset, _maxHeight - TotalHeight);
@@ -164,58 +171,150 @@ internal sealed class ScrollStitcher
         return (offset, matches, rows);
     }
 
-    /// <summary>Rows at the bottom that stayed put while the content moved, up to a third of the height.</summary>
+    /// <summary>Rows at the bottom that (nearly all) stayed put while the content moved, up to a third of the height.</summary>
     /// <remarks>
     /// Erring large is harmless: rows below the cut come from the last frame, so the result
     /// still runs on continuously, and a blank stretch of content that merely looked static
     /// just arrives there instead. Erring small repeats the footer after every slice, so
-    /// there's no attempt to tell a flat-colored footer from blank content that scrolled.
+    /// there's no attempt to tell a flat-colored footer from blank content that scrolled, and
+    /// a row still counts when a little of it changed (a link preview, an animation).
     /// </remarks>
-    private int FindFooter(bool[] stayed)
+    private int FindFooter(int[] a, int[] b, List<(int Start, int End)> moving)
     {
+        int columns = moving.Sum(r => r.End - r.Start);
         int footer = 0;
-        for (int y = _height - 1; y >= _height * 2 / 3 && stayed[y]; y--)
-            footer++;
+        for (int y = _height - 1; y >= _height * 2 / 3; y--, footer++)
+        {
+            int changed = 0;
+            foreach (var (start, end) in moving)
+            {
+                for (int x = start; x < end; x++)
+                {
+                    int i = y * _width + x;
+                    if (Math.Abs(Brightness(a[i]) - Brightness(b[i])) > ChangedPixel)
+                        changed++;
+                }
+            }
+            if (changed > columns * MostlyStayed)
+                break;
+        }
         return footer;
     }
 
-    /// <summary>Everything captured so far: first frame, the new rows in order, then the footer.</summary>
+    /// <summary>
+    /// For each column, whether it moved with the content (it matches the last frame shifted)
+    /// or not (a scrollbar, a window border, a window overlapping the area), tallied over
+    /// every scroll. Columns that don't move with the content aren't repeated in each slice.
+    /// </summary>
+    /// <param name="stayed">Rows that stayed put (a header); they'd make every column look fixed.</param>
+    private void VoteColumns(int[] a, int[] b, int offset, int body, bool[] stayed)
+    {
+        for (int x = 0; x < _width; x++)
+        {
+            int shifted = 0, inPlace = 0;
+            for (int y = 0; y < body - offset; y++)
+            {
+                if (stayed[y])
+                    continue;
+                int pb = Brightness(b[y * _width + x]);
+                if (Math.Abs(pb - Brightness(a[(y + offset) * _width + x])) > ChangedPixel)
+                    shifted++;
+                if (Math.Abs(pb - Brightness(a[y * _width + x])) > ChangedPixel)
+                    inPlace++;
+            }
+            // Ties (flat columns, which look the same either way) count as moving with the content.
+            if (inPlace < shifted)
+                _fixedVotes[x]++;
+            else if (shifted < inPlace)
+                _fixedVotes[x]--;
+        }
+    }
+
+    /// <summary>Height of the footer found at the bottom, for diagnostics.</summary>
+    public int Footer => _footer ?? 0;
+
+    /// <summary>
+    /// Everything captured so far: first frame, the new rows in order, then the footer.
+    /// Columns that didn't move with the content (see <see cref="VoteColumns"/>) are laid out
+    /// differently: their top from the first frame, their bottom from the last frame, and in
+    /// between their most common color, so a scrollbar or window edge reads as one long one.
+    /// </summary>
     public CapturedImage Build(double scale, System.Drawing.Rectangle desktopBounds)
     {
         int footer = _footer ?? 0;
+        int body = _height - footer;
         int height = TotalHeight;
-        var pixels = new byte[_width * height * 4];
+        var pixels = new int[_width * height];
         int at = 0;
         void Copy(int[] source, int startRow, int rows)
         {
-            Buffer.BlockCopy(source, startRow * _width * 4, pixels, at, rows * _width * 4);
-            at += rows * _width * 4;
+            Array.Copy(source, startRow * _width, pixels, at, rows * _width);
+            at += rows * _width;
         }
 
-        Copy(_first, 0, _height - footer);
+        Copy(_first, 0, body);
         foreach (var slice in _slices)
             Copy(slice, 0, slice.Length / _width);
-        Copy(_reference, _height - footer, footer);
-        return new CapturedImage(pixels, _width, height, scale, desktopBounds, IsScrolling: true);
+        Copy(_reference, body, footer);
+
+        int added = height - _height;
+        if (added > 0)
+        {
+            // Rows of fixed columns that stay with the bottom (a scrollbar's down arrow, say).
+            int bottomPart = body / 4;
+            for (int x = 0; x < _width; x++)
+            {
+                if (_fixedVotes[x] <= 0)
+                    continue;
+                int fill = MostCommon(_first, x, 0, body);
+                for (int y = body - bottomPart; y < body - bottomPart + added; y++)
+                    pixels[y * _width + x] = fill;
+                for (int y = 0; y < bottomPart; y++)
+                    pixels[(body - bottomPart + added + y) * _width + x] = _reference[(body - bottomPart + y) * _width + x];
+            }
+        }
+
+        var bytes = new byte[pixels.Length * 4];
+        Buffer.BlockCopy(pixels, 0, bytes, 0, bytes.Length);
+        return new CapturedImage(bytes, _width, height, scale, desktopBounds, IsScrolling: true);
+    }
+
+    private int MostCommon(int[] pixels, int x, int fromRow, int toRow)
+    {
+        var counts = new Dictionary<int, int>();
+        for (int y = fromRow; y < toRow; y++)
+        {
+            int p = pixels[y * _width + x];
+            counts[p] = counts.GetValueOrDefault(p) + 1;
+        }
+        return counts.Count == 0 ? 0 : counts.MaxBy(c => c.Value).Key;
     }
 
     private static int Brightness(int p) => (p & 255) + ((p >> 8) & 255) + ((p >> 16) & 255);
 
     /// <summary>Column ranges [start, end) where something clearly changed between the two frames (not just redraw noise).</summary>
-    private List<(int Start, int End)> MovingColumns(int[] a, int[] b)
+    /// <param name="changedRows">How many rows clearly changed.</param>
+    private List<(int Start, int End)> MovingColumns(int[] a, int[] b, out int changedRows)
     {
         var moving = new bool[_width];
+        changedRows = 0;
         for (int y = 0; y < _height; y++)
         {
             var rowA = a.AsSpan(y * _width, _width);
             var rowB = b.AsSpan(y * _width, _width);
             if (rowA.SequenceEqual(rowB))
                 continue;
+            bool changed = false;
             for (int x = 0; x < _width; x++)
             {
-                if (!moving[x] && rowA[x] != rowB[x] && Math.Abs(Brightness(rowA[x]) - Brightness(rowB[x])) > ChangedPixel)
+                if (rowA[x] != rowB[x] && Math.Abs(Brightness(rowA[x]) - Brightness(rowB[x])) > ChangedPixel)
+                {
                     moving[x] = true;
+                    changed = true;
+                }
             }
+            if (changed)
+                changedRows++;
         }
 
         var ranges = new List<(int, int)>();
