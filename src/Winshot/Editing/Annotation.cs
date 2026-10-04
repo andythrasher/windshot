@@ -43,6 +43,19 @@ internal abstract class Annotation
     public virtual void MoveHandle(int index, Vector2 position)
     {
     }
+
+    /// <summary>An independent copy, used for undo snapshots.</summary>
+    public Annotation Clone()
+    {
+        var copy = (Annotation)MemberwiseClone();
+        copy.OnCloned();
+        return copy;
+    }
+
+    /// <summary>Drop anything the copy must not share with the original, such as cached GPU resources.</summary>
+    protected virtual void OnCloned()
+    {
+    }
 }
 
 /// <summary>An annotation defined by two points, created by dragging from Start to End.</summary>

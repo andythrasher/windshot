@@ -98,5 +98,12 @@ internal sealed class TextAnnotation : Annotation, IDisposable
 
     public override void MoveBy(Vector2 delta) => Position += delta;
 
+    protected override void OnCloned()
+    {
+        // The layout is rebuilt lazily; sharing it would let one copy dispose the other's.
+        _layout = null;
+        _layoutText = null;
+    }
+
     public void Dispose() => _layout?.Dispose();
 }

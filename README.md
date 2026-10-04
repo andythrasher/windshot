@@ -16,8 +16,9 @@ The app lives in the tray. **Ctrl+Shift+2** captures a region (or left-click the
 or launch the exe again while it's running).
 
 In the editor: **A** arrow, **R** rectangle, **T** text, **V** select. **[** and **]** (or the
-Size slider) change the selected object, or the next one drawn. Drag handles to reshape arrows
-and rectangles; double-click text to edit it. **Delete** removes, **Ctrl+C** copies, **Ctrl+S** saves.
+Size slider) and **1–8** (colors) change the selected object, or the next one drawn. Drag
+handles to reshape arrows and rectangles; double-click text to edit it. **Ctrl+Z** /
+**Ctrl+Y** undo and redo, **Delete** removes, **Ctrl+C** copies, **Ctrl+S** saves.
 
 Log: `%LOCALAPPDATA%\Winshot\winshot.log`.
 

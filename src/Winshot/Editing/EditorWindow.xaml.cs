@@ -36,10 +36,12 @@ public sealed partial class EditorWindow : Window
     private const float HitTolerance = 6;
     private const float HandleRadius = 5;
     private const float MinShapeSize = 3;
-    private static readonly Color DefaultColor = Color.FromArgb(255, 255, 59, 48);
     private static readonly Color AccentColor = Color.FromArgb(255, 0, 120, 212);
 
     private readonly Document _document;
+    private readonly History _history;
+    private readonly List<Microsoft.UI.Xaml.Controls.Button> _swatches = new();
+    private Color _color = Palette.Colors[0].Color;
     private readonly Dictionary<Tool, int> _toolWeights = new()
     {
         [Tool.Arrow] = 4,
@@ -58,21 +60,28 @@ public sealed partial class EditorWindow : Window
     private DragState? _drag;
     private TextAnnotation? _editingText;
     private TextBox? _textBox;
+    private bool _editingIsNew;
+    private string _textBeforeEdit = "";
 
     /// <param name="Handle">Index into <see cref="Annotation.Handles"/>, or -1 to move the whole object.</param>
     private sealed record DragState(uint PointerId, Annotation Target, int Handle, bool Creating)
     {
         public Vector2 Last { get; set; }
+
+        /// <summary>Whether anything changed; a click that only selects shouldn't add an undo step.</summary>
+        public bool Moved { get; set; }
     }
 
     internal EditorWindow(CapturedImage capture)
     {
         InitializeComponent();
         _document = new Document(capture);
+        _history = new History(_document);
 
         // Hooked up here rather than in XAML: setting Minimum during load fires ValueChanged
         // before the rest of the window exists.
         WeightSlider.ValueChanged += WeightSlider_ValueChanged;
+        BuildSwatches();
         SizeToCapture(capture);
         SetTool(Tool.Arrow);
         Closed += (_, _) => _document.Dispose();
@@ -124,7 +133,10 @@ public sealed partial class EditorWindow : Window
     private void Select(Annotation? annotation)
     {
         _selected = annotation;
+        if (annotation is not null)
+            _color = annotation.Color; // picking up an object's color makes it easy to match
         SyncSlider();
+        SyncColor();
         Canvas.Invalidate();
     }
 
@@ -148,13 +160,16 @@ public sealed partial class EditorWindow : Window
 
     private void SetWeight(int weight)
     {
+        CommitTextEdit();
         weight = Math.Clamp(weight, Annotation.MinWeight, Annotation.MaxWeight);
         if (_selected is not null)
         {
-            _selected.Weight = weight;
             _toolWeights[ToolFor(_selected)] = weight; // the next one drawn matches
-            if (_selected == _editingText && _textBox is not null)
-                _textBox.FontSize = _editingText.FontSize * _view.M11;
+            if (_selected.Weight != weight)
+            {
+                _selected.Weight = weight;
+                Commit(coalesceKey: ("weight", _selected));
+            }
         }
         else if (_toolWeights.ContainsKey(_tool))
         {
@@ -162,6 +177,84 @@ public sealed partial class EditorWindow : Window
         }
         SyncSlider();
         Canvas.Invalidate();
+    }
+
+    // ---- Color -------------------------------------------------------------------------
+
+    private void BuildSwatches()
+    {
+        for (int i = 0; i < Palette.Colors.Length; i++)
+        {
+            var (name, color) = Palette.Colors[i];
+            var swatch = new Microsoft.UI.Xaml.Controls.Button
+            {
+                Width = 28,
+                Height = 28,
+                Padding = new Thickness(0),
+                CornerRadius = new CornerRadius(14),
+                Background = new SolidColorBrush(color),
+                BorderBrush = (Brush)Application.Current.Resources["TextFillColorPrimaryBrush"],
+            };
+            // Keep the swatch's color on hover and press instead of the default button tint.
+            swatch.Resources["ButtonBackgroundPointerOver"] = swatch.Background;
+            swatch.Resources["ButtonBackgroundPressed"] = swatch.Background;
+            ToolTipService.SetToolTip(swatch, $"{name} ({i + 1})");
+            swatch.Click += (_, _) =>
+            {
+                SetColor(color);
+                ColorFlyout.Hide();
+            };
+            _swatches.Add(swatch);
+            SwatchPanel.Children.Add(swatch);
+        }
+        SyncColor();
+    }
+
+    private void SetColor(Color color)
+    {
+        CommitTextEdit();
+        _color = color;
+        if (_selected is not null && _selected.Color != color)
+        {
+            _selected.Color = color;
+            Commit(coalesceKey: ("color", _selected));
+        }
+        SyncColor();
+        Canvas.Invalidate();
+    }
+
+    private void SyncColor()
+    {
+        ColorSwatch.Fill = new SolidColorBrush(_color);
+        for (int i = 0; i < _swatches.Count; i++)
+            _swatches[i].BorderThickness = new Thickness(Palette.Colors[i].Color == _color ? 3 : 1);
+    }
+
+    // ---- Undo / redo -------------------------------------------------------------------
+
+    private void Commit(object? coalesceKey = null)
+    {
+        _history.Commit(_document, coalesceKey);
+        SyncHistoryButtons();
+    }
+
+    private void Undo_Click(object sender, RoutedEventArgs e) => StepHistory(undo: true);
+    private void Redo_Click(object sender, RoutedEventArgs e) => StepHistory(undo: false);
+
+    private void StepHistory(bool undo)
+    {
+        if (_drag is not null)
+            return;
+        CommitTextEdit();
+        if (undo ? _history.Undo(_document) : _history.Redo(_document))
+            Select(null); // the restored objects are copies; the old selection no longer exists
+        SyncHistoryButtons();
+    }
+
+    private void SyncHistoryButtons()
+    {
+        UndoButton.IsEnabled = _history.CanUndo;
+        RedoButton.IsEnabled = _history.CanRedo;
     }
 
     // ---- Keyboard ----------------------------------------------------------------------
@@ -173,9 +266,20 @@ public sealed partial class EditorWindow : Window
             return;
 
         bool ctrl = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control).HasFlag(CoreVirtualKeyStates.Down);
+        bool shift = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(CoreVirtualKeyStates.Down);
+        int colorIndex = e.Key switch
+        {
+            >= VirtualKey.Number1 and <= VirtualKey.Number8 => e.Key - VirtualKey.Number1,
+            >= VirtualKey.NumberPad1 and <= VirtualKey.NumberPad8 => e.Key - VirtualKey.NumberPad1,
+            _ => -1,
+        };
+
         bool handled = true;
         switch (e.Key)
         {
+            case VirtualKey.Z when ctrl: StepHistory(undo: !shift); break;
+            case VirtualKey.Y when ctrl: StepHistory(undo: false); break;
+            case var _ when colorIndex >= 0 && !ctrl: SetColor(Palette.Colors[colorIndex].Color); break;
             case VirtualKey.C when ctrl: Copy_Click(this, new RoutedEventArgs()); break;
             case VirtualKey.S when ctrl: Save_Click(this, new RoutedEventArgs()); break;
             case VirtualKey.V when !ctrl: SetTool(Tool.Select); break;
@@ -188,6 +292,7 @@ public sealed partial class EditorWindow : Window
                 _document.Annotations.Remove(_selected);
                 (_selected as IDisposable)?.Dispose();
                 Select(null);
+                Commit();
                 break;
             case VirtualKey.Escape when _selected is not null: Select(null); break;
             default: handled = false; break;
@@ -303,7 +408,7 @@ public sealed partial class EditorWindow : Window
             // Clicking an existing object grabs it, whichever tool is active.
             Select(hit);
             if (hit is TextAnnotation text && _tool == Tool.Text)
-                BeginTextEdit(text);
+                BeginTextEdit(text, isNew: false);
             else
                 StartDrag(e, hit, handle: -1, creating: false, p);
         }
@@ -324,18 +429,18 @@ public sealed partial class EditorWindow : Window
         int weight = _toolWeights[_tool];
         if (_tool == Tool.Text)
         {
-            var text = new TextAnnotation(p, DefaultColor, weight, Unit);
+            var text = new TextAnnotation(p, _color, weight, Unit);
             // Put the click at the middle of the first line, where the caret appears.
             text.Position -= new Vector2(0, text.FontSize * 0.65f);
             _document.Annotations.Add(text);
             Select(text);
-            BeginTextEdit(text);
+            BeginTextEdit(text, isNew: true);
             return;
         }
 
         TwoPointAnnotation shape = _tool == Tool.Arrow
-            ? new ArrowAnnotation(p, DefaultColor, weight, Unit)
-            : new RectangleAnnotation(p, DefaultColor, weight, Unit);
+            ? new ArrowAnnotation(p, _color, weight, Unit)
+            : new RectangleAnnotation(p, _color, weight, Unit);
         _document.Annotations.Add(shape);
         Select(shape);
         StartDrag(e, shape, TwoPointAnnotation.EndHandle, creating: true, p);
@@ -370,6 +475,7 @@ public sealed partial class EditorWindow : Window
             _drag.Target.MoveHandle(_drag.Handle, p);
         else
             _drag.Target.MoveBy(p - _drag.Last);
+        _drag.Moved |= p != _drag.Last;
         _drag.Last = p;
 
         Canvas.Invalidate();
@@ -388,6 +494,10 @@ public sealed partial class EditorWindow : Window
             _document.Annotations.Remove(shape);
             Select(null);
         }
+        else if (_drag.Moved)
+        {
+            Commit();
+        }
 
         _drag = null;
         CanvasHost.ReleasePointerCapture(e.Pointer);
@@ -401,17 +511,19 @@ public sealed partial class EditorWindow : Window
         if (_document.HitTest(p, HitTolerance / _view.M11) is TextAnnotation text)
         {
             Select(text);
-            BeginTextEdit(text);
+            BeginTextEdit(text, isNew: false);
             e.Handled = true;
         }
     }
 
     // ---- Inline text editing -----------------------------------------------------------
 
-    private void BeginTextEdit(TextAnnotation text)
+    private void BeginTextEdit(TextAnnotation text, bool isNew)
     {
         CommitTextEdit();
         _editingText = text;
+        _editingIsNew = isNew;
+        _textBeforeEdit = text.Text;
 
         float scale = _view.M11;
         var color = new SolidColorBrush(text.Color);
@@ -478,13 +590,19 @@ public sealed partial class EditorWindow : Window
             _textBox = null;
         }
 
-        if (string.IsNullOrWhiteSpace(text.Text))
+        bool removed = string.IsNullOrWhiteSpace(text.Text);
+        if (removed)
         {
             _document.Annotations.Remove(text);
             text.Dispose();
             if (_selected == text)
                 Select(null);
         }
+
+        // The whole typing session is one undo step (the text box has its own undo while typing).
+        bool changed = _editingIsNew ? !removed : removed || text.Text != _textBeforeEdit;
+        if (changed)
+            Commit();
         Canvas.Invalidate();
     }
 
