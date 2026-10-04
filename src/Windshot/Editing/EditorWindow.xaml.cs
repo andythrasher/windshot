@@ -418,6 +418,11 @@ public sealed partial class EditorWindow : Window
         bool handled = true;
         switch (e.Key)
         {
+            // Zoom: Ctrl+= / Ctrl+- step, Ctrl+0 fits the window, Ctrl+1 shows actual pixels.
+            case (VirtualKey)187 or VirtualKey.Add when ctrl: ZoomBy(ZoomStep, CanvasCenter); break;
+            case (VirtualKey)189 or VirtualKey.Subtract when ctrl: ZoomBy(1 / ZoomStep, CanvasCenter); break;
+            case VirtualKey.Number0 or VirtualKey.NumberPad0 when ctrl: FitToWindow(); break;
+            case VirtualKey.Number1 or VirtualKey.NumberPad1 when ctrl: SetZoom(1, CanvasCenter); break;
             case VirtualKey.Z when ctrl: StepHistory(undo: !shift); break;
             case VirtualKey.Y when ctrl: StepHistory(undo: false); break;
             case var _ when colorIndex >= 0 && !ctrl: SetColor(Palette.Colors[colorIndex].Color); break;
@@ -473,8 +478,16 @@ public sealed partial class EditorWindow : Window
 
     private void Canvas_Draw(CanvasControl sender, CanvasDrawEventArgs args)
     {
-        if (_drag is null && _editingText is null)
+        // Until the user zooms or pans, keep the whole canvas fitted to the window.
+        if (_drag is null && _editingText is null && !_manualView)
             _view = FitView(sender);
+        UpdateZoomLabel();
+
+        // Hard pixel edges when magnified (for inspecting pixels), smooth when shrunk.
+        float zoom = Zoom;
+        _document.ImageInterpolation = zoom > 1.5f ? CanvasImageInterpolation.NearestNeighbor
+            : zoom < 1 ? CanvasImageInterpolation.HighQualityCubic
+            : CanvasImageInterpolation.Linear;
 
         var ds = args.DrawingSession;
         ds.Transform = _view;
@@ -542,6 +555,18 @@ public sealed partial class EditorWindow : Window
     private void Canvas_PointerPressed(object sender, PointerRoutedEventArgs e)
     {
         var point = e.GetCurrentPoint(Canvas);
+
+        // Middle-drag, or Space + drag, pans the view.
+        if (point.Properties.IsMiddleButtonPressed || (_spaceHeld && point.Properties.IsLeftButtonPressed))
+        {
+            CommitTextEdit();
+            _pan = (e.Pointer.PointerId, point.Position.ToVector2());
+            CanvasHost.CapturePointer(e.Pointer);
+            CanvasHost.Cursor = _moveCursor;
+            e.Handled = true;
+            return;
+        }
+
         if (!point.Properties.IsLeftButtonPressed)
             return;
         e.Handled = true;
@@ -665,6 +690,17 @@ public sealed partial class EditorWindow : Window
 
     private void Canvas_PointerMoved(object sender, PointerRoutedEventArgs e)
     {
+        if (_pan is { } pan && e.Pointer.PointerId == pan.PointerId)
+        {
+            var position = e.GetCurrentPoint(Canvas).Position.ToVector2();
+            _view.Translation += position - pan.Last;
+            _pan = (pan.PointerId, position);
+            _manualView = true;
+            Canvas.Invalidate();
+            e.Handled = true;
+            return;
+        }
+
         var p = ToDocument(e.GetCurrentPoint(Canvas).Position.ToVector2());
 
         if (_textDrag is not null && e.Pointer.PointerId == _textDrag.PointerId)
@@ -694,6 +730,16 @@ public sealed partial class EditorWindow : Window
 
     private void Canvas_PointerReleased(object sender, PointerRoutedEventArgs e)
     {
+        if (_pan is { } pan && e.Pointer.PointerId == pan.PointerId)
+        {
+            _pan = null;
+            CanvasHost.ReleasePointerCapture(e.Pointer);
+            CanvasHost.Cursor = _spaceHeld ? _panCursor : null;
+            UpdateCursor(null);
+            e.Handled = true;
+            return;
+        }
+
         if (_textDrag is not null && e.Pointer.PointerId == _textDrag.PointerId)
         {
             var drag = _textDrag;
@@ -736,6 +782,109 @@ public sealed partial class EditorWindow : Window
         }
     }
 
+    // ---- Zoom and pan ------------------------------------------------------------------
+
+    private const float ZoomStep = 1.25f;
+    private const float MinZoom = 0.05f;
+    private const float MaxZoom = 32f;
+
+    /// <summary>Set once the user zooms or pans; until then the canvas auto-fits the window.</summary>
+    private bool _manualView;
+    private (uint PointerId, Vector2 Last)? _pan;
+    private bool _spaceHeld;
+    private readonly InputCursor _panCursor = InputSystemCursor.Create(InputSystemCursorShape.Hand);
+
+    private float RasterScale => (float)(Canvas.XamlRoot?.RasterizationScale ?? 1.0);
+
+    /// <summary>Screen pixels per image pixel: 1 is "actual pixels" (100%).</summary>
+    private float Zoom => _view.M11 * RasterScale;
+
+    private Vector2 CanvasCenter => Canvas.ActualSize / 2;
+
+    private void Canvas_PointerWheelChanged(object sender, PointerRoutedEventArgs e)
+    {
+        var point = e.GetCurrentPoint(Canvas);
+        int delta = point.Properties.MouseWheelDelta;
+        if (point.Properties.IsHorizontalMouseWheel)
+        {
+            // Tilt wheels and sideways touchpad swipes pan instead.
+            _view.Translation -= new Vector2(delta, 0);
+            _manualView = true;
+            Canvas.Invalidate();
+        }
+        else if (_drag is null && _textDrag is null)
+        {
+            ZoomBy(MathF.Pow(ZoomStep, delta / 120f), point.Position.ToVector2());
+        }
+        e.Handled = true;
+    }
+
+    private void ZoomBy(float factor, Vector2 anchor)
+    {
+        float current = Zoom;
+        float target = Math.Clamp(current * factor, MinZoom, MaxZoom);
+        // Land exactly on 100% when passing through it, so pixels line up.
+        if ((current < 1 && target > 1) || (current > 1 && target < 1))
+            target = 1;
+        SetZoom(target, anchor);
+    }
+
+    /// <summary>Zooms to <paramref name="zoom"/>, keeping the point under <paramref name="anchor"/> (control DIPs) in place.</summary>
+    private void SetZoom(float zoom, Vector2 anchor)
+    {
+        CommitTextEdit(); // the inline text box is positioned for the old zoom
+        var pinned = ToDocument(anchor);
+        float scale = zoom / RasterScale;
+        _view = Matrix3x2.CreateScale(scale) * Matrix3x2.CreateTranslation(anchor - pinned * scale);
+        _manualView = true;
+        Canvas.Invalidate();
+    }
+
+    private void FitToWindow()
+    {
+        CommitTextEdit();
+        _manualView = false;
+        Canvas.Invalidate();
+    }
+
+    /// <summary>The zoom pill: fit when zoomed, actual pixels when fitted.</summary>
+    private void ZoomButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_manualView)
+            FitToWindow();
+        else
+            SetZoom(1, CanvasCenter);
+    }
+
+    private void UpdateZoomLabel()
+    {
+        string text = $"{Math.Round(Zoom * 100)}%";
+        if (ZoomButton.Content as string != text)
+            ZoomButton.Content = text;
+    }
+
+    // Space is caught on the way down (preview), so it pans instead of clicking a focused button.
+    private void Root_PreviewKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key != VirtualKey.Space || _editingText is not null || e.OriginalSource is TextBox)
+            return;
+        if (!_spaceHeld)
+        {
+            _spaceHeld = true;
+            CanvasHost.Cursor = _panCursor;
+        }
+        e.Handled = true;
+    }
+
+    private void Root_PreviewKeyUp(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key != VirtualKey.Space || !_spaceHeld)
+            return;
+        _spaceHeld = false;
+        UpdateCursor(null);
+        e.Handled = true;
+    }
+
     // ---- Cursor ------------------------------------------------------------------------
 
     private readonly InputCursor _arrowCursor = InputSystemCursor.Create(InputSystemCursorShape.Arrow);
@@ -754,6 +903,9 @@ public sealed partial class EditorWindow : Window
     /// <param name="point">The pointer in document space, or null if unknown.</param>
     private void UpdateCursor(Vector2? point)
     {
+        if (_spaceHeld || _pan is not null)
+            return; // the pan cursor wins while panning is armed
+
         var cursor = _tool switch
         {
             Tool.Select => _arrowCursor,

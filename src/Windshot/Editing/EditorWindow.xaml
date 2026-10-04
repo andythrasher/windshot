@@ -11,7 +11,7 @@
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <Grid x:Name="Root" KeyDown="Root_KeyDown">
+    <Grid x:Name="Root" KeyDown="Root_KeyDown" PreviewKeyDown="Root_PreviewKeyDown" PreviewKeyUp="Root_PreviewKeyUp">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -123,6 +123,7 @@
             PointerPressed="Canvas_PointerPressed"
             PointerMoved="Canvas_PointerMoved"
             PointerReleased="Canvas_PointerReleased"
+            PointerWheelChanged="Canvas_PointerWheelChanged"
             DoubleTapped="Canvas_DoubleTapped">
             <canvas:CanvasControl
                 x:Name="Canvas"
@@ -131,6 +132,16 @@
                 Draw="Canvas_Draw" />
             <!-- Hosts the inline text box while a text annotation is being typed. -->
             <Canvas x:Name="TextLayer" />
+            <!-- Zoom readout; click to switch between fit and actual pixels. -->
+            <Button
+                x:Name="ZoomButton"
+                Margin="12"
+                Padding="10,4"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Bottom"
+                MinWidth="64"
+                Click="ZoomButton_Click"
+                ToolTipService.ToolTip="Zoom: scroll, Ctrl+= / Ctrl+-, Ctrl+0 to fit, Ctrl+1 for actual pixels. Space+drag or middle-drag to pan. Click to switch between fit and 100%." />
         </local:CursorHost>
     </Grid>
 </Window>

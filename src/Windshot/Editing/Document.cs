@@ -42,6 +42,9 @@ internal sealed class Document : IDisposable
     /// <summary>Explicit crop. When null, the canvas auto-fits the image and all annotations.</summary>
     public Rect? CropOverride { get; set; }
 
+    /// <summary>How the screenshot is scaled when the editor zooms; set by the editor before drawing.</summary>
+    public CanvasImageInterpolation ImageInterpolation { get; set; } = CanvasImageInterpolation.Linear;
+
     /// <summary>Optional "beautify" style. When set, it's part of what you see and export.</summary>
     public Backdrop? Backdrop { get; set; }
 
@@ -146,7 +149,7 @@ internal sealed class Document : IDisposable
         {
             if (fillsInCard)
                 DrawFills(ds, fills);
-            ds.DrawImage(Image, 0, 0);
+            ds.DrawImage(Image, ImageBounds, ImageBounds, 1, ImageInterpolation);
 
             foreach (var blur in Annotations.OfType<BlurAnnotation>())
                 blur.Draw(ds);
@@ -222,7 +225,11 @@ internal sealed class Document : IDisposable
         {
             ds.Clear(Microsoft.UI.Colors.Transparent);
             ds.Transform = Matrix3x2.CreateTranslation(-(float)bounds.X, -(float)bounds.Y);
+            // Exports are 1:1, so copy pixels exactly regardless of the editor's zoom.
+            var interpolation = ImageInterpolation;
+            ImageInterpolation = CanvasImageInterpolation.NearestNeighbor;
             Render(ds);
+            ImageInterpolation = interpolation;
         }
 
         var stream = new Windows.Storage.Streams.InMemoryRandomAccessStream();

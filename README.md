@@ -32,6 +32,11 @@ Size slider) and **1–8** (colors) change the selected object, or the next one 
 handles to reshape arrows and rectangles; double-click text to edit it. **Ctrl+Z** /
 **Ctrl+Y** undo and redo, **Delete** removes, **Ctrl+C** copies, **Ctrl+S** saves.
 
+**Zoom** with the scroll wheel (around the cursor) or **Ctrl+=** / **Ctrl+−**; **Ctrl+0** fits the
+window and **Ctrl+1** shows actual pixels. Pan with **Space+drag** or a middle-button drag. The
+zoom readout in the corner switches between fit and 100% when clicked. Above 150% pixels are
+drawn with hard edges for inspection; exports are unaffected.
+
 **Beautify** (toolbar toggle; its arrow picks a gradient and padding) puts the capture on a
 gradient backdrop with rounded corners and a shadow, in the editor and in everything exported.
 **Ctrl+P** pins the result above other windows where it was captured: drag to move, scroll to
