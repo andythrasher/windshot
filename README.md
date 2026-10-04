@@ -7,6 +7,20 @@ annotations stay editable objects and the canvas grows when you draw past the ed
 
 Requires the .NET 10 SDK (`winget install Microsoft.DotNet.SDK.10`). No Visual Studio needed.
 
+To install (or update) it for your account, in `%LOCALAPPDATA%\Programs\Windshot` with a Start
+menu shortcut, run:
+
+```
+powershell -ExecutionPolicy Bypass -File tools/install.ps1
+```
+
+It builds a self-contained Release version (no .NET install needed), closes any running
+Windshot (refusing if an editor is open), installs it and starts it. If Start with Windows is on,
+it now starts the installed copy. `-Uninstall` removes it again; settings and pins in
+`%LOCALAPPDATA%\Windshot` stay either way.
+
+For development, build and run the Debug version in place:
+
 ```
 dotnet build src/Windshot
 src/Windshot/bin/Debug/net10.0-windows10.0.26100.0/win-x64/Windshot.exe

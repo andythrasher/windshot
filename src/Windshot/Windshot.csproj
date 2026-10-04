@@ -15,6 +15,9 @@
     <UseWinUI>true</UseWinUI>
     <WindowsPackageType>None</WindowsPackageType>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <!-- Without it, dotnet publish leaves out Windshot.pri and the compiled XAML (.xbf),
+         and the editor window fails to load. Nothing is packaged as MSIX. -->
+    <EnableMsixTooling>true</EnableMsixTooling>
   </PropertyGroup>
 
   <ItemGroup>
