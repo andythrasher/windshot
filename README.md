@@ -85,9 +85,11 @@ to add one, add its name to the script and rerun it.
   "reverse crop" falls out of the model. Export renders those bounds. Added area is filled
   per side with the dominant color of the image edge beside it (`EdgeColors`), preferring the
   stretch next to whatever overhangs; sides without a clear background color stay transparent.
-- **Scrolling capture stitches by rows.** `Capture/ScrollStitcher.cs` hashes each row of
-  the columns that changed between frames; rows vote for how far the content moved, and the
-  winning offset must be backed by most of the rows that should still be visible. Rows that
+- **Scrolling capture stitches by rows.** `Capture/ScrollStitcher.cs` reduces each row of
+  the columns that changed between frames to a coarse signature (strip brightnesses), since
+  browsers redraw scrolled content with slight differences; the offset where the most rows
+  look the same wins, if most of the rows that should still be visible agree and no other
+  offset comes close. Auto-scroll waits for each smooth-scroll animation to settle. Rows that
   stayed put at the bottom count as a footer, added once at the end. The border and panel are
   excluded from screen capture (`WDA_EXCLUDEFROMCAPTURE`), so they never land in a frame.
 - **Physical pixels everywhere on the capture side.** The process is Per-Monitor-V2 DPI aware,

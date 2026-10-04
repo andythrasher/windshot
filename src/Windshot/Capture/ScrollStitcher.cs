@@ -8,7 +8,7 @@ internal enum StitchResult
     Appended,
     /// <summary>Scrolled back up; nothing to add until it comes back down.</summary>
     ScrolledBack,
-    /// <summary>Changed, but no overlap with the last frame was found (scrolled too fast, or the content changed).</summary>
+    /// <summary>Changed, but no overlap with the last frame was found (scrolled too fast, mid-animation, or the content changed).</summary>
     Lost,
     /// <summary>Reached the maximum height; the result is complete.</summary>
     Full,
@@ -16,22 +16,33 @@ internal enum StitchResult
 
 /// <summary>
 /// Builds one tall image from frames of the same screen area taken while it scrolls down.
-/// Each frame is matched against the last one that was used by comparing rows: the offset
-/// that lines up the most rows is how far the content scrolled, and the rows that came into
+/// Each frame is lined up against the last one that was used: the vertical offset where
+/// the rows look the same is how far the content scrolled, and the rows that came into
 /// view at the bottom get appended.
 /// </summary>
 /// <remarks>
-/// Only columns that changed take part in matching, so a fixed sidebar or the page margins
-/// beside the scrolling content don't get in the way. Rows that stayed put at the top (a
-/// sticky header) can't line up with anything and are ignored; rows that stayed put at the
-/// bottom (a sticky footer) are kept out of the middle and added once, at the very end.
+/// Rows are compared by a coarse signature (the brightness of a few dozen strips across the
+/// row), not exactly: browsers redraw scrolled content with slight differences (about one
+/// pixel in 200 off by a shade or two), so exact matching almost never lines anything up.
+/// Only columns that changed take part, so a fixed sidebar or the page margins beside the
+/// scrolling content don't get in the way. Rows that stayed put (a sticky header) are left
+/// out of the comparison; rows that stayed put at the bottom (a sticky footer) are kept out
+/// of the middle and added once, at the very end.
 /// </remarks>
 internal sealed class ScrollStitcher
 {
-    /// <summary>Rows that show up more often than this (blank lines, repeated borders) can't place anything.</summary>
-    private const int MaxRepeats = 4;
-    private const int MinVotes = 3;
+    /// <summary>Strips per row signature.</summary>
+    private const int Strips = 32;
+    /// <summary>A pixel counts as changed when its R+G+B moved by more than this; below it is redraw noise.</summary>
+    private const int ChangedPixel = 24;
+    /// <summary>Average R+G+B difference per pixel under which two rows count as the same.</summary>
+    private const double SameRow = 1.5;
+    /// <summary>Share of the compared rows that must line up for an offset to be accepted.</summary>
     private const double MinAgreement = 0.5;
+    /// <summary>The runner-up offset may line up at most this share as many rows.</summary>
+    private const double MaxRival = 0.7;
+    /// <summary>Candidate offsets from the quick pass that get the full comparison.</summary>
+    private const int Candidates = 8;
 
     private readonly int _width;
     private readonly int _height;
@@ -64,74 +75,93 @@ internal sealed class ScrollStitcher
         if (moving.Count == 0)
             return StitchResult.Unchanged;
 
-        var (hashA, infoA) = HashRows(a, moving);
-        var (hashB, infoB) = HashRows(frame, moving);
+        int columns = moving.Sum(r => r.End - r.Start);
+        var sigA = new Signatures(a, _width, _height, moving);
+        var sigB = new Signatures(frame, _width, _height, moving);
+
+        // Rows that stayed put: a sticky header or footer, or a margin that never changes.
+        var stayed = new bool[_height];
+        for (int y = 0; y < _height; y++)
+            stayed[y] = sigA.Distance(y, sigB, y) <= SameRow * columns;
+
         int footer = _footer ?? 0;
         int body = _height - footer;
-
-        // Where each row of the last frame is, by content.
-        var rowsByHash = new Dictionary<ulong, List<int>>();
-        for (int y = 0; y < body; y++)
-        {
-            if (!infoA[y])
-                continue;
-            if (!rowsByHash.TryGetValue(hashA[y], out var list))
-                rowsByHash[hashA[y]] = list = new List<int>();
-            list.Add(y);
-        }
-
-        // Each changed row of the new frame votes for how far the content moved to get there.
-        // Index _height + d holds the votes for an offset of d (negative: scrolled back up).
-        var votes = new int[_height * 2];
-        for (int y = 0; y < body; y++)
-        {
-            if (!infoB[y] || hashA[y] == hashB[y] || !rowsByHash.TryGetValue(hashB[y], out var matches) || matches.Count > MaxRepeats)
-                continue;
-            foreach (int ya in matches)
-            {
-                if (ya != y)
-                    votes[_height + ya - y]++;
-            }
-        }
-
-        int best = 0;
-        for (int i = 1; i < votes.Length; i++)
-        {
-            if (votes[i] > votes[best])
-                best = i;
-        }
-        int offset = best - _height;
-        if (votes[best] < MinVotes)
+        int minOverlap = Math.Max(16, body / 8);
+        int maxOffset = body - minOverlap;
+        if (maxOffset < 1)
             return StitchResult.Lost;
 
-        // Of the rows that changed and should still be on screen at that offset, enough must agree;
-        // otherwise a few look-alike rows (borders, repeated lines) could fake a match.
-        int candidates = 0;
-        for (int y = Math.Max(0, -offset); y < Math.Min(body, body - offset); y++)
+        // Each offset is scored by how many rows line up (look the same) there. Counting rather
+        // than averaging means rows that legitimately don't line up, like content that slid
+        // under a sticky footer, can't drown out the rest.
+        long tolerance = (long)(SameRow * columns);
+
+        // Quick pass on row brightness alone, to find a handful of plausible offsets.
+        var quick = new List<(int Offset, int Matches)>();
+        for (int d = -maxOffset; d <= maxOffset; d++)
         {
-            if (infoB[y] && hashA[y] != hashB[y])
-                candidates++;
+            if (d == 0)
+                continue;
+            int matches = 0, rows = 0;
+            for (int y = Math.Max(0, -d); y < Math.Min(body, body - d); y++)
+            {
+                if (stayed[y] || !(sigB.Detail[y] || sigA.Detail[y + d]))
+                    continue;
+                rows++;
+                if (Math.Abs(sigB.Total[y] - sigA.Total[y + d]) <= tolerance)
+                    matches++;
+            }
+            if (rows >= 8 && matches > 0)
+                quick.Add((d, matches));
         }
-        if (votes[best] < MinAgreement * candidates)
+        if (quick.Count == 0)
+            return StitchResult.Lost;
+
+        // The full comparison for the best few.
+        var scored = quick.OrderByDescending(q => q.Matches).Take(Candidates)
+            .Select(q => FullScore(sigA, sigB, stayed, body, q.Offset, tolerance))
+            .OrderByDescending(s => s.Matches).ToList();
+        var (offset, best, compared) = scored[0];
+        if (best < MinAgreement * compared || best < 8)
+            return StitchResult.Lost;
+        // Look-alike content (lines of text at a regular spacing, blank space) can line up at
+        // more than one offset; take the match only when it clearly beats the next one.
+        int rival = scored.Skip(1).Where(s => Math.Abs(s.Offset - offset) > 2).Select(s => s.Matches).DefaultIfEmpty(0).Max();
+        if (rival > best * MaxRival)
             return StitchResult.Lost;
         if (offset < 0)
             return StitchResult.ScrolledBack;
 
-        _footer ??= FindFooter(hashA, hashB);
+        _footer ??= FindFooter(stayed);
         footer = _footer.Value;
         body = _height - footer;
         if (offset >= body)
             return StitchResult.Lost;
 
         // The rows that scrolled into view at the bottom of the scrolling part.
-        int rows = Math.Min(offset, _maxHeight - TotalHeight);
-        if (rows <= 0)
+        int added = Math.Min(offset, _maxHeight - TotalHeight);
+        if (added <= 0)
             return StitchResult.Full;
-        var slice = new int[rows * _width];
+        var slice = new int[added * _width];
         Array.Copy(frame, (body - offset) * _width, slice, 0, slice.Length);
         _slices.Add(slice);
         _reference = frame;
-        return rows < offset || TotalHeight >= _maxHeight ? StitchResult.Full : StitchResult.Appended;
+        return added < offset || TotalHeight >= _maxHeight ? StitchResult.Full : StitchResult.Appended;
+    }
+
+    /// <summary>How many of the compared rows look the same with the last frame shifted by <paramref name="offset"/>.</summary>
+    private static (int Offset, int Matches, int Rows) FullScore(Signatures a, Signatures b, bool[] stayed, int body, int offset, long tolerance)
+    {
+        int matches = 0, rows = 0;
+        for (int y = Math.Max(0, -offset); y < Math.Min(body, body - offset); y++)
+        {
+            if (stayed[y] || !(b.Detail[y] || a.Detail[y + offset]))
+                continue;
+            rows++;
+            if (b.Distance(y, a, y + offset) <= tolerance)
+                matches++;
+        }
+        return (offset, matches, rows);
     }
 
     /// <summary>Rows at the bottom that stayed put while the content moved, up to a third of the height.</summary>
@@ -141,10 +171,10 @@ internal sealed class ScrollStitcher
     /// just arrives there instead. Erring small repeats the footer after every slice, so
     /// there's no attempt to tell a flat-colored footer from blank content that scrolled.
     /// </remarks>
-    private int FindFooter(ulong[] hashA, ulong[] hashB)
+    private int FindFooter(bool[] stayed)
     {
         int footer = 0;
-        for (int y = _height - 1; y >= _height * 2 / 3 && hashA[y] == hashB[y]; y--)
+        for (int y = _height - 1; y >= _height * 2 / 3 && stayed[y]; y--)
             footer++;
         return footer;
     }
@@ -169,7 +199,9 @@ internal sealed class ScrollStitcher
         return new CapturedImage(pixels, _width, height, scale, desktopBounds, IsScrolling: true);
     }
 
-    /// <summary>Column ranges [start, end) where anything differs between the two frames.</summary>
+    private static int Brightness(int p) => (p & 255) + ((p >> 8) & 255) + ((p >> 16) & 255);
+
+    /// <summary>Column ranges [start, end) where something clearly changed between the two frames (not just redraw noise).</summary>
     private List<(int Start, int End)> MovingColumns(int[] a, int[] b)
     {
         var moving = new bool[_width];
@@ -181,7 +213,7 @@ internal sealed class ScrollStitcher
                 continue;
             for (int x = 0; x < _width; x++)
             {
-                if (rowA[x] != rowB[x])
+                if (!moving[x] && rowA[x] != rowB[x] && Math.Abs(Brightness(rowA[x]) - Brightness(rowB[x])) > ChangedPixel)
                     moving[x] = true;
             }
         }
@@ -199,29 +231,46 @@ internal sealed class ScrollStitcher
         return ranges;
     }
 
-    /// <summary>A hash of each row over the given columns, and whether the row has any detail there (isn't one flat color).</summary>
-    private (ulong[] Hashes, bool[] Informative) HashRows(int[] pixels, List<(int Start, int End)> columns)
+    /// <summary>Per row, over the given columns: the summed R+G+B of each of a few strips, their total, and whether the row has any detail.</summary>
+    private sealed class Signatures
     {
-        var hashes = new ulong[_height];
-        var informative = new bool[_height];
-        for (int y = 0; y < _height; y++)
+        public readonly int[] Strip;
+        public readonly long[] Total;
+        public readonly bool[] Detail;
+
+        public Signatures(int[] pixels, int width, int height, List<(int Start, int End)> columns)
         {
-            int row = y * _width;
-            int first = pixels[row + columns[0].Start];
-            ulong hash = 14695981039346656037;
-            bool detail = false;
-            foreach (var (start, end) in columns)
+            Strip = new int[height * Strips];
+            Total = new long[height];
+            Detail = new bool[height];
+            int count = columns.Sum(c => c.End - c.Start);
+            for (int y = 0; y < height; y++)
             {
-                for (int x = start; x < end; x++)
+                int row = y * width, i = 0, min = int.MaxValue, max = 0;
+                long total = 0;
+                foreach (var (start, end) in columns)
                 {
-                    int p = pixels[row + x];
-                    hash = (hash ^ (uint)p) * 1099511628211;
-                    detail |= p != first;
+                    for (int x = start; x < end; x++, i++)
+                    {
+                        int v = Brightness(pixels[row + x]);
+                        Strip[y * Strips + (int)((long)i * Strips / count)] += v;
+                        total += v;
+                        min = Math.Min(min, v);
+                        max = Math.Max(max, v);
+                    }
                 }
+                Total[y] = total;
+                Detail[y] = max - min > ChangedPixel;
             }
-            hashes[y] = hash;
-            informative[y] = detail;
         }
-        return (hashes, informative);
+
+        /// <summary>Sum of strip differences between row <paramref name="y"/> here and row <paramref name="otherY"/> there.</summary>
+        public long Distance(int y, Signatures other, int otherY)
+        {
+            long sum = 0;
+            for (int k = 0; k < Strips; k++)
+                sum += Math.Abs(Strip[y * Strips + k] - other.Strip[otherY * Strips + k]);
+            return sum;
+        }
     }
 }

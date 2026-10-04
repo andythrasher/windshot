@@ -94,12 +94,16 @@ internal sealed class ScrollingCapture
 
             var clock = System.Diagnostics.Stopwatch.StartNew();
             AutoScroller? auto = null;
+            int[]? previous = null;
             try
             {
                 while (!token.IsCancellationRequested)
                 {
                     long started = clock.ElapsedMilliseconds;
-                    var result = stitcher.Add(grabber.Grab());
+                    var frame = grabber.Grab();
+                    bool still = previous is not null && frame.AsSpan().SequenceEqual(previous);
+                    previous = frame;
+                    var result = stitcher.Add(frame);
                     int height = stitcher.TotalHeight;
                     if (result != StitchResult.Unchanged)
                         ui.Post(_ => _panel.ShowProgress(result, height), null);
@@ -119,7 +123,7 @@ internal sealed class ScrollingCapture
                     }
                     if (auto is not null && !token.IsCancellationRequested)
                     {
-                        var state = auto.Tick(result, clock.ElapsedMilliseconds);
+                        var state = auto.Tick(result, still, clock.ElapsedMilliseconds);
                         if (state == AutoScrollState.AtEnd)
                         {
                             Log.Write("Auto-scroll reached the end");
@@ -130,9 +134,12 @@ internal sealed class ScrollingCapture
                         {
                             Log.Write($"Auto-scroll stopped: {state}");
                             _autoScroll = false;
-                            string message = state == AutoScrollState.Stuck
-                                ? "This window didn't scroll; scroll it yourself"
-                                : "Auto-scroll paused";
+                            string message = state switch
+                            {
+                                AutoScrollState.Stuck => "This window didn't scroll; scroll it yourself",
+                                AutoScrollState.NoMatch => "Couldn't line this up; scroll it yourself",
+                                _ => "Auto-scroll paused",
+                            };
                             ui.Post(_ => _panel.ShowAutoStopped(message), null);
                         }
                     }

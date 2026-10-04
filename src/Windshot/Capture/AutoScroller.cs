@@ -10,6 +10,8 @@ internal enum AutoScrollState
     AtEnd,
     /// <summary>Nothing moved at all, either way of scrolling.</summary>
     Stuck,
+    /// <summary>It scrolls, but the frames never line up (an animation in the area, or an area smaller than a notch).</summary>
+    NoMatch,
     /// <summary>The user moved the mouse while it was parked over the area.</summary>
     Interrupted,
 }
@@ -22,11 +24,17 @@ internal enum AutoScrollState
 /// </summary>
 internal sealed class AutoScroller : IDisposable
 {
-    private const int StepMs = 200;
+    private const int StepMs = 150;
+    /// <summary>Longest wait for the content to settle after a notch (it may never, e.g. with a video in the area).</summary>
+    private const int SettleTimeoutMs = 1000;
     /// <summary>Notches without any movement before trying the next way of scrolling.</summary>
     private const int TriesPerMethod = 4;
+    /// <summary>Notches that moved things but never added anything, before giving up.</summary>
+    private const int MaxFruitlessSteps = 8;
     /// <summary>How long the content must stay still, after it has moved, to count as the end.</summary>
     private const int EndQuietMs = 1500;
+    /// <summary>Hand jitter on a mouse that's just been let go of shouldn't count as taking it back.</summary>
+    private const int CursorSlack = 8;
     private const int WheelNotch = 120;
     private const int WM_MOUSEWHEEL = 0x020A;
     private const uint MOUSEEVENTF_WHEEL = 0x0800;
@@ -35,7 +43,10 @@ internal sealed class AutoScroller : IDisposable
     private bool _realInput;
     private Point? _savedCursor;
     private int _steps;
+    /// <summary>Something on screen moved since this way of scrolling started, so it works.</summary>
+    private bool _sawMotion;
     private bool _progressed;
+    private int _fruitlessSteps;
     private long _lastStep = long.MinValue / 2;
     private long _lastProgress;
 
@@ -48,27 +59,34 @@ internal sealed class AutoScroller : IDisposable
     }
 
     /// <summary>Call once per frame with what the stitcher made of it.</summary>
+    /// <param name="still">The frame is identical to the one before: the content has settled.</param>
     /// <param name="now">A millisecond clock.</param>
-    public AutoScrollState Tick(StitchResult result, long now)
+    public AutoScrollState Tick(StitchResult result, bool still, long now)
     {
+        if (!still && _steps > 0)
+            _sawMotion = true;
         if (result == StitchResult.Appended)
         {
             _progressed = true;
             _lastProgress = now;
+            _fruitlessSteps = 0;
         }
 
-        if (_realInput && GetCursorPos(out var cursor) && (cursor.X != _target.X || cursor.Y != _target.Y))
+        if (_realInput && GetCursorPos(out var cursor)
+            && (Math.Abs(cursor.X - _target.X) > CursorSlack || Math.Abs(cursor.Y - _target.Y) > CursorSlack))
         {
             _savedCursor = null; // they've taken the mouse; leave it where they put it
             return AutoScrollState.Interrupted;
         }
 
-        if (now - _lastStep < StepMs)
+        // One notch at a time, each once the last one's smooth-scroll animation has finished,
+        // so the frames that get stitched aren't caught halfway.
+        if (now - _lastStep < StepMs || (!still && now - _lastStep < SettleTimeoutMs))
             return AutoScrollState.Running;
 
         if (_progressed && now - _lastProgress > EndQuietMs)
             return AutoScrollState.AtEnd;
-        if (!_progressed && _steps >= TriesPerMethod)
+        if (!_sawMotion && _steps >= TriesPerMethod)
         {
             if (_realInput)
                 return AutoScrollState.Stuck;
@@ -78,10 +96,14 @@ internal sealed class AutoScroller : IDisposable
             if (GetCursorPos(out var saved))
                 _savedCursor = new Point(saved.X, saved.Y);
         }
+        if (_fruitlessSteps >= MaxFruitlessSteps)
+            return AutoScrollState.NoMatch;
 
-        // Scrolled too far to stitch: back up a notch so the frames overlap again.
-        Wheel(result == StitchResult.Lost ? WheelNotch : -WheelNotch);
+        // Settled and still no match: the notch went too far to stitch, so back up and let the next one try again.
+        bool backUp = result == StitchResult.Lost && still;
+        Wheel(backUp ? WheelNotch : -WheelNotch);
         _steps++;
+        _fruitlessSteps++; // reset when a frame gets appended
         _lastStep = now;
         return AutoScrollState.Running;
     }
