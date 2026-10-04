@@ -8,7 +8,8 @@ namespace Windshot.Capture;
 /// <summary>Straight BGRA pixels handed from the capture side to the editor.</summary>
 /// <param name="Scale">Device pixels per DIP on the monitor the region came from.</param>
 /// <param name="DesktopBounds">Where the region was on screen, in physical pixels.</param>
-internal sealed record CapturedImage(byte[] Pixels, int Width, int Height, double Scale, Rectangle DesktopBounds);
+/// <param name="IsScrolling">Stitched from a scrolling capture, so likely much taller than the screen.</param>
+internal sealed record CapturedImage(byte[] Pixels, int Width, int Height, double Scale, Rectangle DesktopBounds, bool IsScrolling = false);
 
 /// <summary>A frozen copy of the entire virtual desktop, in physical pixels.</summary>
 internal sealed class ScreenSnapshot : IDisposable

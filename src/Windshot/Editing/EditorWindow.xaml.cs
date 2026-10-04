@@ -95,6 +95,7 @@ public sealed partial class EditorWindow : Window
         InitializeIcons();
         _document = new Document(capture);
         _desktopBounds = capture.DesktopBounds;
+        _startAtTop = capture.IsScrolling;
         _history = new History(_document);
 
         var prefs = Settings.Current;
@@ -478,6 +479,17 @@ public sealed partial class EditorWindow : Window
 
     private void Canvas_Draw(CanvasControl sender, CanvasDrawEventArgs args)
     {
+        if (_startAtTop && sender.ActualSize.Y > 0)
+        {
+            _startAtTop = false;
+            if (TopView(sender) is Matrix3x2 top)
+            {
+                _view = top;
+                _manualView = true;
+                _wheelScrolls = true;
+            }
+        }
+
         // Until the user zooms or pans, keep the whole canvas fitted to the window.
         if (_drag is null && _editingText is null && !_manualView)
             _view = FitView(sender);
@@ -542,6 +554,25 @@ public sealed partial class EditorWindow : Window
         return Matrix3x2.CreateTranslation(-(float)bounds.X, -(float)bounds.Y)
              * Matrix3x2.CreateScale(scale)
              * Matrix3x2.CreateTranslation(offset);
+    }
+
+    /// <summary>
+    /// For tall (scrolling) captures: the top of the canvas, as wide as the window allows,
+    /// rather than the whole thing shrunk to a sliver. Null when fitting it all is about as good.
+    /// </summary>
+    private Matrix3x2? TopView(CanvasControl canvas)
+    {
+        var bounds = _document.Bounds;
+        var available = canvas.ActualSize - new Vector2(ViewPadding * 2);
+        float rasterScale = (float)(canvas.XamlRoot?.RasterizationScale ?? 1.0);
+        float scale = Math.Max(Math.Min(1 / rasterScale, available.X / (float)bounds.Width), 0.01f);
+        if ((float)bounds.Height * scale <= available.Y * 1.5f)
+            return null;
+
+        float left = (canvas.ActualSize.X - (float)bounds.Width * scale) / 2;
+        return Matrix3x2.CreateTranslation(-(float)bounds.X, -(float)bounds.Y)
+             * Matrix3x2.CreateScale(scale)
+             * Matrix3x2.CreateTranslation(left, ViewPadding);
     }
 
     private Vector2 ToDocument(Vector2 controlPoint)
@@ -790,6 +821,10 @@ public sealed partial class EditorWindow : Window
 
     /// <summary>Set once the user zooms or pans; until then the canvas auto-fits the window.</summary>
     private bool _manualView;
+    /// <summary>A scrolling capture opens at its top; set until its first draw.</summary>
+    private bool _startAtTop;
+    /// <summary>For tall captures the wheel scrolls (as in a document) and Ctrl+wheel zooms.</summary>
+    private bool _wheelScrolls;
     private (uint PointerId, Vector2 Last)? _pan;
     private bool _spaceHeld;
     private readonly InputCursor _panCursor = InputSystemCursor.Create(InputSystemCursorShape.Hand);
@@ -809,6 +844,13 @@ public sealed partial class EditorWindow : Window
         {
             // Tilt wheels and sideways touchpad swipes pan instead.
             _view.Translation -= new Vector2(delta, 0);
+            _manualView = true;
+            Canvas.Invalidate();
+        }
+        else if (_wheelScrolls && !e.KeyModifiers.HasFlag(Windows.System.VirtualKeyModifiers.Control))
+        {
+            // Touchpad pinches arrive as Ctrl+wheel, so they still zoom.
+            _view.Translation += new Vector2(0, delta);
             _manualView = true;
             Canvas.Invalidate();
         }

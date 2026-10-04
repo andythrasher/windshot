@@ -47,6 +47,9 @@ internal sealed class Settings
 
         /// <summary>Capture a region and copy its text.</summary>
         public string CopyText { get; set; } = "Ctrl+Shift+3";
+
+        /// <summary>Pick an area and scroll it to capture more than fits on screen. Press again to finish.</summary>
+        public string ScrollingCapture { get; set; } = "Ctrl+Shift+4";
     }
 
     public sealed class EditorSettings

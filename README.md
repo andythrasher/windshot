@@ -32,6 +32,15 @@ Size slider) and **1–8** (colors) change the selected object, or the next one 
 handles to reshape arrows and rectangles; double-click text to edit it. **Ctrl+Z** /
 **Ctrl+Y** undo and redo, **Delete** removes, **Ctrl+C** copies, **Ctrl+S** saves.
 
+**Ctrl+Shift+4** starts a **scrolling capture**: select the scrolling area (or click a window),
+then scroll it yourself, with the wheel, keyboard or scrollbar. Windshot grabs frames as it moves
+and stitches them into one tall image. Sticky headers, footers and sidebars are handled; a
+panel below the area shows progress (if it says it lost track, you scrolled too fast, so back up a
+little). Press **Done**, Enter, or Ctrl+Shift+4 again to open the result. Selecting just
+the scrolling part of a window (not its sidebar or toolbar) gives the cleanest result. Tall
+captures open at the top, fitted to the window's width; there the wheel scrolls and
+Ctrl+wheel zooms.
+
 **Zoom** with the scroll wheel (around the cursor) or **Ctrl+=** / **Ctrl+−**; **Ctrl+0** fits the
 window and **Ctrl+1** shows actual pixels. Pan with **Space+drag** or a middle-button drag. The
 zoom readout in the corner switches between fit and 100% when clicked. Above 150% pixels are
@@ -47,7 +56,7 @@ zoom, Ctrl+scroll for opacity, Esc or middle-click to close, right-click for mor
 `%LOCALAPPDATA%\Windshot\settings.json` (tray menu → Settings…). Hand-editable; comments and
 trailing commas are fine, and changes apply when you save, with no restart needed.
 
-- `Hotkeys`: `Capture` and `CopyText`, written like `"Ctrl+Shift+2"`, `"Alt+S"` or `"PrintScreen"`
+- `Hotkeys`: `Capture`, `CopyText` and `ScrollingCapture`, written like `"Ctrl+Shift+2"`, `"Alt+S"` or `"PrintScreen"`
   (for Print Screen, first turn off "Use the Print screen key to open screen capture" in
   Windows Settings → Accessibility → Keyboard).
 - `Capture`: `ShowMagnifier` (default `true`).
@@ -73,6 +82,11 @@ to add one, add its name to the script and rerun it.
   "reverse crop" falls out of the model. Export renders those bounds. Added area is filled
   per side with the dominant color of the image edge beside it (`EdgeColors`), preferring the
   stretch next to whatever overhangs; sides without a clear background color stay transparent.
+- **Scrolling capture stitches by rows.** `Capture/ScrollStitcher.cs` hashes each row of
+  the columns that changed between frames; rows vote for how far the content moved, and the
+  winning offset must be backed by most of the rows that should still be visible. Rows that
+  stayed put at the bottom count as a footer, added once at the end. The border and panel are
+  excluded from screen capture (`WDA_EXCLUDEFROMCAPTURE`), so they never land in a frame.
 - **Physical pixels everywhere on the capture side.** The process is Per-Monitor-V2 DPI aware,
   the desktop is snapshotted once, and each monitor gets its own overlay window in its own
   pixel space, which keeps mixed-DPI setups from breaking.

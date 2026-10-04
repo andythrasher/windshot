@@ -43,7 +43,7 @@ public partial class App : Application
 
         Settings.Load();
         _hotkeys = new HotkeyWindow();
-        _tray = new TrayIcon(StartCapture, StartTextCapture, OpenSettings, Quit);
+        _tray = new TrayIcon(StartCapture, StartTextCapture, StartScrollingCapture, OpenSettings, Quit);
         string hotkeys = ApplyHotkeys();
         WatchSettingsFile(dispatcher);
         Log.Write($"Started; {hotkeys}");
@@ -57,8 +57,10 @@ public partial class App : Application
         _hotkeys!.UnregisterAll();
         string? capture = _hotkeys.TryRegister(keys.Capture, StartCapture) ? keys.Capture : null;
         string? copyText = _hotkeys.TryRegister(keys.CopyText, StartTextCapture) ? keys.CopyText : null;
-        _tray!.SetShortcuts(capture, copyText);
-        return $"hotkeys capture={capture ?? $"'{keys.Capture}' unavailable"} text={copyText ?? $"'{keys.CopyText}' unavailable"}";
+        string? scrolling = _hotkeys.TryRegister(keys.ScrollingCapture, StartScrollingCapture) ? keys.ScrollingCapture : null;
+        _tray!.SetShortcuts(capture, copyText, scrolling);
+        return $"hotkeys capture={capture ?? $"'{keys.Capture}' unavailable"} text={copyText ?? $"'{keys.CopyText}' unavailable"}"
+            + $" scrolling={scrolling ?? $"'{keys.ScrollingCapture}' unavailable"}";
     }
 
     private FileSystemWatcher? _settingsWatcher;
@@ -97,7 +99,7 @@ public partial class App : Application
         var before = Settings.Current.Hotkeys;
         Settings.Load();
         var after = Settings.Current.Hotkeys;
-        if (before.Capture != after.Capture || before.CopyText != after.CopyText)
+        if (before.Capture != after.Capture || before.CopyText != after.CopyText || before.ScrollingCapture != after.ScrollingCapture)
             Log.Write($"Settings reloaded; {ApplyHotkeys()}");
         else
             Log.Write("Settings reloaded");
@@ -136,6 +138,19 @@ public partial class App : Application
         string message = await TextRecognizer.CopyToClipboardAsync(image.Pixels, image.Width, image.Height, image.Scale);
         Log.Write($"OCR: {message}");
         Hud.Show(message, image.DesktopBounds, image.Scale);
+    }
+
+    /// <summary>Scroll an area to capture more than fits on screen; again while running, finish.</summary>
+    private void StartScrollingCapture()
+    {
+        try
+        {
+            ScrollingCapture.Begin(OpenEditor);
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Scrolling capture failed: {ex}");
+        }
     }
 
     private void StartCapture()

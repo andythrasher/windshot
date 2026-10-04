@@ -1,3 +1,4 @@
+using System.Drawing;
 using System.Windows.Forms;
 
 namespace Windshot.Capture;
@@ -11,7 +12,22 @@ internal static class CaptureSession
     private static List<SelectionOverlay>? _overlays;
 
     /// <param name="hint">Optional instruction shown at the top of each monitor, e.g. for OCR.</param>
-    public static void Begin(Action<CapturedImage> onCaptured, string? hint = null)
+    public static void Begin(Action<CapturedImage> onCaptured, string? hint = null) =>
+        Show(hint, (snapshot, area, scale) =>
+        {
+            var image = snapshot.Crop(area, scale);
+            return () => onCaptured(image);
+        });
+
+    /// <summary>Lets the user pick an area (or click a window) without capturing it; for live captures.</summary>
+    /// <param name="onSelected">The area in desktop pixels, and its monitor's scale.</param>
+    public static void SelectArea(Action<Rectangle, double> onSelected, string? hint = null) =>
+        Show(hint, (_, area, scale) => () => onSelected(area, scale));
+
+    /// <param name="prepare">
+    /// Runs while the frozen snapshot is still around; returns what to do once the overlays are gone.
+    /// </param>
+    private static void Show(string? hint, Func<ScreenSnapshot, Rectangle, double, Action> prepare)
     {
         if (_overlays is not null)
             return;
@@ -42,9 +58,9 @@ internal static class CaptureSession
             overlay.Selected += (source, desktopRect) =>
             {
                 Log.Write($"Selected {desktopRect} at scale {source.MonitorScale}");
-                var image = snapshot.Crop(desktopRect, source.MonitorScale);
+                var then = prepare(snapshot, desktopRect, source.MonitorScale);
                 End();
-                onCaptured(image);
+                then();
             };
             overlay.Cancelled += End;
             _overlays.Add(overlay);
