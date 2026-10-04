@@ -29,6 +29,8 @@ internal enum Tool
     Rectangle,
     Text,
     Blur,
+    Step,
+    Spotlight,
 }
 
 public sealed partial class EditorWindow : Window
@@ -49,6 +51,8 @@ public sealed partial class EditorWindow : Window
         [Tool.Rectangle] = 3,
         [Tool.Text] = 4,
         [Tool.Blur] = 4,
+        [Tool.Step] = 4,
+        [Tool.Spotlight] = 4,
     };
     private bool _pixelate = true;
 
@@ -98,7 +102,8 @@ public sealed partial class EditorWindow : Window
         var workArea = DisplayArea.GetFromPoint(new PointInt32(0, 0), DisplayAreaFallback.Primary).WorkArea;
         int chromeWidth = (int)(2 * ViewPadding * capture.Scale + 120);
         int chromeHeight = (int)((2 * ViewPadding + 90) * capture.Scale);
-        int width = Math.Clamp(capture.Width + chromeWidth, (int)(720 * capture.Scale), (int)(workArea.Width * 0.85));
+        // The minimum keeps the whole toolbar visible.
+        int width = Math.Clamp(capture.Width + chromeWidth, (int)(860 * capture.Scale), (int)(workArea.Width * 0.85));
         int height = Math.Clamp(capture.Height + chromeHeight, (int)(360 * capture.Scale), (int)(workArea.Height * 0.85));
         AppWindow.Resize(new SizeInt32(width, height));
         AppWindow.Move(new PointInt32(
@@ -112,11 +117,12 @@ public sealed partial class EditorWindow : Window
     {
         CommitTextEdit();
         _tool = tool;
-        SelectButton.IsChecked = tool == Tool.Select;
-        ArrowButton.IsChecked = tool == Tool.Arrow;
-        RectangleButton.IsChecked = tool == Tool.Rectangle;
-        TextButton.IsChecked = tool == Tool.Text;
-        BlurButton.IsChecked = tool == Tool.Blur;
+        // Tool buttons are tagged with their Tool name.
+        foreach (var button in Toolbar.PrimaryCommands.OfType<AppBarToggleButton>())
+        {
+            if (button.Tag is string tag)
+                button.IsChecked = tag == tool.ToString();
+        }
 
         if (tool != Tool.Select)
         {
@@ -137,13 +143,15 @@ public sealed partial class EditorWindow : Window
         ArrowAnnotation => Tool.Arrow,
         TextAnnotation => Tool.Text,
         BlurAnnotation => Tool.Blur,
+        StepAnnotation => Tool.Step,
+        SpotlightAnnotation => Tool.Spotlight,
         _ => Tool.Rectangle,
     };
 
     private void Select(Annotation? annotation)
     {
         _selected = annotation;
-        if (annotation is not null and not BlurAnnotation)
+        if (annotation is { IsAreaEffect: false })
             _color = annotation.Color; // picking up an object's color makes it easy to match
         SyncSlider();
         SyncColor();
@@ -247,7 +255,7 @@ public sealed partial class EditorWindow : Window
     {
         CommitTextEdit();
         _color = color;
-        if (_selected is not null and not BlurAnnotation && _selected.Color != color)
+        if (_selected is { IsAreaEffect: false } && _selected.Color != color)
         {
             _selected.Color = color;
             Commit(coalesceKey: ("color", _selected));
@@ -320,6 +328,8 @@ public sealed partial class EditorWindow : Window
             case VirtualKey.R when !ctrl: SetTool(Tool.Rectangle); break;
             case VirtualKey.T when !ctrl: SetTool(Tool.Text); break;
             case VirtualKey.B when !ctrl: SetTool(Tool.Blur); break;
+            case VirtualKey.N when !ctrl: SetTool(Tool.Step); break;
+            case VirtualKey.S when !ctrl: SetTool(Tool.Spotlight); break;
             case VirtualKey.P when !ctrl && PixelateButton.Visibility == Visibility.Visible:
                 SetPixelate(PixelateButton.IsChecked != true);
                 break;
@@ -380,7 +390,7 @@ public sealed partial class EditorWindow : Window
     {
         float px = 1 / _view.M11;
         // Text has no handles, and a blur has no visible edge; outline both so the extent is clear.
-        if (annotation.Handles.Count == 0 || annotation is BlurAnnotation)
+        if (annotation.Handles.Count == 0 || annotation.IsAreaEffect)
         {
             using var dashed = new CanvasStrokeStyle { DashStyle = CanvasDashStyle.Dash };
             ds.DrawRectangle(annotation.Bounds.Inflate(2 * px), AccentColor, 1.5f * px, dashed);
@@ -440,7 +450,7 @@ public sealed partial class EditorWindow : Window
         {
             StartDrag(e, _selected, handle, creating: false, p);
         }
-        else if (_document.HitTest(p, tolerance, includeBlurs: _tool is Tool.Select or Tool.Blur) is Annotation hit)
+        else if (_document.HitTest(p, tolerance, includeAreaEffects: _tool is Tool.Select or Tool.Blur or Tool.Spotlight) is Annotation hit)
         {
             // Clicking an existing object grabs it, whichever tool is active.
             Select(hit);
@@ -475,10 +485,21 @@ public sealed partial class EditorWindow : Window
             return;
         }
 
+        if (_tool == Tool.Step)
+        {
+            // Placed on press; dragging before release moves it into position.
+            var step = new StepAnnotation(p, _color, weight, Unit);
+            _document.Annotations.Add(step);
+            Select(step);
+            StartDrag(e, step, handle: -1, creating: true, p);
+            return;
+        }
+
         TwoPointAnnotation shape = _tool switch
         {
             Tool.Arrow => new ArrowAnnotation(p, _color, weight, Unit),
             Tool.Blur => new BlurAnnotation(p, _document.Image, _document.ImageBounds, _pixelate, weight, Unit),
+            Tool.Spotlight => new SpotlightAnnotation(p, _document.ImageBounds, weight, Unit),
             _ => new RectangleAnnotation(p, _color, weight, Unit),
         };
         _document.Annotations.Add(shape);
@@ -534,7 +555,7 @@ public sealed partial class EditorWindow : Window
             _document.Annotations.Remove(shape);
             Select(null);
         }
-        else if (_drag.Moved)
+        else if (_drag.Moved || _drag.Creating)
         {
             Commit();
         }
@@ -548,7 +569,7 @@ public sealed partial class EditorWindow : Window
     private void Canvas_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
     {
         var p = ToDocument(e.GetPosition(Canvas).ToVector2());
-        if (_document.HitTest(p, HitTolerance / _view.M11, includeBlurs: false) is TextAnnotation text)
+        if (_document.HitTest(p, HitTolerance / _view.M11, includeAreaEffects: false) is TextAnnotation text)
         {
             Select(text);
             BeginTextEdit(text, isNew: false);

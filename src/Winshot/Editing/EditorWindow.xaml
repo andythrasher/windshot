@@ -16,9 +16,19 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <CommandBar HorizontalAlignment="Left" DefaultLabelPosition="Right" IsDynamicOverflowEnabled="False">
-            <AppBarButton x:Name="UndoButton" Icon="Undo" LabelPosition="Collapsed" Click="Undo_Click" IsEnabled="False" ToolTipService.ToolTip="Undo (Ctrl+Z)" />
-            <AppBarButton x:Name="RedoButton" Icon="Redo" LabelPosition="Collapsed" Click="Redo_Click" IsEnabled="False" ToolTipService.ToolTip="Redo (Ctrl+Y)" />
+        <!-- Icon-only, like Snipping Tool; labels live in the tooltips. -->
+        <CommandBar x:Name="Toolbar" HorizontalAlignment="Left" DefaultLabelPosition="Collapsed" IsDynamicOverflowEnabled="False">
+            <CommandBar.Resources>
+                <!-- Compact, Snipping Tool-sized buttons; the defaults leave room for labels. -->
+                <Style TargetType="AppBarButton" BasedOn="{StaticResource DefaultAppBarButtonStyle}">
+                    <Setter Property="Width" Value="44" />
+                </Style>
+                <Style TargetType="AppBarToggleButton" BasedOn="{StaticResource DefaultAppBarToggleButtonStyle}">
+                    <Setter Property="Width" Value="44" />
+                </Style>
+            </CommandBar.Resources>
+            <AppBarButton x:Name="UndoButton" Icon="Undo" Click="Undo_Click" IsEnabled="False" ToolTipService.ToolTip="Undo (Ctrl+Z)" />
+            <AppBarButton x:Name="RedoButton" Icon="Redo" Click="Redo_Click" IsEnabled="False" ToolTipService.ToolTip="Redo (Ctrl+Y)" />
             <AppBarSeparator />
             <AppBarToggleButton x:Name="SelectButton" Label="Select" Click="ToolButton_Click" Tag="Select" ToolTipService.ToolTip="Select (V)">
                 <AppBarToggleButton.Icon>
@@ -43,6 +53,17 @@
             <AppBarToggleButton x:Name="BlurButton" Label="Blur" Click="ToolButton_Click" Tag="Blur" ToolTipService.ToolTip="Blur (B)">
                 <AppBarToggleButton.Icon>
                     <FontIcon Glyph="&#xE8B9;" />
+                </AppBarToggleButton.Icon>
+            </AppBarToggleButton>
+            <AppBarToggleButton Label="Step" Click="ToolButton_Click" Tag="Step" ToolTipService.ToolTip="Numbered step (N)">
+                <AppBarToggleButton.Icon>
+                    <!-- A "1" inside a ring (even-odd fill makes the ring). -->
+                    <PathIcon Data="F0 M8,0.5 A7.5,7.5 0 1 1 8,15.5 A7.5,7.5 0 1 1 8,0.5 Z M8,1.9 A6.1,6.1 0 1 0 8,14.1 A6.1,6.1 0 1 0 8,1.9 Z M7.3,4.3 L8.7,4.3 L8.7,11.7 L7.3,11.7 Z M7.3,4.3 L5.4,5.9 L5.4,7.3 L7.3,5.8 Z" />
+                </AppBarToggleButton.Icon>
+            </AppBarToggleButton>
+            <AppBarToggleButton Label="Spotlight" Click="ToolButton_Click" Tag="Spotlight" ToolTipService.ToolTip="Spotlight (S)">
+                <AppBarToggleButton.Icon>
+                    <FontIcon Glyph="&#xE706;" />
                 </AppBarToggleButton.Icon>
             </AppBarToggleButton>
             <AppBarSeparator />

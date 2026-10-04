@@ -35,14 +35,7 @@ internal sealed class TextAnnotation : Annotation, IDisposable
 
     private float OutlineWidth => FontSize * 0.14f;
 
-    private Color OutlineColor
-    {
-        get
-        {
-            double luminance = (0.2126 * Color.R + 0.7152 * Color.G + 0.0722 * Color.B) / 255;
-            return luminance > 0.6 ? Color.FromArgb(255, 24, 24, 24) : Color.FromArgb(255, 255, 255, 255);
-        }
-    }
+    private Color OutlineColor => Color.Contrasting();
 
     private CanvasTextLayout Layout
     {

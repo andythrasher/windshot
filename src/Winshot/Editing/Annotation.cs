@@ -29,6 +29,13 @@ internal abstract class Annotation
     /// <summary>Image pixels per DIP on the source monitor, so a weight looks the same on any display.</summary>
     public float Unit { get; }
 
+    /// <summary>
+    /// Area effects (blur, spotlight) change a region of the screenshot itself: they paint
+    /// beneath other annotations, never extend the canvas, and are only grabbable with the
+    /// Select tool or their own tool, so you can still start an arrow on top of them.
+    /// </summary>
+    public virtual bool IsAreaEffect => false;
+
     public abstract Rect Bounds { get; }
 
     public abstract void Draw(CanvasDrawingSession ds);

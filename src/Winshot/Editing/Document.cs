@@ -56,35 +56,38 @@ internal sealed class Document : IDisposable
     }
 
     /// <param name="skip">An annotation the editor is showing some other way, e.g. text being typed.</param>
+    /// <summary>
+    /// Paints in layers: the image, then area effects (blurs, then the spotlight dimming),
+    /// then every other annotation on top, so arrows and text stay crisp and bright.
+    /// </summary>
     public void Render(CanvasDrawingSession ds, Annotation? skip = null)
     {
         ds.DrawImage(Image, 0, 0);
-        foreach (var annotation in InPaintOrder())
+
+        foreach (var blur in Annotations.OfType<BlurAnnotation>())
+            blur.Draw(ds);
+        SpotlightAnnotation.DrawDimming(ds, ImageBounds, Annotations.OfType<SpotlightAnnotation>().ToList());
+
+        int step = 0;
+        foreach (var annotation in Annotations.Where(a => !a.IsAreaEffect))
         {
+            if (annotation is StepAnnotation marker)
+                marker.Number = ++step;
             if (annotation != skip)
                 annotation.Draw(ds);
         }
     }
 
-    /// <summary>
-    /// Blurs are part of the picture, so they paint right after the image and under every
-    /// other annotation, whatever order they were drawn in.
-    /// </summary>
-    private IEnumerable<Annotation> InPaintOrder() =>
-        Annotations.Where(a => a is BlurAnnotation).Concat(Annotations.Where(a => a is not BlurAnnotation));
-
-    /// <param name="includeBlurs">
-    /// Blurs fill their whole area; leaving them out lets you start an arrow on a blurred region
-    /// instead of accidentally grabbing the blur.
+    /// <param name="includeAreaEffects">
+    /// Area effects fill their whole region; leaving them out lets you start an arrow inside
+    /// a blur or spotlight instead of accidentally grabbing it.
     /// </param>
-    public Annotation? HitTest(Vector2 point, float tolerance, bool includeBlurs)
+    public Annotation? HitTest(Vector2 point, float tolerance, bool includeAreaEffects)
     {
-        foreach (var annotation in InPaintOrder().Reverse())
-        {
-            if ((includeBlurs || annotation is not BlurAnnotation) && annotation.HitTest(point, tolerance))
-                return annotation;
-        }
-        return null;
+        // Topmost first: regular annotations paint above area effects.
+        var ordered = Annotations.Where(a => !a.IsAreaEffect).Reverse()
+            .Concat(includeAreaEffects ? Annotations.Where(a => a.IsAreaEffect).Reverse() : []);
+        return ordered.FirstOrDefault(a => a.HitTest(point, tolerance));
     }
 
     /// <summary>Renders the full canvas to a PNG. Area outside the image is transparent.</summary>

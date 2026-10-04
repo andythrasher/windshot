@@ -28,6 +28,8 @@ internal sealed class BlurAnnotation : BoxAnnotation, IDisposable
     /// </summary>
     public bool Pixelate { get; set; }
 
+    public override bool IsAreaEffect => true;
+
     private float BlockSize => (4 + Weight * 2) * Unit;
 
     private float BlurAmount => (3 + Weight * 1.5f) * Unit;
