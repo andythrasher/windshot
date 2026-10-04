@@ -31,6 +31,21 @@ gradient backdrop with rounded corners and a shadow, in the editor and in everyt
 **Ctrl+P** pins the result above other windows where it was captured: drag to move, scroll to
 zoom, Ctrl+scroll for opacity, Esc or middle-click to close, right-click for more.
 
+## Settings
+
+`%LOCALAPPDATA%\Winshot\settings.json` (tray menu → Settings…). Hand-editable; comments and
+trailing commas are fine, and changes apply when you save, with no restart needed.
+
+- `Hotkeys`: `Capture` and `CopyText`, written like `"Ctrl+Shift+2"`, `"Alt+S"` or `"PrintScreen"`
+  (for Print Screen, first turn off "Use the Print screen key to open screen capture" in
+  Windows Settings → Accessibility → Keyboard).
+- `Editor`: per-tool sizes (1–10), colors (`"#RRGGBB"`), pixelate and text background.
+  Saved automatically when an editor closes.
+- `Beautify`: `OnByDefault`, `Preset` (Sky, Sunset, Grape, Mint, Peach, Night, Graphite,
+  Paper) and `Padding`.
+
+If the file can't be read, Winshot uses defaults and keeps the broken copy as `settings.json.bad`.
+
 Log: `%LOCALAPPDATA%\Winshot\winshot.log`.
 
 ## Design notes

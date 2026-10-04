@@ -42,31 +42,22 @@ public sealed partial class EditorWindow : Window
     private const float MinShapeSize = 3;
     private static readonly Color AccentColor = Color.FromArgb(255, 0, 120, 212);
 
-    // Beautify starts off for every capture; the chosen gradient and padding carry over (for this session).
-    private static int s_backdropPreset;
-    private static double s_backdropPadding = 64;
-
     private readonly Document _document;
     private readonly System.Drawing.Rectangle _desktopBounds;
     private readonly List<Microsoft.UI.Xaml.Controls.Button> _backdropSwatches = new();
     private readonly History _history;
     private readonly List<Microsoft.UI.Xaml.Controls.Button> _swatches = new();
-    private Color _color = Palette.Colors[0].Color;
+
+    // Preferences: loaded from settings when the editor opens, saved back when it closes.
+    private readonly Dictionary<Tool, int> _toolWeights;
+    private Color _color;
     // The highlighter keeps its own color: yellow highlights shouldn't turn your arrows yellow.
-    private Color _highlightColor = Palette.Colors[2].Color;
-    private readonly Dictionary<Tool, int> _toolWeights = new()
-    {
-        [Tool.Arrow] = 4,
-        [Tool.Rectangle] = 3,
-        [Tool.Text] = 4,
-        [Tool.Blur] = 4,
-        [Tool.Step] = 4,
-        [Tool.Spotlight] = 4,
-        [Tool.Highlighter] = 4,
-    };
-    private bool _pixelate = true;
+    private Color _highlightColor;
+    private bool _pixelate;
     private bool _textBoxed;
     private bool _beautify;
+    private int _backdropPreset;
+    private double _backdropPadding;
 
     private Tool _tool;
     private Annotation? _selected;
@@ -105,6 +96,17 @@ public sealed partial class EditorWindow : Window
         _desktopBounds = capture.DesktopBounds;
         _history = new History(_document);
 
+        var prefs = Settings.Current;
+        _toolWeights = new Dictionary<Tool, int>(prefs.Editor.Sizes);
+        _color = ColorExtensions.TryParseHex(prefs.Editor.Color, out var color) ? color : Palette.Colors[0].Color;
+        _highlightColor = ColorExtensions.TryParseHex(prefs.Editor.HighlighterColor, out var highlight) ? highlight : Palette.Colors[2].Color;
+        _pixelate = prefs.Editor.Pixelate;
+        _textBoxed = prefs.Editor.TextBackground;
+        _beautify = prefs.Beautify.OnByDefault;
+        _backdropPreset = Math.Max(0, Array.FindIndex(BackdropPresets.All,
+            p => p.Name.Equals(prefs.Beautify.Preset, StringComparison.OrdinalIgnoreCase)));
+        _backdropPadding = Math.Clamp(prefs.Beautify.Padding, 16, 160);
+
         // Hooked up here rather than in XAML: setting Minimum during load fires ValueChanged
         // before the rest of the window exists.
         WeightSlider.ValueChanged += WeightSlider_ValueChanged;
@@ -112,10 +114,28 @@ public sealed partial class EditorWindow : Window
         BuildBackdropControls();
         SizeToCapture(capture);
         SetTool(Tool.Arrow);
-        Closed += (_, _) => _document.Dispose();
+        Closed += (_, _) =>
+        {
+            SavePreferences();
+            _document.Dispose();
+        };
     }
 
     private float Unit => (float)_document.SourceScale;
+
+    /// <summary>Remembers this editor's sizes, colors and styles for next time.</summary>
+    private void SavePreferences()
+    {
+        var prefs = Settings.Current;
+        prefs.Editor.Sizes = new Dictionary<Tool, int>(_toolWeights);
+        prefs.Editor.Color = _color.ToHex();
+        prefs.Editor.HighlighterColor = _highlightColor.ToHex();
+        prefs.Editor.Pixelate = _pixelate;
+        prefs.Editor.TextBackground = _textBoxed;
+        prefs.Beautify.Preset = BackdropPresets.All[_backdropPreset].Name;
+        prefs.Beautify.Padding = _backdropPadding;
+        Settings.Save();
+    }
 
     private void SizeToCapture(CapturedImage capture)
     {
@@ -919,7 +939,7 @@ public sealed partial class EditorWindow : Window
             ToolTipService.SetToolTip(swatch, name);
             swatch.Click += (_, _) =>
             {
-                s_backdropPreset = index;
+                _backdropPreset = index;
                 BeautifyButton.IsChecked = true; // turns beautify on if it was off
                 ApplyBackdrop();
             };
@@ -927,14 +947,14 @@ public sealed partial class EditorWindow : Window
             BackdropSwatches.Children.Add(swatch);
         }
 
-        PaddingSlider.Value = s_backdropPadding;
+        PaddingSlider.Value = _backdropPadding;
         // Hooked up after setting the initial value, so loading doesn't count as a change.
         PaddingSlider.ValueChanged += (_, e) =>
         {
-            s_backdropPadding = e.NewValue;
+            _backdropPadding = e.NewValue;
             ApplyBackdrop();
         };
-        BeautifyButton.IsChecked = false;
+        BeautifyButton.IsChecked = _beautify;
         ApplyBackdrop();
     }
 
@@ -946,10 +966,10 @@ public sealed partial class EditorWindow : Window
 
     private void ApplyBackdrop()
     {
-        var (_, from, to) = BackdropPresets.All[s_backdropPreset];
-        _document.Backdrop = _beautify ? new Backdrop(from, to, (float)s_backdropPadding) : null;
+        var (_, from, to) = BackdropPresets.All[_backdropPreset];
+        _document.Backdrop = _beautify ? new Backdrop(from, to, (float)_backdropPadding) : null;
         for (int i = 0; i < _backdropSwatches.Count; i++)
-            _backdropSwatches[i].BorderThickness = new Thickness(i == s_backdropPreset ? 2 : 0);
+            _backdropSwatches[i].BorderThickness = new Thickness(i == _backdropPreset ? 2 : 0);
         Canvas.Invalidate();
     }
 

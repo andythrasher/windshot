@@ -3,7 +3,6 @@ using Microsoft.UI.Xaml;
 using Winshot.Capture;
 using Winshot.Editing;
 using Winshot.Shell;
-using Keys = System.Windows.Forms.Keys;
 
 namespace Winshot;
 
@@ -42,16 +41,82 @@ public partial class App : Application
         // Stay alive with zero windows open; we only exit from the tray menu.
         DispatcherShutdownMode = DispatcherShutdownMode.OnExplicitShutdown;
 
+        Settings.Load();
         _hotkeys = new HotkeyWindow();
-        string? captureHotkey = Register(Keys.D2, "Ctrl+Shift+2", StartCapture);
-        string? copyTextHotkey = Register(Keys.D3, "Ctrl+Shift+3", StartTextCapture);
-        _tray = new TrayIcon(StartCapture, StartTextCapture, Quit, captureHotkey, copyTextHotkey);
-        Log.Write($"Started; hotkeys capture={captureHotkey ?? "taken"} text={copyTextHotkey ?? "taken"}");
+        _tray = new TrayIcon(StartCapture, StartTextCapture, OpenSettings, Quit);
+        string hotkeys = ApplyHotkeys();
+        WatchSettingsFile(dispatcher);
+        Log.Write($"Started; {hotkeys}");
     }
 
-    /// <returns>The shortcut's label, or null if another app already owns it.</returns>
-    private string? Register(Keys key, string label, Action handler) =>
-        _hotkeys!.TryRegister(HotkeyModifiers.Control | HotkeyModifiers.Shift, key, handler) ? label : null;
+    /// <summary>(Re)registers the hotkeys from settings and shows them in the tray menu.</summary>
+    /// <returns>A summary for the log.</returns>
+    private string ApplyHotkeys()
+    {
+        var keys = Settings.Current.Hotkeys;
+        _hotkeys!.UnregisterAll();
+        string? capture = _hotkeys.TryRegister(keys.Capture, StartCapture) ? keys.Capture : null;
+        string? copyText = _hotkeys.TryRegister(keys.CopyText, StartTextCapture) ? keys.CopyText : null;
+        _tray!.SetShortcuts(capture, copyText);
+        return $"hotkeys capture={capture ?? $"'{keys.Capture}' unavailable"} text={copyText ?? $"'{keys.CopyText}' unavailable"}";
+    }
+
+    private FileSystemWatcher? _settingsWatcher;
+    private DispatcherQueueTimer? _settingsReload;
+
+    /// <summary>Hand edits to the settings file apply as soon as it's saved.</summary>
+    private void WatchSettingsFile(DispatcherQueue dispatcher)
+    {
+        // Editors save in bursts (and we swap in a temp file), so wait for things to settle.
+        _settingsReload = dispatcher.CreateTimer();
+        _settingsReload.Interval = TimeSpan.FromMilliseconds(400);
+        _settingsReload.IsRepeating = false;
+        _settingsReload.Tick += (_, _) => ReloadSettings();
+
+        _settingsWatcher = new FileSystemWatcher(Path.GetDirectoryName(Settings.FilePath)!, Path.GetFileName(Settings.FilePath))
+        {
+            NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.Size,
+        };
+        FileSystemEventHandler changed = (_, _) => dispatcher.TryEnqueue(() =>
+        {
+            _settingsReload.Stop();
+            _settingsReload.Start();
+        });
+        _settingsWatcher.Changed += changed;
+        _settingsWatcher.Created += changed;
+        _settingsWatcher.Renamed += (s, e) => changed(s, e);
+        _settingsWatcher.EnableRaisingEvents = true;
+    }
+
+    private void ReloadSettings()
+    {
+        // Our own saves (e.g. when an editor closes) aren't edits to react to.
+        if (DateTime.UtcNow - Settings.LastSavedUtc < TimeSpan.FromSeconds(2))
+            return;
+
+        var before = Settings.Current.Hotkeys;
+        Settings.Load();
+        var after = Settings.Current.Hotkeys;
+        if (before.Capture != after.Capture || before.CopyText != after.CopyText)
+            Log.Write($"Settings reloaded; {ApplyHotkeys()}");
+        else
+            Log.Write("Settings reloaded");
+    }
+
+    private static void OpenSettings()
+    {
+        if (!File.Exists(Settings.FilePath))
+            Settings.Save();
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Settings.FilePath) { UseShellExecute = true });
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            // No app is associated with .json; Notepad is always there.
+            System.Diagnostics.Process.Start("notepad.exe", $"\"{Settings.FilePath}\"");
+        }
+    }
 
     /// <summary>Select a region and copy its text, without opening the editor.</summary>
     private void StartTextCapture()
@@ -100,6 +165,7 @@ public partial class App : Application
 
     private void Quit()
     {
+        _settingsWatcher?.Dispose();
         _hotkeys?.Dispose();
         _tray?.Dispose();
         Exit();
