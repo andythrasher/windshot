@@ -43,8 +43,6 @@ internal sealed class ScrollStitcher
     private const double MaxRival = 0.7;
     /// <summary>Candidate offsets from the quick pass that get the full comparison.</summary>
     private const int Candidates = 8;
-    /// <summary>A footer row may still have this share of its pixels change.</summary>
-    private const double MostlyStayed = 0.05;
 
     private readonly int _width;
     private readonly int _height;
@@ -138,7 +136,7 @@ internal sealed class ScrollStitcher
         if (offset < 0)
             return StitchResult.ScrolledBack;
 
-        _footer ??= FindFooter(a, frame, moving);
+        _footer ??= FindFooter(a, frame, offset);
         footer = _footer.Value;
         body = _height - footer;
         if (offset >= body)
@@ -171,31 +169,31 @@ internal sealed class ScrollStitcher
         return (offset, matches, rows);
     }
 
-    /// <summary>Rows at the bottom that (nearly all) stayed put while the content moved, up to a third of the height.</summary>
+    /// <summary>Rows at the bottom that didn't move with the content, up to a third of the height.</summary>
     /// <remarks>
+    /// A row belongs to the footer when it looks more like itself in place than like the
+    /// content that would have scrolled there. That holds even when it changed a little: a
+    /// window's border changes color when the window loses focus (as it does when the panel
+    /// is clicked), and a link preview or animation can sit in it.
     /// Erring large is harmless: rows below the cut come from the last frame, so the result
     /// still runs on continuously, and a blank stretch of content that merely looked static
     /// just arrives there instead. Erring small repeats the footer after every slice, so
-    /// there's no attempt to tell a flat-colored footer from blank content that scrolled, and
-    /// a row still counts when a little of it changed (a link preview, an animation).
+    /// ties (flat rows that look the same either way) count as footer.
     /// </remarks>
-    private int FindFooter(int[] a, int[] b, List<(int Start, int End)> moving)
+    private int FindFooter(int[] a, int[] b, int offset)
     {
-        int columns = moving.Sum(r => r.End - r.Start);
         int footer = 0;
-        for (int y = _height - 1; y >= _height * 2 / 3; y--, footer++)
+        for (int y = _height - 1; y >= _height * 2 / 3 && y - offset >= 0; y--, footer++)
         {
-            int changed = 0;
-            foreach (var (start, end) in moving)
+            long inPlace = 0, scrolled = 0;
+            for (int x = 0; x < _width; x++)
             {
-                for (int x = start; x < end; x++)
-                {
-                    int i = y * _width + x;
-                    if (Math.Abs(Brightness(a[i]) - Brightness(b[i])) > ChangedPixel)
-                        changed++;
-                }
+                int pa = Brightness(a[y * _width + x]);
+                inPlace += Math.Abs(pa - Brightness(b[y * _width + x]));
+                // If row y moved with the content, it's now offset rows higher.
+                scrolled += Math.Abs(pa - Brightness(b[(y - offset) * _width + x]));
             }
-            if (changed > columns * MostlyStayed)
+            if (inPlace > scrolled)
                 break;
         }
         return footer;

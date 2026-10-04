@@ -29,9 +29,11 @@ internal sealed class AutoScroller : IDisposable
     private const int SettleTimeoutMs = 1000;
     /// <summary>Notches without any movement before trying the next way of scrolling.</summary>
     private const int TriesPerMethod = 4;
-    /// <summary>Notches that moved things but never added anything, before giving up.</summary>
+    /// <summary>Notches in a row that moved things but added nothing, before giving up.</summary>
     private const int MaxFruitlessSteps = 8;
-    /// <summary>How long the content must stay still, after it has moved, to count as the end.</summary>
+    /// <summary>Notches in a row that move nothing, after it has scrolled, that mean the end of the page.</summary>
+    private const int EndQuietSteps = 3;
+    /// <summary>How long without anything added, after it has scrolled, before stopping anyway.</summary>
     private const int EndQuietMs = 1500;
     /// <summary>Hand jitter on a mouse that's just been let go of shouldn't count as taking it back.</summary>
     private const int CursorSlack = 8;
@@ -47,6 +49,10 @@ internal sealed class AutoScroller : IDisposable
     private bool _sawMotion;
     private bool _progressed;
     private int _fruitlessSteps;
+    /// <summary>Notches in a row after which nothing on screen moved.</summary>
+    private int _quietSteps;
+    private bool _movedSinceStep;
+    private bool _appendedSinceStep;
     private long _lastStep = long.MinValue / 2;
     private long _lastProgress;
 
@@ -64,10 +70,10 @@ internal sealed class AutoScroller : IDisposable
     public AutoScrollState Tick(StitchResult result, bool still, long now)
     {
         if (!still && _steps > 0)
-            _sawMotion = true;
+            _sawMotion = _movedSinceStep = true;
         if (result == StitchResult.Appended)
         {
-            _progressed = true;
+            _progressed = _appendedSinceStep = true;
             _lastProgress = now;
             _fruitlessSteps = 0;
         }
@@ -84,7 +90,17 @@ internal sealed class AutoScroller : IDisposable
         if (now - _lastStep < StepMs || (!still && now - _lastStep < SettleTimeoutMs))
             return AutoScrollState.Running;
 
-        if (_progressed && now - _lastProgress > EndQuietMs)
+        // What the last notch did, now that it has settled.
+        if (_steps > 0)
+        {
+            if (!_movedSinceStep)
+                _quietSteps++; // nothing moved: the end of the page, if it had been scrolling
+            else
+                _quietSteps = 0;
+            if (_movedSinceStep && !_appendedSinceStep)
+                _fruitlessSteps++; // it moved, but nothing lined up
+        }
+        if (_progressed && (_quietSteps >= EndQuietSteps || now - _lastProgress > EndQuietMs))
             return AutoScrollState.AtEnd;
         if (!_sawMotion && _steps >= TriesPerMethod)
         {
@@ -103,7 +119,7 @@ internal sealed class AutoScroller : IDisposable
         bool backUp = result == StitchResult.Lost && still;
         Wheel(backUp ? WheelNotch : -WheelNotch);
         _steps++;
-        _fruitlessSteps++; // reset when a frame gets appended
+        _movedSinceStep = _appendedSinceStep = false;
         _lastStep = now;
         return AutoScrollState.Running;
     }
