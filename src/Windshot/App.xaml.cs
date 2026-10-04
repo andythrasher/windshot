@@ -46,7 +46,8 @@ public partial class App : Application
         _tray = new TrayIcon(StartCapture, StartTextCapture, StartScrollingCapture, OpenSettings, Quit);
         string hotkeys = ApplyHotkeys();
         WatchSettingsFile(dispatcher);
-        Log.Write($"Started; {hotkeys}");
+        int pins = PinStore.RestoreAll(OpenEditor);
+        Log.Write($"Started; {hotkeys}" + (pins > 0 ? $"; restored {pins} pins" : ""));
     }
 
     /// <summary>(Re)registers the hotkeys from settings and shows them in the tray menu.</summary>
@@ -180,6 +181,8 @@ public partial class App : Application
 
     private void Quit()
     {
+        // Pins stay for next time; only closing one yourself removes it.
+        PinWindow.AppExiting = true;
         _settingsWatcher?.Dispose();
         _hotkeys?.Dispose();
         _tray?.Dispose();

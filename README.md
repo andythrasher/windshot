@@ -54,7 +54,9 @@ drawn with hard edges for inspection; exports are unaffected.
 **Beautify** (toolbar toggle; its arrow picks a gradient and padding) puts the capture on a
 gradient backdrop with rounded corners and a shadow, in the editor and in everything exported.
 **Ctrl+P** pins the result above other windows where it was captured: drag to move, scroll to
-zoom, Ctrl+scroll for opacity, Esc or middle-click to close, right-click for more.
+zoom, Ctrl+scroll for opacity, Esc or middle-click to close, right-click for more. Pins stay
+put across restarts (and crashes) until you close them; they're kept in
+`%LOCALAPPDATA%\Windshot\pins`.
 
 ## Settings
 

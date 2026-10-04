@@ -9,7 +9,8 @@ namespace Windshot.Shell;
 
 /// <summary>
 /// A capture floating above other windows. Drag to move, scroll to zoom around the cursor,
-/// Ctrl+scroll for opacity, Esc or middle-click to close, right-click for more.
+/// Ctrl+scroll for opacity, Esc or middle-click to close, right-click for more. Pins outlive
+/// restarts (see <see cref="PinStore"/>) until they're closed.
 /// </summary>
 internal sealed class PinWindow : Form
 {
@@ -23,21 +24,34 @@ internal sealed class PinWindow : Form
 
     private readonly Bitmap _image;
     private readonly double _scale;
+    /// <summary>Names its files in <see cref="PinStore"/>.</summary>
+    private readonly string _id;
+    private readonly bool _restored;
     private readonly Action<CapturedImage> _edit;
     /// <summary>Transparent pixels (rounded window corners, unfilled canvas) show what's behind.</summary>
     private readonly bool _opaque;
     private float _zoom = 1;
     private double _opacity = 1;
     private Point? _grab;
+    private bool _dragged;
+
+    /// <summary>Set while Windshot quits, so closing pins then keeps them for next time.</summary>
+    public static bool AppExiting { get; set; }
 
     /// <param name="location">Where the image's top-left goes, in physical desktop pixels.</param>
     /// <param name="scale">Device pixels per DIP of the source capture, kept for editing later.</param>
-    public PinWindow(Bitmap image, Point location, double scale, Action<CapturedImage> edit)
+    /// <param name="id">For a pin restored from <see cref="PinStore"/>, with its zoom and opacity; null for a new one.</param>
+    public PinWindow(Bitmap image, Point location, double scale, Action<CapturedImage> edit,
+        string? id = null, float zoom = 1, double opacity = 1)
     {
         _image = image;
         _scale = scale;
         _edit = edit;
         _opaque = IsOpaque(image);
+        _restored = id is not null;
+        _id = id ?? Guid.NewGuid().ToString("N");
+        _zoom = Math.Clamp(zoom, MinZoom, MaxZoom);
+        _opacity = Math.Clamp(opacity, 0.2, 1);
 
         FormBorderStyle = FormBorderStyle.None;
         StartPosition = FormStartPosition.Manual;
@@ -46,7 +60,7 @@ internal sealed class PinWindow : Form
         TopMost = true;
         DoubleBuffered = true;
         KeyPreview = true;
-        Bounds = new Rectangle(location, image.Size);
+        Bounds = new Rectangle(location, new Size(Math.Max(1, (int)(image.Width * _zoom)), Math.Max(1, (int)(image.Height * _zoom))));
         ContextMenuStrip = BuildMenu();
         Open.Add(this);
     }
@@ -90,13 +104,22 @@ internal sealed class PinWindow : Form
     {
         _opacity = opacity;
         Render();
+        SaveState();
     }
 
     protected override void OnShown(EventArgs e)
     {
         base.OnShown(e);
         Render();
+        if (!_restored)
+        {
+            PinStore.SaveImage(_id, _image);
+            SaveState();
+        }
     }
+
+    private void SaveState() =>
+        PinStore.SaveState(_id, new PinStore.PinState(Left, Top, _zoom, _opacity, _scale));
 
     /// <summary>
     /// Draws the pin into the layered window. Unlike painting, this keeps the image's own
@@ -171,7 +194,10 @@ internal sealed class PinWindow : Form
     protected override void OnMouseDown(MouseEventArgs e)
     {
         if (e.Button == MouseButtons.Left)
+        {
             _grab = e.Location;
+            _dragged = false;
+        }
         else if (e.Button == MouseButtons.Middle)
             Close();
     }
@@ -179,10 +205,19 @@ internal sealed class PinWindow : Form
     protected override void OnMouseMove(MouseEventArgs e)
     {
         if (_grab is Point grab)
+        {
             Location = new Point(Cursor.Position.X - grab.X, Cursor.Position.Y - grab.Y);
+            _dragged = true;
+        }
     }
 
-    protected override void OnMouseUp(MouseEventArgs e) => _grab = null;
+    protected override void OnMouseUp(MouseEventArgs e)
+    {
+        _grab = null;
+        if (_dragged)
+            SaveState();
+        _dragged = false;
+    }
 
     protected override void OnMouseWheel(MouseEventArgs e)
     {
@@ -211,6 +246,7 @@ internal sealed class PinWindow : Form
             size.Width, size.Height);
         _zoom = zoom;
         Render();
+        SaveState();
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
@@ -244,6 +280,9 @@ internal sealed class PinWindow : Form
     {
         // Closing a modeless form disposes it, which also releases the image.
         Open.Remove(this);
+        // Closed by the user (or turned back into an editor): it's gone for good.
+        if (!AppExiting)
+            PinStore.Delete(_id);
         base.OnFormClosed(e);
     }
 
