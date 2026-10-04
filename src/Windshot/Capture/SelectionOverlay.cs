@@ -114,10 +114,8 @@ internal sealed class SelectionOverlay : Form
         g.DrawImage(_dim, e.ClipRectangle, e.ClipRectangle, GraphicsUnit.Pixel);
         DrawHint(g);
 
-        if (_selection.Width > 0 && _selection.Height > 0)
-            DrawLit(g, _selection, _selection.Size, Color.White, 1);
-        else if (_dragStart is null && !_rulerOn && HoverClientRect() is Rectangle window)
-            DrawLit(g, window, _hover!.Value.Size, WindowHighlight, (int)Math.Ceiling(2 * MonitorScale));
+        if (CurrentLit() is Lit lit)
+            DrawLit(g, lit);
 
         if (_cursor is Point cursor)
         {
@@ -243,21 +241,65 @@ internal sealed class SelectionOverlay : Form
         UpdateCursorAids(null); // the cursor moved to another monitor's overlay
     }
 
-    /// <summary>Shows an area at full brightness, outlined, with its size (which may be larger than the visible part).</summary>
-    private void DrawLit(Graphics g, Rectangle area, Size size, Color border, int thickness)
+    /// <summary>An area shown at full brightness, outlined, with its size (which may be larger than the visible part).</summary>
+    private readonly record struct Lit(Rectangle Area, Size Size, Color Border, int Thickness);
+
+    /// <summary>What's lit right now: the selection while dragging, else the window under the cursor.</summary>
+    private Lit? CurrentLit()
     {
+        // Until the mouse has clearly moved, a press is still a click on the hovered window.
+        bool dragging = _selection.Width >= MinSelection || _selection.Height >= MinSelection;
+        if (dragging)
+            return _selection.Width > 0 && _selection.Height > 0 ? new Lit(_selection, _selection.Size, Color.White, 1) : null;
+        if (!_rulerOn && HoverClientRect() is Rectangle window)
+            return new Lit(window, _hover!.Value.Size, WindowHighlight, (int)Math.Ceiling(2 * MonitorScale));
+        return null;
+    }
+
+    /// <summary>
+    /// Everything the lit area paints, label included. Painting and invalidation both go
+    /// through here so they can't disagree; when they did, stale outlines and labels stayed
+    /// on screen (e.g. a label wider than a narrow selection).
+    /// </summary>
+    private Rectangle LitBounds(Lit lit) => Rectangle.Union(lit.Area, LabelBounds(lit, out _));
+
+    private Rectangle LabelBounds(Lit lit, out string label)
+    {
+        label = $"{lit.Size.Width} × {lit.Size.Height}";
+        var text = TextRenderer.MeasureText(label, LabelFont);
+        var rect = new Rectangle(lit.Area.Right - text.Width - 4, lit.Area.Bottom + 4, text.Width + 4, text.Height + 2);
+        if (rect.Bottom > ClientSize.Height)
+            rect.Y = lit.Area.Bottom - rect.Height - 4;
+        return rect;
+    }
+
+    /// <summary>The lit area as last invalidated, so it can be erased when it changes.</summary>
+    private Lit? _litShown;
+
+    /// <summary>Call after anything that changes <see cref="CurrentLit"/>: repaints where it was and where it is.</summary>
+    private void RefreshLit()
+    {
+        var lit = CurrentLit();
+        if (lit == _litShown)
+            return;
+        if (_litShown is Lit old)
+            Invalidate(LitBounds(old));
+        if (lit is Lit now)
+            Invalidate(LitBounds(now));
+        _litShown = lit;
+    }
+
+    private void DrawLit(Graphics g, Lit lit)
+    {
+        var area = lit.Area;
         g.CompositingMode = CompositingMode.SourceCopy;
         g.DrawImage(_bright, area, area, GraphicsUnit.Pixel);
 
         g.CompositingMode = CompositingMode.SourceOver;
-        using (var pen = new Pen(border, thickness) { Alignment = PenAlignment.Inset })
+        using (var pen = new Pen(lit.Border, lit.Thickness) { Alignment = PenAlignment.Inset })
             g.DrawRectangle(pen, area.X, area.Y, area.Width - 1, area.Height - 1);
 
-        string label = $"{size.Width} × {size.Height}";
-        var text = TextRenderer.MeasureText(label, LabelFont);
-        var labelRect = new Rectangle(area.Right - text.Width - 4, area.Bottom + 4, text.Width + 4, text.Height + 2);
-        if (labelRect.Bottom > ClientSize.Height)
-            labelRect.Y = area.Bottom - labelRect.Height - 4;
+        var labelRect = LabelBounds(lit, out string label);
         using (var bg = new SolidBrush(Color.FromArgb(200, 32, 32, 32)))
             g.FillRectangle(bg, labelRect);
         TextRenderer.DrawText(g, label, LabelFont, labelRect, Color.White,
@@ -289,21 +331,8 @@ internal sealed class SelectionOverlay : Form
     {
         var desktop = new Point(client.X + _monitorBounds.X, client.Y + _monitorBounds.Y);
         var target = WindowAt(desktop);
-        if (_hover == target)
-            return;
-
-        InvalidateHover();
         _hover = target;
-        InvalidateHover();
-    }
-
-    private void InvalidateHover()
-    {
-        if (HoverClientRect() is Rectangle area)
-        {
-            area.Inflate(4, 40); // room for the border and size label
-            Invalidate(area);
-        }
+        RefreshLit();
     }
 
     protected override void OnShown(EventArgs e)
@@ -362,9 +391,6 @@ internal sealed class SelectionOverlay : Form
         var rect = Rectangle.FromLTRB(
             Math.Min(start.X, e.X), Math.Min(start.Y, e.Y),
             Math.Max(start.X, e.X), Math.Max(start.Y, e.Y));
-        // Once it's clearly a drag, the window highlight gives way to the region.
-        if (_selection.IsEmpty && rect.Width >= MinSelection && rect.Height >= MinSelection)
-            InvalidateHover();
         SetSelection(Rectangle.Intersect(rect, ClientRectangle));
     }
 
@@ -407,7 +433,7 @@ internal sealed class SelectionOverlay : Form
                 break;
             case Keys.R when e.Modifiers == Keys.None:
                 _rulerOn = !_rulerOn;
-                InvalidateHover(); // the window highlight gives way to the ruler, and back
+                RefreshLit(); // the window highlight gives way to the ruler, and back
                 UpdateCursorAids(_cursor);
                 break;
             case Keys.M when e.Modifiers == Keys.None:
@@ -428,11 +454,8 @@ internal sealed class SelectionOverlay : Form
 
     private void SetSelection(Rectangle rect)
     {
-        // Repaint only what changed: old and new selection plus room for the size label.
-        var dirty = Rectangle.Union(_selection, rect);
-        dirty.Inflate(2, 40);
         _selection = rect;
-        Invalidate(dirty);
+        RefreshLit();
     }
 
     protected override void Dispose(bool disposing)
