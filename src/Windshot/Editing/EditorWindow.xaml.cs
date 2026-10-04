@@ -115,7 +115,8 @@ public sealed partial class EditorWindow : Window
         SizeToCapture(capture);
         if (File.Exists(AppIcon.FilePath))
             AppWindow.SetIcon(AppIcon.FilePath);
-        SetTool(Tool.Arrow);
+        // Start in Select so a stray click doesn't draw something.
+        SetTool(Tool.Select);
         Closed += (_, _) =>
         {
             SavePreferences();
