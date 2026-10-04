@@ -14,7 +14,12 @@ src/Windshot/bin/Debug/net10.0-windows10.0.26100.0/win-x64/Windshot.exe
 
 The app lives in the tray. **Ctrl+Shift+2** captures: drag a region, or click to capture the
 window under the cursor (click the desktop for the whole monitor). Left-clicking the tray icon,
-or launching the exe again while it's running, does the same. **Ctrl+Shift+3** copies the text in a region
+or launching the exe again while it's running, does the same.
+
+While capturing, a magnifier follows the cursor with the color under it. **C** copies that
+color as hex, **R** toggles a smart ruler (measures the same-colored run through the cursor,
+e.g. a button's width and height; click to copy), **M** hides the magnifier, and the arrow
+keys nudge the cursor one pixel. **Ctrl+Shift+3** copies the text in a region
 straight to the clipboard (offline Windows OCR); in the editor, **Ctrl+Shift+C** does the same
 for the whole capture.
 
@@ -40,6 +45,7 @@ trailing commas are fine, and changes apply when you save, with no restart neede
 - `Hotkeys`: `Capture` and `CopyText`, written like `"Ctrl+Shift+2"`, `"Alt+S"` or `"PrintScreen"`
   (for Print Screen, first turn off "Use the Print screen key to open screen capture" in
   Windows Settings → Accessibility → Keyboard).
+- `Capture`: `ShowMagnifier` (default `true`).
 - `Editor`: per-tool sizes (1–10), colors (`"#RRGGBB"`), pixelate and text background.
   Saved automatically when an editor closes.
 - `Beautify`: `OnByDefault`, `Preset` (Sky, Sunset, Grape, Mint, Peach, Night, Graphite,

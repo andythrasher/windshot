@@ -33,6 +33,17 @@ internal sealed class SelectionOverlay : Form
     /// <summary>The window under the cursor, in desktop coordinates; what a click captures.</summary>
     private Rectangle? _hover;
 
+    private static readonly Color RulerColor = Color.FromArgb(255, 45, 120);
+
+    /// <summary>The cursor in client coordinates, while it's over this monitor.</summary>
+    private Point? _cursor;
+    private bool _showLoupe = Settings.Current.Capture.ShowMagnifier;
+    private bool _rulerOn;
+    private PixelRuler? _ruler;
+    private Measurement? _measurement;
+    /// <summary>Area currently covered by the loupe and ruler, so it can be repainted when they move.</summary>
+    private Rectangle _aidsArea;
+
     /// <param name="windows">Windows on screen at the moment of capture, front to back.</param>
     public SelectionOverlay(ScreenSnapshot snapshot, Rectangle monitorBounds, IReadOnlyList<WindowRegion> windows, string? hint)
     {
@@ -105,8 +116,131 @@ internal sealed class SelectionOverlay : Form
 
         if (_selection.Width > 0 && _selection.Height > 0)
             DrawLit(g, _selection, _selection.Size, Color.White, 1);
-        else if (_dragStart is null && HoverClientRect() is Rectangle window)
+        else if (_dragStart is null && !_rulerOn && HoverClientRect() is Rectangle window)
             DrawLit(g, window, _hover!.Value.Size, WindowHighlight, (int)Math.Ceiling(2 * MonitorScale));
+
+        if (_cursor is Point cursor)
+        {
+            if (_rulerOn && _dragStart is null && _measurement is Measurement m)
+                DrawRuler(g, m);
+            if (_showLoupe)
+                Loupe.Draw(g, _bright, cursor, Loupe.Bounds(cursor, ClientSize, MonitorScale), MonitorScale,
+                    ColorAt(cursor), ToDesktop(cursor));
+        }
+    }
+
+    // ---- Magnifier, color picker and ruler ---------------------------------------------
+
+    private Point ToDesktop(Point client) => new(client.X + _monitorBounds.X, client.Y + _monitorBounds.Y);
+
+    private Color ColorAt(Point client)
+    {
+        var c = _bright.GetPixel(Math.Clamp(client.X, 0, _bright.Width - 1), Math.Clamp(client.Y, 0, _bright.Height - 1));
+        return Color.FromArgb(255, c.R, c.G, c.B);
+    }
+
+    private void DrawRuler(Graphics g, Measurement m)
+    {
+        float thickness = (float)Math.Max(1, Math.Round(MonitorScale));
+        int tick = (int)(5 * MonitorScale);
+        var state = g.Save();
+        g.CompositingMode = CompositingMode.SourceOver;
+        g.SmoothingMode = SmoothingMode.None;
+        using (var pen = new Pen(RulerColor, thickness))
+        {
+            // Lines span the same-colored run, edge to edge, with end ticks.
+            int y = m.Origin.Y, x = m.Origin.X;
+            g.DrawLine(pen, m.Left, y, m.Right, y);
+            g.DrawLine(pen, m.Left, y - tick, m.Left, y + tick);
+            g.DrawLine(pen, m.Right, y - tick, m.Right, y + tick);
+            g.DrawLine(pen, x, m.Top, x, m.Bottom);
+            g.DrawLine(pen, x - tick, m.Top, x + tick, m.Top);
+            g.DrawLine(pen, x - tick, m.Bottom, x + tick, m.Bottom);
+        }
+
+        var label = RulerLabelBounds(m, out string text);
+        using (var bg = new SolidBrush(RulerColor))
+            g.FillRectangle(bg, label);
+        TextRenderer.DrawText(g, text, LabelFont, label, Color.White,
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
+        g.Restore(state);
+    }
+
+    /// <summary>The measurement label, above-left of the cursor so it doesn't collide with the loupe.</summary>
+    private Rectangle RulerLabelBounds(Measurement m, out string text)
+    {
+        text = $"{m.Width} × {m.Height}";
+        // At display scaling other than 100%, also give the size in 100%-scale pixels (CSS/design units).
+        if (Math.Abs(MonitorScale - 1) > 0.01)
+            text += $"   ({Math.Round(m.Width / MonitorScale)} × {Math.Round(m.Height / MonitorScale)} at 100%)";
+        var size = TextRenderer.MeasureText(text, LabelFont);
+        int gap = (int)(12 * MonitorScale);
+        var rect = new Rectangle(m.Origin.X - gap - size.Width - 8, m.Origin.Y - gap - size.Height - 4, size.Width + 8, size.Height + 4);
+        if (rect.X < 0) rect.X = m.Origin.X + gap;
+        if (rect.Y < 0) rect.Y = m.Origin.Y + gap;
+        return rect;
+    }
+
+    /// <summary>Moves the loupe and ruler to the cursor, repainting only where they were and are.</summary>
+    private void UpdateCursorAids(Point? cursor)
+    {
+        _cursor = cursor;
+        _measurement = null;
+        var area = Rectangle.Empty;
+        if (cursor is Point p)
+        {
+            if (_showLoupe)
+                area = Loupe.Bounds(p, ClientSize, MonitorScale);
+            if (_rulerOn)
+            {
+                _ruler ??= new PixelRuler(_bright);
+                var m = _ruler.Measure(p);
+                _measurement = m;
+                int tick = (int)(6 * MonitorScale) + 2;
+                area = Union(area, Rectangle.FromLTRB(m.Left - 2, m.Origin.Y - tick, m.Right + 3, m.Origin.Y + tick + 1));
+                area = Union(area, Rectangle.FromLTRB(m.Origin.X - tick, m.Top - 2, m.Origin.X + tick + 1, m.Bottom + 3));
+                area = Union(area, RulerLabelBounds(m, out _));
+            }
+        }
+        Invalidate(_aidsArea);
+        Invalidate(area);
+        _aidsArea = area;
+    }
+
+    private static Rectangle Union(Rectangle a, Rectangle b) => a.IsEmpty ? b : Rectangle.Union(a, b);
+
+    /// <summary>C: copy the color under the cursor and finish.</summary>
+    private void CopyColor()
+    {
+        if (_cursor is not Point p)
+            return;
+        var c = ColorAt(p);
+        string hex = $"#{c.R:X2}{c.G:X2}{c.B:X2}";
+        Clipboard.SetText(hex);
+        Finish($"Copied {hex}", p);
+    }
+
+    /// <summary>Click in ruler mode: copy the measurement and finish.</summary>
+    private void CopyMeasurement()
+    {
+        if (_measurement is not Measurement m)
+            return;
+        string text = $"{m.Width} × {m.Height}";
+        Clipboard.SetText(text);
+        Finish($"Copied {text}", m.Origin);
+    }
+
+    private void Finish(string message, Point client)
+    {
+        var desktop = ToDesktop(client);
+        Shell.Hud.Show(message, new Rectangle(desktop.X - 1, desktop.Y - 1, 2, 2), MonitorScale);
+        Cancelled?.Invoke(); // nothing to capture; just close the overlay
+    }
+
+    protected override void OnMouseLeave(EventArgs e)
+    {
+        base.OnMouseLeave(e);
+        UpdateCursorAids(null); // the cursor moved to another monitor's overlay
     }
 
     /// <summary>Shows an area at full brightness, outlined, with its size (which may be larger than the visible part).</summary>
@@ -177,7 +311,10 @@ internal sealed class SelectionOverlay : Form
         base.OnShown(e);
         // Light up whatever is under the cursor right away, before it moves.
         if (_monitorBounds.Contains(Cursor.Position))
+        {
             UpdateHover(PointToClient(Cursor.Position));
+            UpdateCursorAids(PointToClient(Cursor.Position));
+        }
     }
 
     private void DrawHint(Graphics g)
@@ -215,6 +352,7 @@ internal sealed class SelectionOverlay : Form
 
     protected override void OnMouseMove(MouseEventArgs e)
     {
+        UpdateCursorAids(e.Location);
         if (_dragStart is not Point start)
         {
             UpdateHover(e.Location);
@@ -242,6 +380,10 @@ internal sealed class SelectionOverlay : Form
             desktopRect.Offset(_monitorBounds.Location);
             Selected?.Invoke(this, desktopRect);
         }
+        else if (_rulerOn)
+        {
+            CopyMeasurement();
+        }
         else if (_hover is Rectangle window)
         {
             // A click: capture the window under the cursor.
@@ -255,9 +397,34 @@ internal sealed class SelectionOverlay : Form
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
-        if (e.KeyCode == Keys.Escape)
-            Cancelled?.Invoke();
+        switch (e.KeyCode)
+        {
+            case Keys.Escape:
+                Cancelled?.Invoke();
+                break;
+            case Keys.C when e.Modifiers == Keys.None:
+                CopyColor();
+                break;
+            case Keys.R when e.Modifiers == Keys.None:
+                _rulerOn = !_rulerOn;
+                InvalidateHover(); // the window highlight gives way to the ruler, and back
+                UpdateCursorAids(_cursor);
+                break;
+            case Keys.M when e.Modifiers == Keys.None:
+                _showLoupe = !_showLoupe;
+                UpdateCursorAids(_cursor);
+                break;
+            // Arrow keys nudge the cursor a pixel at a time, for precise picking and selecting.
+            case Keys.Left: Cursor.Position = Cursor.Position with { X = Cursor.Position.X - 1 }; break;
+            case Keys.Right: Cursor.Position = Cursor.Position with { X = Cursor.Position.X + 1 }; break;
+            case Keys.Up: Cursor.Position = Cursor.Position with { Y = Cursor.Position.Y - 1 }; break;
+            case Keys.Down: Cursor.Position = Cursor.Position with { Y = Cursor.Position.Y + 1 }; break;
+        }
     }
+
+    // Arrow keys are normally used for focus navigation; claim them for nudging instead.
+    protected override bool IsInputKey(Keys keyData) =>
+        keyData is Keys.Left or Keys.Right or Keys.Up or Keys.Down || base.IsInputKey(keyData);
 
     private void SetSelection(Rectangle rect)
     {

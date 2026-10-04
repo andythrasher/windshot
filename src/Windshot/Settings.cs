@@ -30,7 +30,14 @@ internal sealed class Settings
     };
 
     public HotkeySettings Hotkeys { get; set; } = new();
+    public CaptureSettings Capture { get; set; } = new();
     public EditorSettings Editor { get; set; } = new();
+
+    public sealed class CaptureSettings
+    {
+        /// <summary>Show the magnifier (with the color under the cursor) on the capture overlay. M toggles it.</summary>
+        public bool ShowMagnifier { get; set; } = true;
+    }
     public BeautifySettings Beautify { get; set; } = new();
 
     public sealed class HotkeySettings
@@ -144,6 +151,7 @@ internal sealed class Settings
     private void FillMissing()
     {
         Hotkeys ??= new HotkeySettings();
+        Capture ??= new CaptureSettings();
         Editor ??= new EditorSettings();
         Beautify ??= new BeautifySettings();
 
