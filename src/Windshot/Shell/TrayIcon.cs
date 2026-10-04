@@ -21,6 +21,11 @@ internal sealed class TrayIcon : IDisposable
         menu.Items.Add(_copyTextItem);
         menu.Items.Add("Close all pins", null, (_, _) => PinWindow.CloseAll());
         menu.Items.Add(new ToolStripSeparator());
+        var autostart = new ToolStripMenuItem("Start with Windows") { CheckOnClick = true };
+        autostart.Click += (_, _) => Autostart.Set(autostart.Checked);
+        // Read fresh each time: it can also be switched off in Task Manager.
+        menu.Opening += (_, _) => autostart.Checked = Autostart.IsEnabled;
+        menu.Items.Add(autostart);
         menu.Items.Add("Settings…", null, (_, _) => openSettings());
         menu.Items.Add("Quit Windshot", null, (_, _) => quit());
 

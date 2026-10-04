@@ -12,7 +12,9 @@ dotnet build src/Windshot
 src/Windshot/bin/Debug/net10.0-windows10.0.26100.0/win-x64/Windshot.exe
 ```
 
-The app lives in the tray. **Ctrl+Shift+2** captures: drag a region, or click to capture the
+The app lives in the tray; tick **Start with Windows** in its menu to have it there (with your
+pins) after signing in. That's the usual per-user startup entry, so it also shows in Task
+Manager's Startup apps, and turning it off there is reflected in the menu. **Ctrl+Shift+2** captures: drag a region, or click to capture the
 window under the cursor (click the desktop for the whole monitor). On Windows 11, window
 captures keep the window's rounded corners: what showed through them is made transparent, and
 stays transparent when copied (as PNG), saved or pinned. Left-clicking the tray icon,

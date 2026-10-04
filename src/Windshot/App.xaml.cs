@@ -29,7 +29,9 @@ public partial class App : Application
         _captureSignal = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\Windshot.Capture", out bool isFirstInstance);
         if (!isFirstInstance)
         {
-            _captureSignal.Set();
+            // Launched at sign-in while already running: nothing to do (and no surprise capture).
+            if (!Environment.GetCommandLineArgs().Contains(Shell.Autostart.Argument))
+                _captureSignal.Set();
             Exit();
             return;
         }
@@ -47,7 +49,9 @@ public partial class App : Application
         string hotkeys = ApplyHotkeys();
         WatchSettingsFile(dispatcher);
         int pins = PinStore.RestoreAll(OpenEditor);
-        Log.Write($"Started; {hotkeys}" + (pins > 0 ? $"; restored {pins} pins" : ""));
+        Autostart.Repair();
+        bool atSignIn = Environment.GetCommandLineArgs().Contains(Autostart.Argument);
+        Log.Write($"Started{(atSignIn ? " at sign-in" : "")}; {hotkeys}" + (pins > 0 ? $"; restored {pins} pins" : ""));
     }
 
     /// <summary>(Re)registers the hotkeys from settings and shows them in the tray menu.</summary>
