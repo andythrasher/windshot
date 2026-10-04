@@ -55,11 +55,15 @@ internal sealed class Document : IDisposable
         }
     }
 
-    public void Render(CanvasDrawingSession ds)
+    /// <param name="skip">An annotation the editor is showing some other way, e.g. text being typed.</param>
+    public void Render(CanvasDrawingSession ds, Annotation? skip = null)
     {
         ds.DrawImage(Image, 0, 0);
         foreach (var annotation in Annotations)
-            annotation.Draw(ds);
+        {
+            if (annotation != skip)
+                annotation.Draw(ds);
+        }
     }
 
     public Annotation? HitTest(Vector2 point, float tolerance)
@@ -91,5 +95,10 @@ internal sealed class Document : IDisposable
         return stream;
     }
 
-    public void Dispose() => Image.Dispose();
+    public void Dispose()
+    {
+        Image.Dispose();
+        foreach (var annotation in Annotations.OfType<IDisposable>())
+            annotation.Dispose();
+    }
 }

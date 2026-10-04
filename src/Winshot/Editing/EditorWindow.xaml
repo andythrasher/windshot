@@ -10,40 +10,50 @@
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <Grid x:Name="Root" KeyboardAcceleratorPlacementMode="Hidden">
+    <Grid x:Name="Root" KeyDown="Root_KeyDown">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Grid.KeyboardAccelerators>
-            <KeyboardAccelerator Key="Delete" Invoked="Delete_Invoked" />
-            <KeyboardAccelerator Key="V" Invoked="SelectTool_Invoked" />
-            <KeyboardAccelerator Key="R" Invoked="RectangleTool_Invoked" />
-        </Grid.KeyboardAccelerators>
-
         <CommandBar HorizontalAlignment="Left" DefaultLabelPosition="Right" IsDynamicOverflowEnabled="False">
-            <AppBarToggleButton x:Name="SelectButton" Label="Select" Click="SelectButton_Click" ToolTipService.ToolTip="Select (V)">
+            <AppBarToggleButton x:Name="SelectButton" Label="Select" Click="ToolButton_Click" Tag="Select" ToolTipService.ToolTip="Select (V)">
                 <AppBarToggleButton.Icon>
                     <FontIcon Glyph="&#xE7C9;" />
                 </AppBarToggleButton.Icon>
             </AppBarToggleButton>
-            <AppBarToggleButton x:Name="RectangleButton" Label="Rectangle" Click="RectangleButton_Click" ToolTipService.ToolTip="Rectangle (R)">
+            <AppBarToggleButton x:Name="ArrowButton" Label="Arrow" Click="ToolButton_Click" Tag="Arrow" ToolTipService.ToolTip="Arrow (A)">
+                <AppBarToggleButton.Icon>
+                    <FontIcon Glyph="&#xE72A;" />
+                </AppBarToggleButton.Icon>
+            </AppBarToggleButton>
+            <AppBarToggleButton x:Name="RectangleButton" Label="Rectangle" Click="ToolButton_Click" Tag="Rectangle" ToolTipService.ToolTip="Rectangle (R)">
                 <AppBarToggleButton.Icon>
                     <FontIcon Glyph="&#xE739;" />
                 </AppBarToggleButton.Icon>
             </AppBarToggleButton>
+            <AppBarToggleButton x:Name="TextButton" Label="Text" Click="ToolButton_Click" Tag="Text" ToolTipService.ToolTip="Text (T)">
+                <AppBarToggleButton.Icon>
+                    <FontIcon Glyph="&#xE8D2;" />
+                </AppBarToggleButton.Icon>
+            </AppBarToggleButton>
             <AppBarSeparator />
-            <AppBarButton Icon="Copy" Label="Copy" Click="Copy_Click">
-                <AppBarButton.KeyboardAccelerators>
-                    <KeyboardAccelerator Modifiers="Control" Key="C" />
-                </AppBarButton.KeyboardAccelerators>
-            </AppBarButton>
-            <AppBarButton Icon="Save" Label="Save" Click="Save_Click">
-                <AppBarButton.KeyboardAccelerators>
-                    <KeyboardAccelerator Modifiers="Control" Key="S" />
-                </AppBarButton.KeyboardAccelerators>
-            </AppBarButton>
+            <AppBarElementContainer VerticalContentAlignment="Center" ToolTipService.ToolTip="Size ([ and ])">
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="12,0">
+                    <TextBlock Text="Size" VerticalAlignment="Center" />
+                    <Slider
+                        x:Name="WeightSlider"
+                        Width="120"
+                        VerticalAlignment="Center"
+                        Minimum="1"
+                        Maximum="10"
+                        StepFrequency="1"
+                        IsThumbToolTipEnabled="True" />
+                </StackPanel>
+            </AppBarElementContainer>
+            <AppBarSeparator />
+            <AppBarButton Icon="Copy" Label="Copy" Click="Copy_Click" ToolTipService.ToolTip="Copy (Ctrl+C)" />
+            <AppBarButton Icon="Save" Label="Save" Click="Save_Click" ToolTipService.ToolTip="Save (Ctrl+S)" />
         </CommandBar>
 
         <!-- Transparent background makes the whole area hit-testable, not just drawn pixels. -->
@@ -53,12 +63,15 @@
             Background="Transparent"
             PointerPressed="Canvas_PointerPressed"
             PointerMoved="Canvas_PointerMoved"
-            PointerReleased="Canvas_PointerReleased">
+            PointerReleased="Canvas_PointerReleased"
+            DoubleTapped="Canvas_DoubleTapped">
             <canvas:CanvasControl
                 x:Name="Canvas"
                 ClearColor="Transparent"
                 CreateResources="Canvas_CreateResources"
                 Draw="Canvas_Draw" />
+            <!-- Hosts the inline text box while a text annotation is being typed. -->
+            <Canvas x:Name="TextLayer" />
         </Grid>
     </Grid>
 </Window>

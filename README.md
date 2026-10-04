@@ -13,8 +13,11 @@ src/Winshot/bin/Debug/net10.0-windows10.0.26100.0/win-x64/Winshot.exe
 ```
 
 The app lives in the tray. **Ctrl+Shift+2** captures a region (or left-click the tray icon,
-or launch the exe again while it's running). In the editor: **R** rectangle, **V** select,
-**Delete** removes the selected object, **Ctrl+C** copies, **Ctrl+S** saves.
+or launch the exe again while it's running).
+
+In the editor: **A** arrow, **R** rectangle, **T** text, **V** select. **[** and **]** (or the
+Size slider) change the selected object, or the next one drawn. Drag handles to reshape arrows
+and rectangles; double-click text to edit it. **Delete** removes, **Ctrl+C** copies, **Ctrl+S** saves.
 
 Log: `%LOCALAPPDATA%\Winshot\winshot.log`.
 
