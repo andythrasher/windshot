@@ -25,6 +25,9 @@ internal sealed class ScrollingCapture
     private Thread? _worker;
     private ScrollStitcher? _stitcher;
     private bool _ended;
+    /// <summary>Set from the panel, read by the worker thread.</summary>
+    private volatile bool _autoScroll;
+    private readonly Rectangle _panelBounds;
 
     private ScrollingCapture(Rectangle area, double scale, Action<CapturedImage> onCaptured)
     {
@@ -33,8 +36,14 @@ internal sealed class ScrollingCapture
         _onCaptured = onCaptured;
         _frame = new AreaFrame(area, scale);
         _panel = new ScrollPanel(area, scale);
+        _panelBounds = _panel.Bounds;
         _panel.Done += Finish;
         _panel.Cancelled += Cancel;
+        _panel.AutoScrollToggled += on =>
+        {
+            _autoScroll = on;
+            Log.Write($"Auto-scroll {(on ? "on" : "off")}");
+        };
     }
 
     /// <summary>Selects an area and starts; while a capture is running, finishes it instead.</summary>
@@ -84,21 +93,58 @@ internal sealed class ScrollingCapture
             ui.Post(_ => _panel.ShowProgress(StitchResult.Unchanged, stitcher.TotalHeight), null);
 
             var clock = System.Diagnostics.Stopwatch.StartNew();
-            while (!token.IsCancellationRequested)
+            AutoScroller? auto = null;
+            try
             {
-                long started = clock.ElapsedMilliseconds;
-                var result = stitcher.Add(grabber.Grab());
-                int height = stitcher.TotalHeight;
-                if (result != StitchResult.Unchanged)
-                    ui.Post(_ => _panel.ShowProgress(result, height), null);
-                if (result == StitchResult.Full)
+                while (!token.IsCancellationRequested)
                 {
-                    ui.Post(_ => Finish(), null);
-                    return;
+                    long started = clock.ElapsedMilliseconds;
+                    var result = stitcher.Add(grabber.Grab());
+                    int height = stitcher.TotalHeight;
+                    if (result != StitchResult.Unchanged)
+                        ui.Post(_ => _panel.ShowProgress(result, height), null);
+                    if (result == StitchResult.Full)
+                    {
+                        ui.Post(_ => Finish(), null);
+                        return;
+                    }
+
+                    // Auto-scroll is switched on and off from the panel; it's driven from here so it can react to each frame.
+                    if (_autoScroll && auto is null)
+                        auto = new AutoScroller(_area, _panelBounds);
+                    else if (!_autoScroll && auto is not null)
+                    {
+                        auto.Dispose();
+                        auto = null;
+                    }
+                    if (auto is not null && !token.IsCancellationRequested)
+                    {
+                        var state = auto.Tick(result, clock.ElapsedMilliseconds);
+                        if (state == AutoScrollState.AtEnd)
+                        {
+                            Log.Write("Auto-scroll reached the end");
+                            ui.Post(_ => Finish(), null);
+                            return;
+                        }
+                        if (state != AutoScrollState.Running)
+                        {
+                            Log.Write($"Auto-scroll stopped: {state}");
+                            _autoScroll = false;
+                            string message = state == AutoScrollState.Stuck
+                                ? "This window didn't scroll; scroll it yourself"
+                                : "Auto-scroll paused";
+                            ui.Post(_ => _panel.ShowAutoStopped(message), null);
+                        }
+                    }
+
+                    int wait = FrameIntervalMs - (int)(clock.ElapsedMilliseconds - started);
+                    if (wait > 0)
+                        token.WaitHandle.WaitOne(wait);
                 }
-                int wait = FrameIntervalMs - (int)(clock.ElapsedMilliseconds - started);
-                if (wait > 0)
-                    token.WaitHandle.WaitOne(wait);
+            }
+            finally
+            {
+                auto?.Dispose();
             }
         }
         catch (Exception ex)
@@ -240,8 +286,11 @@ internal sealed class ScrollingCapture
     /// <summary>Progress and the Done and Cancel buttons, beside the area. Doesn't take focus, so keys still scroll the app.</summary>
     private sealed class ScrollPanel : Form
     {
+        private const string AutoLabel = "Auto-scroll";
         private readonly Label _status;
+        private readonly Button _autoButton;
         private readonly Font _font;
+        private bool _auto;
 
         public ScrollPanel(Rectangle area, double scale)
         {
@@ -265,13 +314,15 @@ internal sealed class ScrollingCapture
                 Bounds = new Rectangle(S(14), 0, S(250), S(44)),
                 Text = "Scroll down to capture more",
             };
-            var done = MakeButton("Done", Color.FromArgb(64, 132, 214), new Rectangle(S(270), S(8), S(72), S(28)));
-            var cancel = MakeButton("Cancel", Color.FromArgb(64, 64, 64), new Rectangle(S(348), S(8), S(72), S(28)));
+            _autoButton = MakeButton(AutoLabel, Color.FromArgb(64, 64, 64), new Rectangle(S(270), S(8), S(104), S(28)));
+            var done = MakeButton("Done", Color.FromArgb(64, 132, 214), new Rectangle(S(380), S(8), S(72), S(28)));
+            var cancel = MakeButton("Cancel", Color.FromArgb(64, 64, 64), new Rectangle(S(458), S(8), S(72), S(28)));
+            _autoButton.Click += (_, _) => SetAuto(!_auto);
             done.Click += (_, _) => Done?.Invoke();
             cancel.Click += (_, _) => Cancelled?.Invoke();
-            Controls.AddRange([_status, done, cancel]);
+            Controls.AddRange([_status, _autoButton, done, cancel]);
 
-            var size = new Size(S(428), S(44));
+            var size = new Size(S(538), S(44));
             Size = size;
             Region = Region.FromHrgn(CreateRoundRectRgn(0, 0, size.Width + 1, size.Height + 1, S(12), S(12)));
             Location = Place(area, size, S(10));
@@ -279,8 +330,28 @@ internal sealed class ScrollingCapture
 
         public event Action? Done;
         public event Action? Cancelled;
+        public event Action<bool>? AutoScrollToggled;
 
         protected override bool ShowWithoutActivation => true;
+
+        private void SetAuto(bool on)
+        {
+            _auto = on;
+            _autoButton.Text = on ? "Stop" : AutoLabel;
+            if (on)
+                _status.Text = "Auto-scrolling…";
+            AutoScrollToggled?.Invoke(on);
+        }
+
+        /// <summary>Auto-scroll gave up or was interrupted; back to scrolling by hand.</summary>
+        public void ShowAutoStopped(string message)
+        {
+            if (IsDisposed)
+                return;
+            _auto = false;
+            _autoButton.Text = AutoLabel;
+            _status.Text = message;
+        }
 
         protected override CreateParams CreateParams
         {
@@ -305,9 +376,10 @@ internal sealed class ScrollingCapture
             string size = $"{height:N0} px";
             _status.Text = result switch
             {
+                StitchResult.Full => $"Reached the maximum height · {size}",
+                _ when _auto => $"Auto-scrolling · {size}", // auto-scroll recovers from the rest itself
                 StitchResult.Lost => "Lost track: scroll back up a little",
                 StitchResult.ScrolledBack => $"Scroll down to continue · {size}",
-                StitchResult.Full => $"Reached the maximum height · {size}",
                 _ => $"Scroll down · {size}",
             };
         }

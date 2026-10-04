@@ -36,7 +36,10 @@ handles to reshape arrows and rectangles; double-click text to edit it. **Ctrl+Z
 then scroll it yourself, with the wheel, keyboard or scrollbar. Windshot grabs frames as it moves
 and stitches them into one tall image. Sticky headers, footers and sidebars are handled; a
 panel below the area shows progress (if it says it lost track, you scrolled too fast, so back up a
-little). Press **Done**, Enter, or Ctrl+Shift+4 again to open the result. Selecting just
+little). Or press **Auto-scroll** on the panel: Windshot scrolls for you and opens the result
+when the page stops moving. It first sends wheel messages straight to the window, leaving
+your mouse alone; apps that ignore those get real wheel input, with the mouse parked over the
+area and put back afterwards (move the mouse to pause). Press **Done**, Enter, or Ctrl+Shift+4 again to open the result. Selecting just
 the scrolling part of a window (not its sidebar or toolbar) gives the cleanest result. Tall
 captures open at the top, fitted to the window's width; there the wheel scrolls and
 Ctrl+wheel zooms.
