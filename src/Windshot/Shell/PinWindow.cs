@@ -15,6 +15,7 @@ internal sealed class PinWindow : Form
 {
     private const int CS_DROPSHADOW = 0x20000;
     private const int WS_EX_TOOLWINDOW = 0x80;
+    private const int WS_EX_LAYERED = 0x80000;
     private const float MinZoom = 0.1f;
     private const float MaxZoom = 8f;
 
@@ -23,7 +24,10 @@ internal sealed class PinWindow : Form
     private readonly Bitmap _image;
     private readonly double _scale;
     private readonly Action<CapturedImage> _edit;
+    /// <summary>Transparent pixels (rounded window corners, unfilled canvas) show what's behind.</summary>
+    private readonly bool _opaque;
     private float _zoom = 1;
+    private double _opacity = 1;
     private Point? _grab;
 
     /// <param name="location">Where the image's top-left goes, in physical desktop pixels.</param>
@@ -33,6 +37,7 @@ internal sealed class PinWindow : Form
         _image = image;
         _scale = scale;
         _edit = edit;
+        _opaque = IsOpaque(image);
 
         FormBorderStyle = FormBorderStyle.None;
         StartPosition = FormStartPosition.Manual;
@@ -57,8 +62,11 @@ internal sealed class PinWindow : Form
         get
         {
             var cp = base.CreateParams;
-            cp.ClassStyle |= CS_DROPSHADOW;      // subtle shadow so it reads as floating
-            cp.ExStyle |= WS_EX_TOOLWINDOW;      // keep out of Alt+Tab
+            // A subtle shadow so it reads as floating; it's rectangular, so only for rectangular images.
+            if (_opaque)
+                cp.ClassStyle |= CS_DROPSHADOW;
+            // Layered with per-pixel alpha (see Render); kept out of Alt+Tab.
+            cp.ExStyle |= WS_EX_TOOLWINDOW | WS_EX_LAYERED;
             return cp;
         }
     }
@@ -70,7 +78,7 @@ internal sealed class PinWindow : Form
         menu.Items.Add("Edit", null, (_, _) => EditAndClose());
         var opacity = new ToolStripMenuItem("Opacity");
         foreach (int percent in new[] { 100, 75, 50, 25 })
-            opacity.DropDownItems.Add($"{percent}%", null, (_, _) => Opacity = percent / 100.0);
+            opacity.DropDownItems.Add($"{percent}%", null, (_, _) => SetOpacity(percent / 100.0));
         menu.Items.Add(opacity);
         menu.Items.Add("Reset zoom", null, (_, _) => SetZoom(1, new Point(0, 0)));
         menu.Items.Add(new ToolStripSeparator());
@@ -78,16 +86,86 @@ internal sealed class PinWindow : Form
         return menu;
     }
 
-    protected override void OnPaint(PaintEventArgs e)
+    private void SetOpacity(double opacity)
     {
-        var g = e.Graphics;
-        // Crisp pixels at 100% and when zoomed in; smooth when shrunk.
-        g.InterpolationMode = _zoom >= 1 ? InterpolationMode.NearestNeighbor : InterpolationMode.HighQualityBicubic;
-        g.PixelOffsetMode = PixelOffsetMode.Half;
-        g.DrawImage(_image, ClientRectangle);
+        _opacity = opacity;
+        Render();
+    }
 
-        using var border = new Pen(Color.FromArgb(70, 0, 0, 0));
-        g.DrawRectangle(border, 0, 0, ClientSize.Width - 1, ClientSize.Height - 1);
+    protected override void OnShown(EventArgs e)
+    {
+        base.OnShown(e);
+        Render();
+    }
+
+    /// <summary>
+    /// Draws the pin into the layered window. Unlike painting, this keeps the image's own
+    /// transparency, so rounded window corners stay round.
+    /// </summary>
+    private void Render()
+    {
+        if (!IsHandleCreated)
+            return;
+        var size = ClientSize;
+        using var frame = new Bitmap(Math.Max(1, size.Width), Math.Max(1, size.Height), PixelFormat.Format32bppPArgb);
+        using (var g = Graphics.FromImage(frame))
+        {
+            // Crisp pixels at 100% and when zoomed in; smooth when shrunk.
+            g.InterpolationMode = _zoom >= 1 ? InterpolationMode.NearestNeighbor : InterpolationMode.HighQualityBicubic;
+            g.PixelOffsetMode = PixelOffsetMode.Half;
+            g.DrawImage(_image, new Rectangle(Point.Empty, size));
+            g.PixelOffsetMode = PixelOffsetMode.None;
+            if (_opaque)
+            {
+                using var border = new Pen(Color.FromArgb(70, 0, 0, 0));
+                g.DrawRectangle(border, 0, 0, size.Width - 1, size.Height - 1);
+            }
+        }
+
+        var screen = GetDC(IntPtr.Zero);
+        var memory = CreateCompatibleDC(screen);
+        var bitmap = frame.GetHbitmap(Color.FromArgb(0)); // keeps alpha, premultiplied
+        var previous = SelectObject(memory, bitmap);
+        try
+        {
+            var position = new POINT { X = Left, Y = Top };
+            var extent = new SIZE { Width = size.Width, Height = size.Height };
+            var origin = new POINT();
+            var blend = new BLENDFUNCTION { BlendOp = AC_SRC_OVER, SourceConstantAlpha = (byte)Math.Round(_opacity * 255), AlphaFormat = AC_SRC_ALPHA };
+            UpdateLayeredWindow(Handle, screen, ref position, ref extent, memory, ref origin, 0, ref blend, ULW_ALPHA);
+        }
+        finally
+        {
+            SelectObject(memory, previous);
+            DeleteObject(bitmap);
+            DeleteDC(memory);
+            ReleaseDC(IntPtr.Zero, screen);
+        }
+    }
+
+    private static bool IsOpaque(Bitmap image)
+    {
+        if (!Image.IsAlphaPixelFormat(image.PixelFormat))
+            return true;
+        var data = image.LockBits(new Rectangle(Point.Empty, image.Size), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+        try
+        {
+            var row = new int[image.Width];
+            for (int y = 0; y < image.Height; y++)
+            {
+                Marshal.Copy(data.Scan0 + y * data.Stride, row, 0, row.Length);
+                foreach (int p in row)
+                {
+                    if ((uint)p >> 24 != 255)
+                        return false;
+                }
+            }
+            return true;
+        }
+        finally
+        {
+            image.UnlockBits(data);
+        }
     }
 
     protected override void OnMouseDown(MouseEventArgs e)
@@ -110,7 +188,7 @@ internal sealed class PinWindow : Form
     {
         int steps = Math.Sign(e.Delta);
         if (ModifierKeys.HasFlag(Keys.Control))
-            Opacity = Math.Clamp(Opacity + steps * 0.1, 0.2, 1);
+            SetOpacity(Math.Clamp(_opacity + steps * 0.1, 0.2, 1));
         else
             SetZoom(_zoom * MathF.Pow(1.1f, steps), e.Location);
     }
@@ -132,7 +210,7 @@ internal sealed class PinWindow : Form
             screenAnchor.Y - (int)(fy * size.Height),
             size.Width, size.Height);
         _zoom = zoom;
-        Invalidate();
+        Render();
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
@@ -175,4 +253,48 @@ internal sealed class PinWindow : Form
             _image.Dispose();
         base.Dispose(disposing);
     }
+
+    private const byte AC_SRC_OVER = 0;
+    private const byte AC_SRC_ALPHA = 1;
+    private const int ULW_ALPHA = 2;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct POINT
+    {
+        public int X, Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct SIZE
+    {
+        public int Width, Height;
+    }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    private struct BLENDFUNCTION
+    {
+        public byte BlendOp, BlendFlags, SourceConstantAlpha, AlphaFormat;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern bool UpdateLayeredWindow(IntPtr hwnd, IntPtr hdcDst, ref POINT pptDst, ref SIZE psize,
+        IntPtr hdcSrc, ref POINT pptSrc, int crKey, ref BLENDFUNCTION pblend, int dwFlags);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetDC(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern int ReleaseDC(IntPtr hwnd, IntPtr hdc);
+
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr CreateCompatibleDC(IntPtr hdc);
+
+    [DllImport("gdi32.dll")]
+    private static extern bool DeleteDC(IntPtr hdc);
+
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr SelectObject(IntPtr hdc, IntPtr obj);
+
+    [DllImport("gdi32.dll")]
+    private static extern bool DeleteObject(IntPtr obj);
 }

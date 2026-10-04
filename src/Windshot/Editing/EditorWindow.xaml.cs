@@ -1068,6 +1068,9 @@ public sealed partial class EditorWindow : Window
         var png = await _document.EncodePngAsync();
         var package = new DataPackage();
         package.SetBitmap(RandomAccessStreamReference.CreateFromStream(png));
+        // The bitmap format drops transparency (rounded window corners, unfilled canvas);
+        // most apps that paste images look for PNG first and keep it.
+        package.SetData("PNG", png.CloneStream());
         Clipboard.SetContent(package);
         Clipboard.Flush();
     }

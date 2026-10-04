@@ -4,17 +4,44 @@ using System.Text;
 
 namespace Windshot.Capture;
 
+/// <summary>How Windows 11 draws a window's corners.</summary>
+internal enum WindowCorners
+{
+    Square,
+    /// <summary>The usual 8 DIP radius.</summary>
+    Round,
+    /// <summary>4 DIPs, which windows can ask for.</summary>
+    RoundSmall,
+}
+
 /// <summary>A window the user can click to capture, in physical desktop pixels.</summary>
 /// <param name="IsDesktop">The desktop itself; clicking it captures the whole monitor instead.</param>
-internal readonly record struct WindowRegion(Rectangle Bounds, bool IsDesktop);
+internal readonly record struct WindowRegion(Rectangle Bounds, bool IsDesktop, WindowCorners Corners = WindowCorners.Square)
+{
+    /// <summary>The corner radius in physical pixels on a monitor at this scale.</summary>
+    public int CornerRadius(double scale) => (int)Math.Round(Corners switch
+    {
+        WindowCorners.Round => 8 * scale,
+        WindowCorners.RoundSmall => 4 * scale,
+        _ => 0,
+    });
+}
 
 /// <summary>Lists the windows on screen, front to back, at the moment of capture.</summary>
 internal static class WindowFinder
 {
     private const int WS_EX_TRANSPARENT = 0x20;
+    private const int GWL_STYLE = -16;
     private const int GWL_EXSTYLE = -20;
+    private const int WS_CAPTION = 0xC00000;
+    private const int WS_THICKFRAME = 0x40000;
     private const int DWMWA_EXTENDED_FRAME_BOUNDS = 9;
     private const int DWMWA_CLOAKED = 14;
+    private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
+    private const int DWMWCP_DEFAULT = 0, DWMWCP_DONOTROUND = 1, DWMWCP_ROUND = 2, DWMWCP_ROUNDSMALL = 3;
+
+    /// <summary>Rounded window corners arrived with Windows 11.</summary>
+    private static readonly bool RoundedCornersExist = Environment.OSVersion.Version.Build >= 22000;
 
     public static List<WindowRegion> VisibleWindows()
     {
@@ -51,7 +78,40 @@ internal static class WindowFinder
         var className = new StringBuilder(64);
         GetClassName(hwnd, className, className.Capacity);
         bool isDesktop = className.ToString() is "Progman" or "WorkerW";
-        return new WindowRegion(bounds, isDesktop);
+        return new WindowRegion(bounds, isDesktop, isDesktop ? WindowCorners.Square : CornersOf(hwnd));
+    }
+
+    /// <summary>
+    /// Windows 11 rounds framed windows unless they're maximized or snapped, or asked not to
+    /// be; a window can also ask for rounding (or small rounding) explicitly.
+    /// </summary>
+    private static WindowCorners CornersOf(IntPtr hwnd)
+    {
+        if (!RoundedCornersExist || IsZoomed(hwnd) || IsArranged(hwnd))
+            return WindowCorners.Square;
+        if (DwmGetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, out int preference, sizeof(int)) != 0)
+            preference = DWMWCP_DEFAULT;
+        return preference switch
+        {
+            DWMWCP_DONOTROUND => WindowCorners.Square,
+            DWMWCP_ROUND => WindowCorners.Round,
+            DWMWCP_ROUNDSMALL => WindowCorners.RoundSmall,
+            // By default only framed windows are rounded, not bare popups.
+            _ => (GetWindowLong(hwnd, GWL_STYLE) & (WS_CAPTION | WS_THICKFRAME)) != 0 ? WindowCorners.Round : WindowCorners.Square,
+        };
+    }
+
+    /// <summary>Snapped to an edge or a snap layout zone, where Windows squares the corners.</summary>
+    private static bool IsArranged(IntPtr hwnd)
+    {
+        try
+        {
+            return IsWindowArranged(hwnd);
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return false;
+        }
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -70,6 +130,12 @@ internal static class WindowFinder
 
     [DllImport("user32.dll")]
     private static extern bool IsIconic(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsZoomed(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsWindowArranged(IntPtr hwnd);
 
     [DllImport("user32.dll")]
     private static extern int GetWindowLong(IntPtr hwnd, int index);

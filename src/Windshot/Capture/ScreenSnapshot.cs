@@ -5,7 +5,10 @@ using System.Windows.Forms;
 
 namespace Windshot.Capture;
 
-/// <summary>Straight BGRA pixels handed from the capture side to the editor.</summary>
+/// <summary>
+/// Premultiplied BGRA pixels handed from the capture side to the editor. Screen captures are
+/// opaque, apart from the rounded corners of a captured window.
+/// </summary>
 /// <param name="Scale">Device pixels per DIP on the monitor the region came from.</param>
 /// <param name="DesktopBounds">Where the region was on screen, in physical pixels.</param>
 /// <param name="IsScrolling">Stitched from a scrolling capture, so likely much taller than the screen.</param>

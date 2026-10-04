@@ -31,10 +31,11 @@ internal sealed class EdgeColors
     public EdgeColors(byte[] bgra, int width, int height)
     {
         int depth = Math.Min(Depth, Math.Min(width, height));
+        // Not-quite-opaque pixels (a window capture's rounded corners) aren't background; -1 skips them.
         int Pixel(int x, int y)
         {
             int i = (y * width + x) * 4;
-            return bgra[i + 2] << 16 | bgra[i + 1] << 8 | bgra[i];
+            return bgra[i + 3] < 255 ? -1 : bgra[i + 2] << 16 | bgra[i + 1] << 8 | bgra[i];
         }
 
         var left = new int[height * depth];
@@ -85,18 +86,21 @@ internal sealed class EdgeColors
         // Quantize to 4 bits per channel to group near-identical shades, then average the
         // real colors inside the winning group.
         var counts = new Dictionary<int, (int Count, long R, long G, long B)>();
+        int total = 0;
         for (int i = from * _depth; i < to * _depth; i++)
         {
             int c = samples[i];
+            if (c < 0)
+                continue;
+            total++;
             int key = (c >> 20 & 0xF) << 8 | (c >> 12 & 0xF) << 4 | (c >> 4 & 0xF);
             counts.TryGetValue(key, out var bucket);
             counts[key] = (bucket.Count + 1, bucket.R + (c >> 16 & 0xFF), bucket.G + (c >> 8 & 0xFF), bucket.B + (c & 0xFF));
         }
 
         Color? result = null;
-        var top = counts.Values.MaxBy(b => b.Count);
-        int total = (to - from) * _depth;
-        if ((double)top.Count / total >= MinShare)
+        var top = total > 0 ? counts.Values.MaxBy(b => b.Count) : default;
+        if (total > 0 && (double)top.Count / total >= MinShare)
             result = Color.FromArgb(255, (byte)(top.R / top.Count), (byte)(top.G / top.Count), (byte)(top.B / top.Count));
 
         _cache[(side, from, to)] = result;

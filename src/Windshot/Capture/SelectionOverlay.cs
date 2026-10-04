@@ -32,6 +32,8 @@ internal sealed class SelectionOverlay : Form
     private Rectangle _selection;
     /// <summary>The window under the cursor, in desktop coordinates; what a click captures.</summary>
     private Rectangle? _hover;
+    /// <summary>The window behind <see cref="_hover"/>, unless that's a whole monitor.</summary>
+    private WindowRegion? _hoverWindow;
 
     private static readonly Color RulerColor = Color.FromArgb(255, 45, 120);
 
@@ -73,7 +75,8 @@ internal sealed class SelectionOverlay : Form
         Bounds = monitorBounds;
     }
 
-    public event Action<SelectionOverlay, Rectangle>? Selected;
+    /// <summary>An area was picked, in desktop pixels; with the window, when a window was clicked.</summary>
+    public event Action<SelectionOverlay, Rectangle, WindowRegion?>? Selected;
     public event Action? Cancelled;
 
     /// <summary>Device pixels per DIP on this monitor.</summary>
@@ -317,21 +320,21 @@ internal sealed class SelectionOverlay : Form
     }
 
     /// <summary>What a click at this point captures: the frontmost window there, or the monitor for the desktop.</summary>
-    private Rectangle WindowAt(Point desktop)
+    /// <returns>The area, and the window when it's a window (not the monitor).</returns>
+    private (Rectangle Area, WindowRegion? Window) WindowAt(Point desktop)
     {
         foreach (var window in _windows)
         {
             if (window.Bounds.Contains(desktop))
-                return window.IsDesktop ? _monitorBounds : Rectangle.Intersect(window.Bounds, _virtualBounds);
+                return window.IsDesktop ? (_monitorBounds, null) : (Rectangle.Intersect(window.Bounds, _virtualBounds), window);
         }
-        return _monitorBounds;
+        return (_monitorBounds, null);
     }
 
     private void UpdateHover(Point client)
     {
         var desktop = new Point(client.X + _monitorBounds.X, client.Y + _monitorBounds.Y);
-        var target = WindowAt(desktop);
-        _hover = target;
+        (_hover, _hoverWindow) = WindowAt(desktop);
         RefreshLit();
     }
 
@@ -404,7 +407,7 @@ internal sealed class SelectionOverlay : Form
         {
             var desktopRect = _selection;
             desktopRect.Offset(_monitorBounds.Location);
-            Selected?.Invoke(this, desktopRect);
+            Selected?.Invoke(this, desktopRect, null);
         }
         else if (_rulerOn)
         {
@@ -413,7 +416,7 @@ internal sealed class SelectionOverlay : Form
         else if (_hover is Rectangle window)
         {
             // A click: capture the window under the cursor.
-            Selected?.Invoke(this, window);
+            Selected?.Invoke(this, window, _hoverWindow);
         }
         else
         {

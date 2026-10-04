@@ -13,7 +13,9 @@ src/Windshot/bin/Debug/net10.0-windows10.0.26100.0/win-x64/Windshot.exe
 ```
 
 The app lives in the tray. **Ctrl+Shift+2** captures: drag a region, or click to capture the
-window under the cursor (click the desktop for the whole monitor). Left-clicking the tray icon,
+window under the cursor (click the desktop for the whole monitor). On Windows 11, window
+captures keep the window's rounded corners: what showed through them is made transparent, and
+stays transparent when copied (as PNG), saved or pinned. Left-clicking the tray icon,
 or launching the exe again while it's running, does the same.
 
 While capturing, a magnifier follows the cursor with the color under it. **C** copies that
