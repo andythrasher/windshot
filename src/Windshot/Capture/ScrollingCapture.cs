@@ -425,7 +425,6 @@ internal sealed class ScrollingCapture
                 ForeColor = Color.White,
                 Font = _font,
                 TabStop = false,
-                Cursor = Cursors.Hand,
             };
             button.FlatAppearance.BorderSize = 0;
             return button;

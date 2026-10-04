@@ -128,6 +128,48 @@ internal sealed class TextAnnotation : Annotation, IDisposable
 
     public override void MoveBy(Vector2 delta) => Position += delta;
 
+    /// <summary>The smallest and largest font sizes reachable by dragging a corner, in DIPs.</summary>
+    private const float MinResizeSize = 8, MaxResizeSize = 400;
+
+    /// <summary>The four corners, clockwise from top-left: dragging one scales the text.</summary>
+    public override IReadOnlyList<Vector2> Handles
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(Text))
+                return [];
+            var b = Bounds;
+            return [new((float)b.Left, (float)b.Top), new((float)b.Right, (float)b.Top),
+                    new((float)b.Right, (float)b.Bottom), new((float)b.Left, (float)b.Bottom)];
+        }
+    }
+
+    /// <summary>
+    /// Scales the text (font size, and the wrapping width if there is one) so the dragged
+    /// corner follows the pointer while the opposite corner stays put.
+    /// </summary>
+    public override void MoveHandle(int index, Vector2 position)
+    {
+        var corners = Handles;
+        if (corners.Count < 4)
+            return;
+        var anchor = corners[(index + 2) % 4];
+        var diagonal = corners[index] - anchor;
+        if (diagonal.LengthSquared() < 1)
+            return;
+
+        // How far along the diagonal the pointer is: 1 keeps the size, 2 doubles it.
+        float scale = Vector2.Dot(position - anchor, diagonal) / diagonal.LengthSquared();
+        float size = Math.Clamp(FontSize * scale, MinResizeSize * Unit, MaxResizeSize * Unit);
+        scale = size / FontSize;
+        FontSizeOverride = size;
+        if (WrapWidth is float wrap)
+            WrapWidth = wrap * scale;
+
+        // Shift so the opposite corner is back where it was.
+        Position += anchor - Handles[(index + 2) % 4];
+    }
+
     protected override void OnCloned()
     {
         // The layout is rebuilt lazily; sharing it would let one copy dispose the other's.

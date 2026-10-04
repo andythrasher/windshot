@@ -32,6 +32,7 @@ internal enum Tool
     Step,
     Spotlight,
     Highlighter,
+    Crop,
 }
 
 public sealed partial class EditorWindow : Window
@@ -162,6 +163,11 @@ public sealed partial class EditorWindow : Window
     private void SetTool(Tool tool)
     {
         CommitTextEdit();
+        // Leaving the crop tool applies the crop; entering it shows the whole canvas to crop from.
+        if (_tool == Tool.Crop && tool != Tool.Crop)
+            ApplyCrop();
+        else if (tool == Tool.Crop && _tool != Tool.Crop)
+            BeginCrop();
         _tool = tool;
         // Tool buttons are tagged with their Tool name.
         foreach (var button in Toolbar.PrimaryCommands.OfType<AppBarToggleButton>())
@@ -387,6 +393,13 @@ public sealed partial class EditorWindow : Window
     {
         if (_drag is not null)
             return;
+        if (_tool == Tool.Crop)
+        {
+            // While cropping, undo just drops the crop being adjusted.
+            CancelCrop();
+            SetTool(Tool.Select);
+            return;
+        }
         CommitTextEdit();
         if (undo ? _history.Undo(_document) : _history.Redo(_document))
             Select(null); // the restored objects are copies; the old selection no longer exists
@@ -431,6 +444,7 @@ public sealed partial class EditorWindow : Window
             case VirtualKey.P when ctrl: Pin_Click(this, new RoutedEventArgs()); break;
             case VirtualKey.C when ctrl: Copy_Click(this, new RoutedEventArgs()); break;
             case VirtualKey.S when ctrl: Save_Click(this, new RoutedEventArgs()); break;
+            case VirtualKey.C when !ctrl && !shift: SetTool(Tool.Crop); break;
             case VirtualKey.V when !ctrl: SetTool(Tool.Select); break;
             case VirtualKey.A when !ctrl: SetTool(Tool.Arrow); break;
             case VirtualKey.R when !ctrl: SetTool(Tool.Rectangle); break;
@@ -512,6 +526,8 @@ public sealed partial class EditorWindow : Window
 
         if (_selected is not null && _selected != _editingText)
             DrawSelection(ds, _selected);
+        if (_cropRect is { } crop)
+            DrawCropOverlay(ds, crop);
 
         if (_textDrag is not null)
         {
@@ -524,8 +540,8 @@ public sealed partial class EditorWindow : Window
     private void DrawSelection(CanvasDrawingSession ds, Annotation annotation)
     {
         float px = 1 / _view.M11;
-        // Text has no handles, and a blur has no visible edge; outline both so the extent is clear.
-        if (annotation.Handles.Count == 0 || annotation.IsAreaEffect)
+        // Text has no edge of its own, and neither does a blur; outline both so the extent is clear.
+        if (annotation.Handles.Count == 0 || annotation.IsAreaEffect || annotation is TextAnnotation)
         {
             using var dashed = new CanvasStrokeStyle { DashStyle = CanvasDashStyle.Dash };
             ds.DrawRectangle(annotation.Bounds.Inflate(2 * px), AccentColor, 1.5f * px, dashed);
@@ -593,7 +609,7 @@ public sealed partial class EditorWindow : Window
             CommitTextEdit();
             _pan = (e.Pointer.PointerId, point.Position.ToVector2());
             CanvasHost.CapturePointer(e.Pointer);
-            CanvasHost.Cursor = _moveCursor;
+            CanvasHost.Cursor = PanningCursor;
             e.Handled = true;
             return;
         }
@@ -611,6 +627,12 @@ public sealed partial class EditorWindow : Window
 
         var p = ToDocument(point.Position.ToVector2());
         float tolerance = HitTolerance / _view.M11;
+
+        if (_tool == Tool.Crop)
+        {
+            CropPressed(e, p);
+            return;
+        }
 
         if (_selected is not null && HitHandle(_selected, p) is int handle)
         {
@@ -734,6 +756,13 @@ public sealed partial class EditorWindow : Window
 
         var p = ToDocument(e.GetCurrentPoint(Canvas).Position.ToVector2());
 
+        if (_cropDrag is not null && e.Pointer.PointerId == _cropDrag.PointerId)
+        {
+            CropMoved(p);
+            e.Handled = true;
+            return;
+        }
+
         if (_textDrag is not null && e.Pointer.PointerId == _textDrag.PointerId)
         {
             _textDrag.End = p;
@@ -765,8 +794,15 @@ public sealed partial class EditorWindow : Window
         {
             _pan = null;
             CanvasHost.ReleasePointerCapture(e.Pointer);
-            CanvasHost.Cursor = _spaceHeld ? _panCursor : null;
+            CanvasHost.Cursor = _spaceHeld ? PanCursor : null;
             UpdateCursor(null);
+            e.Handled = true;
+            return;
+        }
+
+        if (_cropDrag is not null && e.Pointer.PointerId == _cropDrag.PointerId)
+        {
+            CropReleased(e);
             e.Handled = true;
             return;
         }
@@ -798,6 +834,7 @@ public sealed partial class EditorWindow : Window
 
         _drag = null;
         CanvasHost.ReleasePointerCapture(e.Pointer);
+        SyncSlider(); // resizing text changes its size
         Canvas.Invalidate();
         e.Handled = true;
     }
@@ -827,7 +864,6 @@ public sealed partial class EditorWindow : Window
     private bool _wheelScrolls;
     private (uint PointerId, Vector2 Last)? _pan;
     private bool _spaceHeld;
-    private readonly InputCursor _panCursor = InputSystemCursor.Create(InputSystemCursorShape.Hand);
 
     private float RasterScale => (float)(Canvas.XamlRoot?.RasterizationScale ?? 1.0);
 
@@ -905,15 +941,28 @@ public sealed partial class EditorWindow : Window
             ZoomButton.Content = text;
     }
 
-    // Space is caught on the way down (preview), so it pans instead of clicking a focused button.
+    // Space, and Enter or Esc while cropping, are caught on the way down (preview), so they
+    // act on the canvas instead of clicking whichever toolbar button has focus.
     private void Root_PreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
-        if (e.Key != VirtualKey.Space || _editingText is not null || e.OriginalSource is TextBox)
+        if (_editingText is not null || e.OriginalSource is TextBox)
+            return;
+        if (_tool == Tool.Crop && e.Key is VirtualKey.Enter or VirtualKey.Escape)
+        {
+            // Enter applies the crop (by leaving the tool); Esc puts it back as it was.
+            if (e.Key == VirtualKey.Escape)
+                CancelCrop();
+            SetTool(Tool.Select);
+            e.Handled = true;
+            return;
+        }
+        if (e.Key != VirtualKey.Space)
             return;
         if (!_spaceHeld)
         {
             _spaceHeld = true;
-            CanvasHost.Cursor = _panCursor;
+            if (_pan is null)
+                CanvasHost.Cursor = PanCursor;
         }
         e.Handled = true;
     }
@@ -933,14 +982,24 @@ public sealed partial class EditorWindow : Window
     private readonly InputCursor _crossCursor = InputSystemCursor.Create(InputSystemCursorShape.Cross);
     private readonly InputCursor _textCursor = InputSystemCursor.Create(InputSystemCursorShape.IBeam);
     private readonly InputCursor _moveCursor = InputSystemCursor.Create(InputSystemCursorShape.SizeAll);
-    private readonly InputCursor _handleCursor = InputSystemCursor.Create(InputSystemCursorShape.Hand);
+    private readonly InputCursor _resizeNwSeCursor = InputSystemCursor.Create(InputSystemCursorShape.SizeNorthwestSoutheast);
+    private readonly InputCursor _resizeNeSwCursor = InputSystemCursor.Create(InputSystemCursorShape.SizeNortheastSouthwest);
+    private readonly InputCursor _resizeNsCursor = InputSystemCursor.Create(InputSystemCursorShape.SizeNorthSouth);
+    private readonly InputCursor _resizeWeCursor = InputSystemCursor.Create(InputSystemCursorShape.SizeWestEast);
+    private InputCursor? _openHandCursor, _grabHandCursor;
+
+    /// <summary>Ready to pan (Space held): an open hand. Made on first use, when the display scale is known.</summary>
+    private InputCursor PanCursor => _openHandCursor ??= Shell.HandCursors.Open(RasterScale) ?? _moveCursor;
+
+    /// <summary>Panning: a grabbing hand.</summary>
+    private InputCursor PanningCursor => _grabHandCursor ??= Shell.HandCursors.Grab(RasterScale) ?? _moveCursor;
 
     /// <summary>Blur and spotlight can only be grabbed with Select or their own tool.</summary>
     private bool GrabsAreaEffects => _tool is Tool.Select or Tool.Blur or Tool.Spotlight;
 
     /// <summary>
     /// Crosshair for drawing tools, I-beam for text, arrow for select; over something that
-    /// can be grabbed, a move cursor (or a hand over a resize handle).
+    /// can be grabbed, a move cursor; over a handle, a resize arrow pointing the way it drags.
     /// </summary>
     /// <param name="point">The pointer in document space, or null if unknown.</param>
     private void UpdateCursor(Vector2? point)
@@ -957,12 +1016,28 @@ public sealed partial class EditorWindow : Window
 
         if (point is Vector2 p)
         {
-            if (_selected is not null && HitHandle(_selected, p) is not null)
-                cursor = _handleCursor;
+            if (_tool == Tool.Crop)
+                cursor = CropCursor(p);
+            else if (_selected is not null && HitHandle(_selected, p) is int handle)
+                cursor = HandleCursor(_selected, handle);
             else if (_document.HitTest(p, HitTolerance / _view.M11, GrabsAreaEffects) is Annotation hit)
                 cursor = hit is TextAnnotation && _tool == Tool.Text ? _textCursor : _moveCursor;
         }
         CanvasHost.Cursor = cursor;
+    }
+
+    /// <summary>
+    /// Corners of boxes and text resize diagonally, so they get the matching diagonal arrow;
+    /// the ends of arrows and highlights go anywhere, so they get the move cursor.
+    /// </summary>
+    private InputCursor HandleCursor(Annotation annotation, int handle)
+    {
+        var handles = annotation.Handles;
+        if (handles.Count != 4)
+            return _moveCursor;
+        var center = (handles[0] + handles[1] + handles[2] + handles[3]) / 4;
+        var offset = handles[handle] - center;
+        return offset.X * offset.Y >= 0 ? _resizeNwSeCursor : _resizeNeSwCursor;
     }
 
     // ---- Inline text editing -----------------------------------------------------------
@@ -1062,9 +1137,17 @@ public sealed partial class EditorWindow : Window
 
     // ---- Export ------------------------------------------------------------------------
 
-    private async void Copy_Click(object sender, RoutedEventArgs e)
+    /// <summary>Finishes whatever is in progress (typing, cropping) so exports include it.</summary>
+    private void FinishEditing()
     {
         CommitTextEdit();
+        if (_tool == Tool.Crop)
+            SetTool(Tool.Select);
+    }
+
+    private async void Copy_Click(object sender, RoutedEventArgs e)
+    {
+        FinishEditing();
         var png = await _document.EncodePngAsync();
         var package = new DataPackage();
         package.SetBitmap(RandomAccessStreamReference.CreateFromStream(png));
@@ -1073,12 +1156,23 @@ public sealed partial class EditorWindow : Window
         package.SetData("PNG", png.CloneStream());
         Clipboard.SetContent(package);
         Clipboard.Flush();
+        CloseAfterExport("Copied");
+    }
+
+    /// <summary>After a copy or save, close the editor (unless turned off in settings), saying what happened.</summary>
+    private void CloseAfterExport(string message)
+    {
+        if (!Settings.Current.Editor.CloseAfterSaveOrCopy)
+            return;
+        var window = new System.Drawing.Rectangle(AppWindow.Position.X, AppWindow.Position.Y, AppWindow.Size.Width, AppWindow.Size.Height);
+        Shell.Hud.Show(message, window, Content.XamlRoot.RasterizationScale);
+        Close();
     }
 
     /// <summary>Reads the text in the original screenshot (annotations ignored) and copies it.</summary>
     private async void CopyText_Click(object sender, RoutedEventArgs e)
     {
-        CommitTextEdit();
+        FinishEditing();
         var size = _document.Image.SizeInPixels;
         string message = await TextRecognizer.CopyToClipboardAsync(
             _document.Image.GetPixelBytes(), (int)size.Width, (int)size.Height, _document.SourceScale);
@@ -1093,7 +1187,7 @@ public sealed partial class EditorWindow : Window
     /// </summary>
     private async void Pin_Click(object sender, RoutedEventArgs e)
     {
-        CommitTextEdit();
+        FinishEditing();
         using var png = await _document.EncodePngAsync();
         using var stream = png.AsStreamForRead();
         System.Drawing.Bitmap image;
@@ -1178,6 +1272,7 @@ public sealed partial class EditorWindow : Window
         [nameof(Tool.Step)] = "number_circle_1",
         [nameof(Tool.Highlighter)] = "highlight",
         [nameof(Tool.Spotlight)] = "flashlight",
+        [nameof(Tool.Crop)] = "crop",
     };
 
     /// <summary>
@@ -1231,7 +1326,7 @@ public sealed partial class EditorWindow : Window
 
     private async void Save_Click(object sender, RoutedEventArgs e)
     {
-        CommitTextEdit();
+        FinishEditing();
         var picker = new FileSavePicker
         {
             SuggestedStartLocation = PickerLocationId.PicturesLibrary,
@@ -1245,8 +1340,11 @@ public sealed partial class EditorWindow : Window
             return;
 
         using var png = await _document.EncodePngAsync();
-        using var output = await file.OpenAsync(Windows.Storage.FileAccessMode.ReadWrite);
-        output.Size = 0;
-        await RandomAccessStream.CopyAndCloseAsync(png.GetInputStreamAt(0), output.GetOutputStreamAt(0));
+        using (var output = await file.OpenAsync(Windows.Storage.FileAccessMode.ReadWrite))
+        {
+            output.Size = 0;
+            await RandomAccessStream.CopyAndCloseAsync(png.GetInputStreamAt(0), output.GetOutputStreamAt(0));
+        }
+        CloseAfterExport($"Saved {file.Name}");
     }
 }

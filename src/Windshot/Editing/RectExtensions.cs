@@ -19,6 +19,13 @@ internal static class RectExtensions
         return a;
     }
 
+    /// <summary>The overlap of two rects, or empty if they don't overlap.</summary>
+    public static Rect IntersectWith(this Rect a, Rect b)
+    {
+        a.Intersect(b);
+        return a;
+    }
+
     public static bool ContainsRect(this Rect outer, Rect inner) =>
         inner.Left >= outer.Left && inner.Top >= outer.Top &&
         inner.Right <= outer.Right && inner.Bottom <= outer.Bottom;

@@ -70,6 +70,9 @@ internal sealed class Settings
         public string HighlighterColor { get; set; } = Palette.Colors[2].Color.ToHex();
         public bool Pixelate { get; set; } = true;
         public bool TextBackground { get; set; }
+
+        /// <summary>Close the editor once its image has been copied or saved.</summary>
+        public bool CloseAfterSaveOrCopy { get; set; } = true;
     }
 
     public sealed class BeautifySettings

@@ -43,6 +43,7 @@
             <AppBarToggleButton Label="Step" Click="ToolButton_Click" Tag="Step" ToolTipService.ToolTip="Numbered step (N)" />
             <AppBarToggleButton Label="Highlighter" Click="ToolButton_Click" Tag="Highlighter" ToolTipService.ToolTip="Highlighter (H)" />
             <AppBarToggleButton Label="Spotlight" Click="ToolButton_Click" Tag="Spotlight" ToolTipService.ToolTip="Spotlight (S)" />
+            <AppBarToggleButton Label="Crop" Click="ToolButton_Click" Tag="Crop" ToolTipService.ToolTip="Crop (C). Drag the edges or draw a new area; Enter applies, Esc cancels." />
             <AppBarSeparator />
             <AppBarToggleButton
                 x:Name="PixelateButton"

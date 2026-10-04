@@ -116,11 +116,12 @@ internal sealed class Document : IDisposable
                 allFilled = false;
         }
 
-        // Left and right bands run the full height, so they own the corners.
-        Fill(Sides.Left, new Rect(content.Left, content.Top, image.Left - content.Left, content.Height), true, b => b.Left < image.Left);
-        Fill(Sides.Right, new Rect(image.Right, content.Top, content.Right - image.Right, content.Height), true, b => b.Right > image.Right);
-        Fill(Sides.Top, new Rect(image.Left, content.Top, image.Width, image.Top - content.Top), false, b => b.Top < image.Top);
-        Fill(Sides.Bottom, new Rect(image.Left, image.Bottom, image.Width, content.Bottom - image.Bottom), false, b => b.Bottom > image.Bottom);
+        // Left and right bands run the full height, so they own the corners. A crop can cut
+        // into the image, leaving no band on that side (hence the Max).
+        Fill(Sides.Left, new Rect(content.Left, content.Top, Math.Max(0, image.Left - content.Left), content.Height), true, b => b.Left < image.Left);
+        Fill(Sides.Right, new Rect(image.Right, content.Top, Math.Max(0, content.Right - image.Right), content.Height), true, b => b.Right > image.Right);
+        Fill(Sides.Top, new Rect(image.Left, content.Top, image.Width, Math.Max(0, image.Top - content.Top)), false, b => b.Top < image.Top);
+        Fill(Sides.Bottom, new Rect(image.Left, image.Bottom, image.Width, Math.Max(0, content.Bottom - image.Bottom)), false, b => b.Bottom > image.Bottom);
         complete = allFilled;
         return fills;
     }
@@ -139,8 +140,15 @@ internal sealed class Document : IDisposable
         var fills = ExpansionFills(out bool complete);
         bool fillsInCard = complete && fills.Count > 0;
         var card = fillsInCard ? ContentBounds : ImageBounds;
+        // A crop cuts the card down too, so beautify rounds the cropped corners.
+        if (CropOverride is Rect crop)
+            card = card.IntersectWith(crop) is { IsEmpty: false } inside ? inside : crop;
         if (Backdrop is not null)
             DrawBackdrop(ds, Backdrop, card);
+
+        // Everything past the crop is hidden, on screen as in the export (which would only
+        // trim it at the canvas edge, leaving it on the beautify backdrop).
+        using var cropped = CropOverride is Rect cropRect ? ds.CreateLayer(1, cropRect) : null;
         if (!fillsInCard)
             DrawFills(ds, fills);
 
@@ -210,6 +218,9 @@ internal sealed class Document : IDisposable
     public Annotation? HitTest(Vector2 point, float tolerance, bool includeAreaEffects)
     {
         // Topmost first: regular annotations paint above area effects.
+        // Nothing outside the crop can be grabbed: it isn't shown.
+        if (CropOverride is Rect crop && !crop.Contains(point.ToPoint()))
+            return null;
         var ordered = Annotations.Where(a => !a.IsAreaEffect).Reverse()
             .Concat(includeAreaEffects ? Annotations.Where(a => a.IsAreaEffect).Reverse() : []);
         return ordered.FirstOrDefault(a => a.HitTest(point, tolerance));

@@ -34,6 +34,9 @@ internal sealed class PinWindow : Form
     private double _opacity = 1;
     private Point? _grab;
     private bool _dragged;
+    // It's moved by dragging anywhere, so it shows a hand: open, then grabbing while dragged.
+    private readonly Cursor _openHand;
+    private readonly Cursor _grabHand;
 
     /// <summary>Set while Windshot quits, so closing pins then keeps them for next time.</summary>
     public static bool AppExiting { get; set; }
@@ -62,6 +65,10 @@ internal sealed class PinWindow : Form
         KeyPreview = true;
         Bounds = new Rectangle(location, new Size(Math.Max(1, (int)(image.Width * _zoom)), Math.Max(1, (int)(image.Height * _zoom))));
         ContextMenuStrip = BuildMenu();
+        double dpiScale = DeviceDpi / 96.0;
+        _openHand = HandCursors.OpenForms(dpiScale) ?? Cursors.SizeAll;
+        _grabHand = HandCursors.GrabForms(dpiScale) ?? Cursors.SizeAll;
+        Cursor = _openHand;
         Open.Add(this);
     }
 
@@ -197,6 +204,7 @@ internal sealed class PinWindow : Form
         {
             _grab = e.Location;
             _dragged = false;
+            Cursor = _grabHand;
         }
         else if (e.Button == MouseButtons.Middle)
             Close();
@@ -214,6 +222,7 @@ internal sealed class PinWindow : Form
     protected override void OnMouseUp(MouseEventArgs e)
     {
         _grab = null;
+        Cursor = _openHand;
         if (_dragged)
             SaveState();
         _dragged = false;

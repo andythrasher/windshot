@@ -1,14 +1,16 @@
 namespace Windshot.Editing;
 
 /// <summary>
-/// Undo/redo as whole snapshots of the annotation list. Annotations are tiny and the bitmap
-/// never changes, so snapshots are cheap and far simpler than per-edit commands.
+/// Undo/redo as whole snapshots of the annotation list (and the crop). Annotations are tiny
+/// and the bitmap never changes, so snapshots are cheap and far simpler than per-edit commands.
 /// </summary>
 internal sealed class History
 {
     private const int MaxStates = 200;
 
-    private readonly List<Annotation[]> _states = new();
+    private sealed record State(Annotation[] Annotations, Windows.Foundation.Rect? Crop);
+
+    private readonly List<State> _states = new();
     private int _index;
     private object? _lastKey;
 
@@ -59,10 +61,11 @@ internal sealed class History
             annotation.Dispose();
         document.Annotations.Clear();
         // Clone again so the stored state stays untouched by later edits.
-        document.Annotations.AddRange(_states[index].Select(a => a.Clone()));
+        document.Annotations.AddRange(_states[index].Annotations.Select(a => a.Clone()));
+        document.CropOverride = _states[index].Crop;
         return true;
     }
 
-    private static Annotation[] Snapshot(Document document) =>
-        document.Annotations.Select(a => a.Clone()).ToArray();
+    private static State Snapshot(Document document) =>
+        new(document.Annotations.Select(a => a.Clone()).ToArray(), document.CropOverride);
 }

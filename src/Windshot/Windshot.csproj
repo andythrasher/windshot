@@ -29,6 +29,7 @@
   <ItemGroup>
     <!-- Also loaded at runtime for the tray and window icons. -->
     <Content Include="Assets\Windshot.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\*.cur" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
