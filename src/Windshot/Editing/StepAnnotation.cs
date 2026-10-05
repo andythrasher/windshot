@@ -46,7 +46,7 @@ internal sealed class StepAnnotation : Annotation
         string label = Number.ToString();
         using var format = new CanvasTextFormat
         {
-            FontFamily = TextAnnotation.FontFamily,
+            FontFamily = TextAnnotation.DefaultFontFamily,
             FontWeight = FontWeights.Bold,
             // Shrink a little for two or more digits so they stay inside the circle.
             FontSize = Radius * (label.Length > 1 ? 0.95f : 1.2f),

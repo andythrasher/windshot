@@ -55,6 +55,7 @@ public sealed partial class EditorWindow : Window
     private Color _highlightColor;
     private bool _pixelate;
     private bool _textBoxed;
+    private string _font;
     private bool _beautify;
     private int _backdropPreset;
     private double _backdropPadding;
@@ -106,6 +107,7 @@ public sealed partial class EditorWindow : Window
         _highlightColor = Themes.InSet(ColorExtensions.TryParseHex(prefs.Editor.HighlighterColor, out var highlight) ? highlight : _palette[2].Color, _palette);
         _pixelate = prefs.Editor.Pixelate;
         _textBoxed = prefs.Editor.TextBackground;
+        _font = string.IsNullOrWhiteSpace(prefs.Editor.Font) ? TextAnnotation.DefaultFontFamily : prefs.Editor.Font;
         _beautify = prefs.Beautify.OnByDefault;
         _backdropPreset = Math.Max(0, Array.FindIndex(BackdropPresets.All,
             p => p.Name.Equals(prefs.Beautify.Preset, StringComparison.OrdinalIgnoreCase)));
@@ -115,6 +117,8 @@ public sealed partial class EditorWindow : Window
         // before the rest of the window exists.
         WeightSlider.ValueChanged += WeightSlider_ValueChanged;
         InitializeColorSets();
+        InitializeFonts();
+        InitializeMoreColors();
         BuildSwatches();
         BuildBackdropControls();
         InitializeLayers();
@@ -141,6 +145,7 @@ public sealed partial class EditorWindow : Window
         prefs.Editor.HighlighterColor = _highlightColor.ToHex();
         prefs.Editor.Pixelate = _pixelate;
         prefs.Editor.TextBackground = _textBoxed;
+        prefs.Editor.Font = _font;
         prefs.Editor.ShowLayers = _layersOpen;
         prefs.Beautify.Preset = BackdropPresets.All[_backdropPreset].Name;
         prefs.Beautify.Padding = _backdropPadding;
@@ -224,6 +229,7 @@ public sealed partial class EditorWindow : Window
             SyncSlider();
             SyncPixelate();
             SyncTextBackground();
+            SyncFont();
             SyncColor();
         }
         UpdateCursor(null);
@@ -254,6 +260,7 @@ public sealed partial class EditorWindow : Window
         SyncColor();
         SyncPixelate();
         SyncTextBackground();
+        SyncFont();
         Canvas.Invalidate();
     }
 
@@ -727,12 +734,10 @@ public sealed partial class EditorWindow : Window
         }
         else if (_document.HitTest(p, tolerance, GrabsAreaEffects) is Annotation hit)
         {
-            // Clicking an existing object grabs it, whichever tool is active.
+            // Clicking an existing object grabs it, whichever tool is active; text too, so
+            // it can be moved with the text tool. Double-clicking text edits it.
             Select(hit);
-            if (hit is TextAnnotation text && _tool == Tool.Text)
-                BeginTextEdit(text, isNew: false);
-            else
-                StartDrag(e, hit, handle: -1, creating: false, p);
+            StartDrag(e, hit, handle: -1, creating: false, p);
         }
         else
         {
@@ -783,7 +788,7 @@ public sealed partial class EditorWindow : Window
 
     private void CreateText(TextDrag drag)
     {
-        var text = new TextAnnotation(drag.Start, _color, _toolWeights[Tool.Text], Unit) { Boxed = _textBoxed };
+        var text = new TextAnnotation(drag.Start, _color, _toolWeights[Tool.Text], Unit) { Boxed = _textBoxed, FontFamily = _font };
         var box = new Windows.Foundation.Rect(drag.Start.ToPoint(), drag.End.ToPoint());
         float minBox = 12 / _view.M11; // a few screen pixels of wobble still counts as a click
 
@@ -1108,7 +1113,7 @@ public sealed partial class EditorWindow : Window
             else if (_selected is not null && HitHandle(_selected, p) is int handle)
                 cursor = HandleCursor(_selected, handle);
             else if (_document.HitTest(p, HitTolerance / _view.M11, GrabsAreaEffects) is Annotation hit)
-                cursor = hit is TextAnnotation && _tool == Tool.Text ? _textCursor : _moveCursor;
+                cursor = _moveCursor;
         }
         CanvasHost.Cursor = cursor;
     }
@@ -1143,7 +1148,7 @@ public sealed partial class EditorWindow : Window
         {
             Text = text.Text,
             AcceptsReturn = true,
-            FontFamily = new FontFamily(TextAnnotation.FontFamily),
+            FontFamily = new FontFamily(text.FontFamily),
             FontWeight = TextAnnotation.FontWeight,
             FontSize = text.FontSize * scale,
             Padding = new Thickness(0),

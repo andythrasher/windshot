@@ -14,8 +14,28 @@ namespace Windshot.Editing;
 /// </summary>
 internal sealed class TextAnnotation : Annotation, IDisposable
 {
-    public const string FontFamily = "Segoe UI Variable Display";
+    public const string DefaultFontFamily = "Segoe UI Variable Display";
     public static readonly Windows.UI.Text.FontWeight FontWeight = FontWeights.SemiBold;
+
+    /// <summary>
+    /// Fonts that come with Windows 11, so text looks the same on any PC: (name shown, family).
+    /// </summary>
+    public static readonly (string Name, string Family)[] Fonts =
+    [
+        ("Segoe UI", DefaultFontFamily),
+        ("Bahnschrift", "Bahnschrift"),
+        ("Georgia", "Georgia"),
+        ("Consolas", "Consolas"),
+        ("Courier New", "Courier New"),
+        ("Segoe Print", "Segoe Print"),
+        ("Segoe Script", "Segoe Script"),
+        ("Ink Free", "Ink Free"),
+        ("Comic Sans MS", "Comic Sans MS"),
+        ("Impact", "Impact"),
+    ];
+
+    /// <summary>The font, by family name; any installed font works, e.g. one typed into settings.json.</summary>
+    public string FontFamily { get; set; } = DefaultFontFamily;
 
     /// <summary>Line height as a multiple of font size for this font, used to size text from a dragged box.</summary>
     public const float LineHeightRatio = 1.33f;
@@ -23,7 +43,7 @@ internal sealed class TextAnnotation : Annotation, IDisposable
     private static readonly CanvasStrokeStyle RoundJoin = new() { LineJoin = CanvasLineJoin.Round };
 
     private CanvasTextLayout? _layout;
-    private (string Text, float Size, float? Wrap) _layoutKey;
+    private (string Text, string Font, float Size, float? Wrap) _layoutKey;
 
     public TextAnnotation(Vector2 position, Color color, int weight, float unit)
         : base(color, weight, unit)
@@ -58,7 +78,7 @@ internal sealed class TextAnnotation : Annotation, IDisposable
     {
         get
         {
-            var key = (Text, FontSize, WrapWidth);
+            var key = (Text, FontFamily, FontSize, WrapWidth);
             if (_layout is null || _layoutKey != key)
             {
                 _layout?.Dispose();

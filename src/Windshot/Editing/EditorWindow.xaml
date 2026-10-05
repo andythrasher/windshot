@@ -70,6 +70,10 @@
                 Visibility="Collapsed"
                 Click="TextBackgroundButton_Click"
                 ToolTipService.ToolTip="Text background: set the text on a box of the current color" />
+            <AppBarElementContainer x:Name="FontContainer" Visibility="Collapsed" VerticalContentAlignment="Center" ToolTipService.ToolTip="Font">
+                <!-- Each font is listed in its own typeface. -->
+                <ComboBox x:Name="FontPicker" Width="156" Margin="8,0,4,0" VerticalAlignment="Center" />
+            </AppBarElementContainer>
             <AppBarElementContainer x:Name="SizeContainer" VerticalContentAlignment="Center" ToolTipService.ToolTip="Size ([ and ])">
                 <StackPanel Orientation="Horizontal" Spacing="8" Margin="12,0">
                     <TextBlock Text="Size" VerticalAlignment="Center" />
@@ -113,6 +117,16 @@
                                     <ComboBox x:Name="ColorSetPicker" Grid.Column="1" HorizontalAlignment="Stretch" />
                                 </Grid>
                                 <StackPanel x:Name="SwatchPanel" Orientation="Horizontal" Spacing="8" />
+                                <ToggleButton x:Name="MoreColorsButton" Content="More colors…" HorizontalAlignment="Stretch" />
+                                <ColorPicker
+                                    x:Name="MoreColors"
+                                    Visibility="Collapsed"
+                                    ColorSpectrumShape="Ring"
+                                    IsAlphaEnabled="False"
+                                    IsColorPreviewVisible="False"
+                                    IsColorChannelTextInputVisible="False"
+                                    IsHexInputVisible="True"
+                                    IsMoreButtonVisible="False" />
                             </StackPanel>
                         </Flyout>
                     </DropDownButton.Flyout>

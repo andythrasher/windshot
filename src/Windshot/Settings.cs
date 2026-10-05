@@ -87,6 +87,9 @@ internal sealed class Settings
         public bool Pixelate { get; set; } = true;
         public bool TextBackground { get; set; }
 
+        /// <summary>The font new text uses, by family name, e.g. "Segoe UI Variable Display" or "Consolas".</summary>
+        public string Font { get; set; } = TextAnnotation.DefaultFontFamily;
+
         /// <summary>Close the editor once its image has been copied or saved.</summary>
         public bool CloseAfterSaveOrCopy { get; set; } = true;
 
