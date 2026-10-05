@@ -153,7 +153,7 @@ internal static class PinStore
     }
 
     /// <summary>Where to put a pin so enough of it is visible to grab, e.g. after a monitor was unplugged.</summary>
-    private static Point OnScreen(Rectangle bounds)
+    internal static Point OnScreen(Rectangle bounds)
     {
         const int MinVisible = 48;
         foreach (var monitor in Monitors.All())

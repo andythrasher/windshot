@@ -114,6 +114,27 @@ internal sealed class PinWindow : Form
         SaveState();
     }
 
+    private const int WM_DISPLAYCHANGE = 0x007E;
+
+    protected override void WndProc(ref Message m)
+    {
+        base.WndProc(ref m);
+        // A monitor was disconnected (or rearranged), and Windows leaves tool windows like
+        // this where they were, even if that's on no monitor now. Bring the pin back into
+        // view, once the new layout has settled. Its saved place is kept, so it returns there
+        // after a restart with the monitor back.
+        if (m.Msg == WM_DISPLAYCHANGE)
+            BeginInvoke(() =>
+            {
+                var location = PinStore.OnScreen(Bounds);
+                if (location != Location)
+                {
+                    Log.Write($"Pin {_id} was off screen at {Location}; moved to {location}");
+                    Location = location;
+                }
+            });
+    }
+
     protected override void OnShown(EventArgs e)
     {
         base.OnShown(e);
