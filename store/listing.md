@@ -46,7 +46,8 @@ CAPTURE
 • A magnifier and color picker help you land on the exact pixel. Press C to copy a color as hex.
 
 EDIT
-• Arrows, rectangles, text, numbered steps, highlighter, spotlight, blur and pixelate.
+• Arrows, shapes (rectangles, ellipses, triangles and polygons, outlined or filled), text, numbered steps, highlighter, spotlight, blur and pixelate.
+• An options bar shows the settings for whatever you're drawing or have selected.
 • Everything stays editable: move, resize, recolor or restyle any annotation at any time.
 • Draw past the edge and the canvas grows to fit.
 • Crop after the fact, and pixelate anything private before you share it.
@@ -66,6 +67,12 @@ COPY TEXT
 PIN TO SCREEN
 • Float a capture above your other windows while you work. Zoom it, fade it, and find it where you left it after a restart.
 
+SUPPORTER EXTRAS (optional, one-time purchase)
+• Seven more editor themes, from calm Moss and Fjord to a loving tribute to Windows 3.1's Hot Dog Stand.
+• Matching annotation color sets, which work with any theme.
+• A color wheel for any color, fonts for text, and 24 stickers: checkmarks, warnings, stars, speech bubbles and more.
+Everything else in Windshot is free, with no limits.
+
 PRIVATE BY DESIGN
 • No account, no analytics, no ads.
 • Windshot makes no network connections of its own. Your captures go only where you copy, save or pin them.
@@ -73,6 +80,14 @@ PRIVATE BY DESIGN
 Windshot lives in the notification area and starts in a blink. It can start with Windows, and every shortcut can be changed in Settings.
 
 ### What's new in this version
+
+1.1:
+• New shapes: ellipses, triangles and polygons, outlined or filled. Fill a shape to cover something up.
+• Highlighter blend modes; the default now works like real highlighter ink, so text stays dark.
+• A brighter golden yellow.
+• An options bar under the toolbar with the settings for what you're drawing or have selected.
+• With the text tool, a click moves text and a double-click edits it.
+• Supporter extras: more editor themes, color sets, a color wheel, fonts and stickers, with a one-time purchase.
 
 1.0.1:
 • Works with monitors you connect or disconnect while Windshot is running.
@@ -92,8 +107,10 @@ Windshot lives in the notification area and starts in a blink. It can start with
 6. Copy text from any part of the screen, offline
 7. Pin captures above other windows; they survive restarts
 8. Crop, pixelate and beautify before you share
-9. Every shortcut is customizable, including Print Screen
-10. No account, no tracking, no network connections of its own
+9. Shapes: rectangles, ellipses, triangles and polygons, outlined or filled
+10. Every shortcut is customizable, including Print Screen
+11. No account, no tracking, no network connections of its own
+12. Optional supporter extras: editor themes, color sets, fonts and stickers
 
 ### Search terms (7 max, 30 characters each)
 
@@ -124,6 +141,17 @@ Partner Center can use the package's logos. Optionally upload a 1:1 box art at 1
 ### Additional license terms
 
 Leave empty (the standard Microsoft Store license applies).
+
+## Add-on: Supporter Pack (9NJ2V9GCKP9F)
+
+Durable, lifetime "Forever". In Partner Center: Windshot > Add-ons > Supporter Pack.
+
+- **Title (100 max):** Windshot Supporter Pack
+- **Description (200 max):** Support Windshot and unlock seven more editor themes, matching color sets, a color wheel, fonts for text and 24 stickers. A one-time purchase; Windshot itself stays free.
+- **Keywords:** themes · colors · fonts · stickers · supporter
+- **Icon (optional, 300×300):** the app icon works; the Store falls back to it.
+- **Price:** your choice. (Something like $3.99–$4.99 fits a "thank you" purchase.)
+- **Age rating:** inherits the app's; the app's questionnaire now answers yes to in-app purchases.
 
 ## Submission options
 
