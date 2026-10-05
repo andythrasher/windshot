@@ -1,0 +1,138 @@
+# Microsoft Store listing: Windshot 1.0
+
+Draft text for Partner Center, field by field. Character limits are Partner Center's.
+
+## Pricing and availability
+
+- **Price:** Free
+- **Markets:** all
+- **Visibility:** public
+
+## Properties
+
+- **Category:** Utilities & tools. (Productivity is the alternative; Utilities & tools is where
+  screenshot tools tend to be found.)
+- **Privacy policy URL:** https://windshot.app/privacy/
+- **Website:** https://windshot.app
+- **Support contact info:** support@windshot.app
+- **System requirements:** Windows 11. No special hardware.
+- **Product declarations:** none of the data-collection boxes apply. Accessibility: leave unchecked
+  until it's been tested with Narrator.
+
+## Age ratings (IARC questionnaire)
+
+Category: Utility/productivity app. Every content question is "No": no violence, sexual content,
+language, controlled substances, gambling, user-generated content shared with others, location
+sharing, personal-information sharing, or purchases (until the supporter add-on). Expect the
+lowest rating in every region (e.g. ESRB Everyone, PEGI 3).
+
+## Store listing (English, United States)
+
+### Product name
+
+Windshot
+
+### Short description (1,000 max; shown on some surfaces)
+
+Fast screenshots for Windows 11, with an editor where every arrow, box and blur stays editable. Layers, scrolling capture, text copying and pins. No account, and nothing leaves your PC.
+
+### Description (10,000 max)
+
+Windshot captures any part of your screen in a keystroke, then opens an editor where every annotation stays editable until you're done.
+
+CAPTURE
+• Press Ctrl+Shift+2 (or any shortcut you like, including Print Screen), then drag a region or click a window.
+• Window captures keep Windows 11's rounded corners, with transparent edges when copied or saved.
+• A magnifier and color picker help you land on the exact pixel. Press C to copy a color as hex.
+
+EDIT
+• Arrows, rectangles, text, numbered steps, highlighter, spotlight, blur and pixelate.
+• Everything stays editable: move, resize, recolor or restyle any annotation at any time.
+• Draw past the edge and the canvas grows to fit.
+• Crop after the fact, and pixelate anything private before you share it.
+• Beautify: set the capture on a gradient backdrop with rounded corners and a shadow.
+
+LAYERS
+• Restack, hide, rename and fade annotations like in a photo editor.
+• Blur and spotlight work like adjustment layers on everything beneath them.
+
+SCROLLING CAPTURE
+• Capture a whole web page or long document in one tall image.
+• Scroll it yourself, or let auto-scroll do it.
+
+COPY TEXT
+• Select part of the screen and copy the words in it, using Windows' built-in text recognition. It works offline.
+
+PIN TO SCREEN
+• Float a capture above your other windows while you work. Zoom it, fade it, and find it where you left it after a restart.
+
+PRIVATE BY DESIGN
+• No account, no analytics, no ads.
+• Windshot makes no network connections. Your captures go only where you copy, save or pin them.
+
+Windshot lives in the notification area and starts in a blink. It can start with Windows, and every shortcut can be changed in Settings.
+
+### What's new in this version
+
+First release.
+
+### Product features (up to 20, 200 characters each)
+
+1. Capture a region or a window in a keystroke, with a magnifier and color picker
+2. Window captures keep Windows 11's rounded corners
+3. Annotations stay editable: arrows, boxes, text, steps, highlighter, spotlight, blur
+4. Layers: restack, hide, rename and fade annotations
+5. Scrolling capture for long pages, with auto-scroll
+6. Copy text from any part of the screen, offline
+7. Pin captures above other windows; they survive restarts
+8. Crop, pixelate and beautify before you share
+9. Every shortcut is customizable, including Print Screen
+10. No account, no tracking, no network connections
+
+### Search terms (7 max, 30 characters each)
+
+screenshot · snipping tool · screen capture · annotate screenshot · scrolling screenshot · copy text from screen · screenshot editor
+
+### Screenshots (1–10; 3840×2160 or 1920×1080 PNG recommended)
+
+To make with a neutral demo window (not anyone's real screen):
+
+1. The editor with arrows, a numbered step and a text callout over an app UI
+2. The layers panel open, with a blur above an arrow
+3. A scrolling capture of a long page in the editor
+4. Beautify on: the capture on a gradient backdrop
+5. A pinned capture floating over a desktop
+6. The settings window
+
+Captions (optional, 200 characters each) can reuse the product features above.
+
+### Store logos
+
+Partner Center can use the package's logos. Optionally upload a 1:1 box art at 1080×1080 or
+2160×2160 (the icon on a soft gradient) for a sharper look on the Store's large tiles.
+
+### Copyright and trademark info
+
+© 2026 Andy Thrasher
+
+### Additional license terms
+
+Leave empty (the standard Microsoft Store license applies).
+
+## Submission options
+
+### Restricted capability: runFullTrust (justification)
+
+Windshot is a Windows desktop app built with WinUI 3 and .NET on the Windows App SDK. It runs as a full-trust desktop process because its core features use desktop APIs: system-wide keyboard shortcuts (RegisterHotKey), capturing the screen across all monitors, a notification-area icon, and always-on-top windows for pinned captures. It makes no network connections and collects no data.
+
+### Notes for certification
+
+Windshot runs in the notification area and opens no window at launch. To test:
+
+- Launch Windshot from Start. A Windshot icon appears in the notification area (it may be under the "show hidden icons" arrow).
+- Press Ctrl+Shift+2, or left-click the notification-area icon, or launch Windshot from Start again, to start a capture. Drag a region (or click a window) and the editor opens.
+- In the editor, use the toolbar to annotate; Ctrl+C copies, Ctrl+S saves, Ctrl+P pins.
+- Ctrl+Shift+3 copies text from a region. Ctrl+Shift+4 starts a scrolling capture; press it again (or Done) to finish.
+- Right-click the notification-area icon for Settings, Start with Windows and Quit.
+
+No account, sign-in or test credentials are needed.
