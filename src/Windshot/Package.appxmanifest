@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Microsoft Store (MSIX) package. Only used by the packaged build (tools/package.ps1);
+  the everyday build and tools/install.ps1 run unpackaged.
+
+  Identity Name, Publisher and PublisherDisplayName are placeholders: replace them with the
+  values Partner Center shows under Product identity once the app name is reserved.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap desktop rescap">
+
+  <Identity
+    Name="Windshot.Dev"
+    Publisher="CN=Windshot Dev"
+    Version="1.0.0.0" />
+
+  <Properties>
+    <DisplayName>Windshot</DisplayName>
+    <PublisherDisplayName>Windshot (dev)</PublisherDisplayName>
+    <Logo>Assets\Package\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-US" />
+  </Resources>
+
+  <Applications>
+    <Application Id="App" Executable="$targetnametoken$.exe" EntryPoint="$targetentrypoint$">
+      <uap:VisualElements
+        DisplayName="Windshot"
+        Description="Screenshots with annotations, scrolling capture, text copying and pins."
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Package\Square150x150Logo.png"
+        Square44x44Logo="Assets\Package\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Package\Wide310x150Logo.png" />
+        <uap:SplashScreen Image="Assets\Package\SplashScreen.png" />
+      </uap:VisualElements>
+      <Extensions>
+        <!-- "Start with Windows" for the packaged app; the unpackaged one uses the Run key. -->
+        <desktop:Extension Category="windows.startupTask">
+          <desktop:StartupTask TaskId="WindshotStartup" Enabled="false" DisplayName="Windshot" />
+        </desktop:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!-- A regular desktop app: global hotkeys, screen capture and the tray need full trust. -->
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>

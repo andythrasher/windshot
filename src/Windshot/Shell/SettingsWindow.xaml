@@ -112,6 +112,7 @@
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="Start with Windows" />
                             <TextBlock Style="{StaticResource Description}" Text="Be in the tray, with your pins, after you sign in." />
+                            <TextBlock x:Name="StartWithWindowsProblem" Style="{StaticResource Problem}" />
                         </StackPanel>
                         <ToggleSwitch x:Name="StartWithWindows" Grid.Column="1" MinWidth="0" OnContent="" OffContent="" />
                     </Grid>

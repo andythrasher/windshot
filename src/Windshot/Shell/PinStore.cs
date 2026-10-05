@@ -8,13 +8,12 @@ namespace Windshot.Shell;
 
 /// <summary>
 /// Keeps pins across restarts: each one is a PNG plus a small JSON file with where it is,
-/// in %LOCALAPPDATA%\Windshot\pins. Closing a pin deletes its files; quitting Windshot keeps
+/// in the pins folder under <see cref="AppPackage.DataFolder"/>. Closing a pin deletes its files; quitting Windshot keeps
 /// them, and they come back on the next launch.
 /// </summary>
 internal static class PinStore
 {
-    public static string Folder { get; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Windshot", "pins");
+    public static string Folder { get; } = Path.Combine(AppPackage.DataFolder, "pins");
 
     /// <param name="X">Top-left in physical desktop pixels.</param>
     /// <param name="Scale">Device pixels per DIP of the source capture, kept for editing later.</param>

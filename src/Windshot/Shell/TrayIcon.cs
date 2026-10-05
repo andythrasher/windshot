@@ -22,9 +22,16 @@ internal sealed class TrayIcon : IDisposable
         menu.Items.Add("Close all pins", null, (_, _) => PinWindow.CloseAll());
         menu.Items.Add(new ToolStripSeparator());
         var autostart = new ToolStripMenuItem("Start with Windows") { CheckOnClick = true };
-        autostart.Click += (_, _) => Autostart.Set(autostart.Checked);
+        autostart.Click += async (_, _) =>
+        {
+            if (await Autostart.SetAsync(autostart.Checked) is { } problem)
+            {
+                autostart.Checked = await Autostart.IsEnabledAsync();
+                _icon!.ShowBalloonTip(8000, "Start with Windows", problem, ToolTipIcon.Info);
+            }
+        };
         // Read fresh each time: it can also be switched off in Task Manager.
-        menu.Opening += (_, _) => autostart.Checked = Autostart.IsEnabled;
+        menu.Opening += async (_, _) => autostart.Checked = await Autostart.IsEnabledAsync();
         menu.Items.Add(autostart);
         menu.Items.Add("Settings…", null, (_, _) => openSettings());
         menu.Items.Add("Quit Windshot", null, (_, _) => quit());

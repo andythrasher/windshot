@@ -5,13 +5,12 @@ using Windshot.Editing;
 namespace Windshot;
 
 /// <summary>
-/// User preferences, stored as hand-editable JSON in %LOCALAPPDATA%\Windshot\settings.json.
+/// User preferences, stored as hand-editable JSON in settings.json in <see cref="AppPackage.DataFolder"/>.
 /// Comments and trailing commas are allowed; missing values fall back to defaults.
 /// </summary>
 internal sealed class Settings
 {
-    public static string FilePath { get; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Windshot", "settings.json");
+    public static string FilePath { get; } = Path.Combine(AppPackage.DataFolder, "settings.json");
 
     public static Settings Current { get; private set; } = new();
 
@@ -96,13 +95,14 @@ internal sealed class Settings
     }
 
     /// <summary>
-    /// The app used to be called Winshot. Bring settings over from its folder once, so the
-    /// rename doesn't reset anyone's preferences.
+    /// The unpackaged app used to be called Winshot. Bring settings over from its folder once,
+    /// so the rename doesn't reset anyone's preferences. (The Store app can't do the same for
+    /// the unpackaged app's folder: Windows hides other apps' AppData folders from packages.)
     /// </summary>
     private static void MigrateFromOldName()
     {
         string old = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Winshot", "settings.json");
-        if (File.Exists(FilePath) || !File.Exists(old))
+        if (AppPackage.IsPackaged || File.Exists(FilePath) || !File.Exists(old))
             return;
         try
         {

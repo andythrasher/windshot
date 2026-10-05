@@ -57,7 +57,16 @@ public sealed partial class SettingsWindow : Window
         }
 
         BeautifyPreset.ItemsSource = BackdropPresets.All.Select(p => p.Name).ToList();
-        StartWithWindows.Toggled += (_, _) => { if (!_loading) Autostart.Set(StartWithWindows.IsOn); };
+        StartWithWindows.Toggled += async (_, _) =>
+        {
+            if (_loading)
+                return;
+            string? problem = await Autostart.SetAsync(StartWithWindows.IsOn);
+            StartWithWindowsProblem.Text = problem ?? "";
+            StartWithWindowsProblem.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
+            if (problem is not null)
+                await LoadStartWithWindowsAsync(); // show what it really is
+        };
         ShowMagnifier.Toggled += (_, _) => Save(s => s.Capture.ShowMagnifier = ShowMagnifier.IsOn);
         CloseAfterExport.Toggled += (_, _) => Save(s => s.Editor.CloseAfterSaveOrCopy = CloseAfterExport.IsOn);
         KeepOutOfHistory.Toggled += (_, _) => Save(s => s.Clipboard.KeepOutOfHistory = KeepOutOfHistory.IsOn);
@@ -117,7 +126,7 @@ public sealed partial class SettingsWindow : Window
         var s = Settings.Current;
         foreach (var row in _rows)
             row.Button.Content = Display(row.Get(s.Hotkeys));
-        StartWithWindows.IsOn = Autostart.IsEnabled;
+        _ = LoadStartWithWindowsAsync();
         ShowMagnifier.IsOn = s.Capture.ShowMagnifier;
         CloseAfterExport.IsOn = s.Editor.CloseAfterSaveOrCopy;
         KeepOutOfHistory.IsOn = s.Clipboard.KeepOutOfHistory;
@@ -125,6 +134,14 @@ public sealed partial class SettingsWindow : Window
         BeautifyPreset.SelectedItem = BackdropPresets.All.FirstOrDefault(p => p.Name.Equals(s.Beautify.Preset, StringComparison.OrdinalIgnoreCase)).Name
             ?? BackdropPresets.All[0].Name;
         BeautifyPadding.Value = Math.Clamp(s.Beautify.Padding, 16, 160);
+        _loading = false;
+    }
+
+    private async Task LoadStartWithWindowsAsync()
+    {
+        bool on = await Autostart.IsEnabledAsync();
+        _loading = true;
+        StartWithWindows.IsOn = on;
         _loading = false;
     }
 
@@ -256,7 +273,7 @@ public sealed partial class SettingsWindow : Window
             // Taken by another app (or Windows): keep the old one.
             row.Set(hotkeys, previous);
             status = App.Instance.ApplyHotkeys();
-            ShowProblem(row, $"{Display(shortcut)} is in use by another app or by Windows. Try another.");
+            ShowProblem(row, IsPrintScreen(shortcut) ? PrintScreenTaken : $"{Display(shortcut)} is in use by another app or by Windows. Try another.");
             row.Button.Content = Display(previous);
             ShowStatus(status, except: row);
             return;
@@ -286,8 +303,17 @@ public sealed partial class SettingsWindow : Window
                 continue;
             if (row.Registered(status))
                 row.Problem.Visibility = Visibility.Collapsed;
+            else if (IsPrintScreen(row.Get(Settings.Current.Hotkeys)))
+                ShowProblem(row, PrintScreenTaken);
             else
                 ShowProblem(row, $"{Display(row.Get(Settings.Current.Hotkeys))} isn't working: another app or Windows is using it.");
         }
     }
+
+    /// <summary>Windows 11 gives the bare Print Screen key to Snipping Tool unless that's turned off.</summary>
+    private const string PrintScreenTaken =
+        "Windows is using Print Screen for Snipping Tool. To use it here, turn off \"Use the Print screen key to open screen capture\" in Settings > Accessibility > Keyboard, then pick it again.";
+
+    private static bool IsPrintScreen(string shortcut) =>
+        HotkeyWindow.TryParse(shortcut, out var modifiers, out var key) && modifiers == HotkeyModifiers.None && key == System.Windows.Forms.Keys.PrintScreen;
 }

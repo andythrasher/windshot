@@ -26,6 +26,24 @@ dotnet build src/Windshot
 src/Windshot/bin/Debug/net10.0-windows10.0.26100.0/win-x64/Windshot.exe
 ```
 
+### Microsoft Store package
+
+```
+powershell -ExecutionPolicy Bypass -File tools/package.ps1
+```
+
+builds `artifacts\store\Windshot_<version>_x64.msix` for upload to Partner Center, which signs
+it. It uses the shared Windows App SDK runtime (the Store installs it alongside) rather than
+carrying its own. The identity in `src/Windshot/Package.appxmanifest` (`Identity` Name and
+Publisher, `PublisherDisplayName`) must match Partner Center's Product identity page, and the
+version must go up for each submission. Logos come from `tools/make-store-assets.ps1`.
+
+`-TestInstall` also installs it on this PC as "Windshot.Dev" (needs Developer Mode, since it's
+unsigned), and `-Uninstall` removes that. It stops the unpackaged copy first, since both want
+the same hotkeys. The packaged app differs from the unpackaged one in two ways: Start with
+Windows is the package's startup task (Settings > Apps > Startup), and settings, pins and the
+log live in `%LOCALAPPDATA%\Packages\<package family name>\LocalState`.
+
 The app lives in the tray; tick **Start with Windows** in its menu to have it there (with your
 pins) after signing in. That's the usual per-user startup entry, so it also shows in Task
 Manager's Startup apps, and turning it off there is reflected in the menu. **Ctrl+Shift+2** captures: drag a region, or click to capture the

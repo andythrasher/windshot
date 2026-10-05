@@ -1,15 +1,14 @@
 namespace Windshot;
 
 /// <summary>
-/// Minimal append-only log at %LOCALAPPDATA%\Windshot\windshot.log. Once it passes 1 MB it
+/// Minimal append-only log, windshot.log in <see cref="AppPackage.DataFolder"/>. Once it passes 1 MB it
 /// becomes windshot.old.log and a new one starts, so it never grows without bound.
 /// </summary>
 internal static class Log
 {
     private const long MaxBytes = 1024 * 1024;
 
-    private static readonly string Path = System.IO.Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Windshot", "windshot.log");
+    private static readonly string Path = System.IO.Path.Combine(AppPackage.DataFolder, "windshot.log");
 
     private static readonly object Gate = new();
 

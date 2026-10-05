@@ -39,6 +39,7 @@ public partial class App : Application
         // Single instance: launching again just asks the running instance to capture,
         // so a pinned taskbar icon or a shortcut works as a capture button.
         var commandLine = Environment.GetCommandLineArgs();
+        bool atSignIn = Autostart.LaunchedAtSignIn(commandLine);
         _captureSignal = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\Windshot.Capture", out bool isFirstInstance);
         _settingsSignal = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\Windshot.Settings");
         if (!isFirstInstance)
@@ -46,7 +47,7 @@ public partial class App : Application
             if (commandLine.Contains(SettingsArgument))
                 _settingsSignal.Set();
             // Launched at sign-in while already running: nothing to do (and no surprise capture).
-            else if (!commandLine.Contains(Shell.Autostart.Argument))
+            else if (!atSignIn)
                 _captureSignal.Set();
             Exit();
             return;
@@ -68,8 +69,7 @@ public partial class App : Application
         WatchSettingsFile(dispatcher);
         int pins = PinStore.RestoreAll(OpenEditor);
         Autostart.Repair();
-        bool atSignIn = Environment.GetCommandLineArgs().Contains(Autostart.Argument);
-        Log.Write($"Started{(atSignIn ? " at sign-in" : "")}; {hotkeys}" + (pins > 0 ? $"; restored {pins} pins" : ""));
+        Log.Write($"Started{(AppPackage.IsPackaged ? " (Store package)" : "")}{(atSignIn ? " at sign-in" : "")}; {hotkeys}" + (pins > 0 ? $"; restored {pins} pins" : ""));
         if (commandLine.Contains(SettingsArgument))
             OpenSettings();
     }
@@ -150,14 +150,34 @@ public partial class App : Application
             Settings.Save();
         try
         {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Settings.FilePath) { UseShellExecute = true });
+            // With no app for .json, opening it would show Windows' "How do you want to open
+            // this file?" picker; Notepad is always there.
+            if (HasAppFor(".json"))
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Settings.FilePath) { UseShellExecute = true });
+            else
+                System.Diagnostics.Process.Start("notepad.exe", $"\"{Settings.FilePath}\"");
         }
-        catch (System.ComponentModel.Win32Exception)
+        catch (System.ComponentModel.Win32Exception ex)
         {
-            // No app is associated with .json; Notepad is always there.
-            System.Diagnostics.Process.Start("notepad.exe", $"\"{Settings.FilePath}\"");
+            Log.Write($"Couldn't open the settings file: {ex.Message}");
         }
     }
+
+    private static bool HasAppFor(string extension)
+    {
+        const int ASSOCF_INIT_IGNOREUNKNOWN = 0x400;
+        const int ASSOCSTR_EXECUTABLE = 2;
+        var exe = new char[1024];
+        uint length = (uint)exe.Length;
+        if (AssocQueryString(ASSOCF_INIT_IGNOREUNKNOWN, ASSOCSTR_EXECUTABLE, extension, null, exe, ref length) != 0)
+            return false;
+        // For unknown types Windows can still name its own picker as the "app".
+        string path = new string(exe, 0, (int)Math.Max(0, length - 1));
+        return !Path.GetFileName(path).Equals("OpenWith.exe", StringComparison.OrdinalIgnoreCase);
+    }
+
+    [System.Runtime.InteropServices.DllImport("shlwapi.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern int AssocQueryString(int flags, int str, string assoc, string? extra, char[]? output, ref uint length);
 
     /// <summary>Select a region and copy its text, without opening the editor.</summary>
     private void StartTextCapture()

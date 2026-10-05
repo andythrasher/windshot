@@ -22,6 +22,20 @@
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
 
+  <!--
+    The Microsoft Store package (tools/package.ps1 passes -p:StorePackage=true). It relies on
+    the shared Windows App SDK runtime package, which the Store installs alongside, instead of
+    carrying its own copy; .NET is still included. The Store signs the package on submission.
+  -->
+  <PropertyGroup Condition="'$(StorePackage)' == 'true'">
+    <WindowsPackageType>MSIX</WindowsPackageType>
+    <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
+    <SelfContained>true</SelfContained>
+    <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
+    <AppxBundle>Never</AppxBundle>
+    <GenerateAppxPackageOnBuild>true</GenerateAppxPackageOnBuild>
+  </PropertyGroup>
+
   <ItemGroup>
     <!--
       WinForms is used only for the tray icon, hotkey sink and the capture overlay (it shows
@@ -35,6 +49,8 @@
     <!-- Also loaded at runtime for the tray and window icons. -->
     <Content Include="Assets\Windshot.ico" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\*.cur" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Start menu, taskbar and Store logos for the package; made by tools/make-store-assets.ps1. -->
+    <Content Include="Assets\Package\*.png" Condition="'$(StorePackage)' == 'true'" />
   </ItemGroup>
 
   <ItemGroup>
