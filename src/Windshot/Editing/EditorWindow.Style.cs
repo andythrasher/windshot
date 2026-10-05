@@ -57,6 +57,52 @@ public sealed partial class EditorWindow
         Canvas.Invalidate();
     }
 
+    // ---- Highlighter blend -------------------------------------------------------------
+
+    private static readonly (HighlightBlend Blend, string Name, string Tip)[] Blends =
+    [
+        (HighlightBlend.Multiply, "Multiply", "Like real highlighter ink: text under it stays dark"),
+        (HighlightBlend.Darken, "Darken", "Black text stays black; lighter text takes the ink's color"),
+        (HighlightBlend.Overlay, "Overlay", "Tints and adds contrast"),
+        (HighlightBlend.Screen, "Screen", "For dark backgrounds: lightens what's under it"),
+    ];
+
+    private void InitializeBlend()
+    {
+        foreach (var (_, name, tip) in Blends)
+        {
+            var item = new ComboBoxItem { Content = name };
+            ToolTipService.SetToolTip(item, tip);
+            BlendPicker.Items.Add(item);
+        }
+        BlendPicker.SelectionChanged += (_, _) =>
+        {
+            if (!_syncingStyle && BlendPicker.SelectedIndex >= 0)
+                SetBlend(Blends[BlendPicker.SelectedIndex].Blend);
+        };
+    }
+
+    /// <summary>The blend picker only appears for the highlighter or a selected highlight.</summary>
+    private void SyncBlend()
+    {
+        var highlight = _selected as HighlighterAnnotation;
+        BlendContainer.Visibility = highlight is not null || _tool == Tool.Highlighter ? Visibility.Visible : Visibility.Collapsed;
+        _syncingStyle = true;
+        BlendPicker.SelectedIndex = Array.FindIndex(Blends, b => b.Blend == (highlight?.Blend ?? _highlightBlend));
+        _syncingStyle = false;
+    }
+
+    private void SetBlend(HighlightBlend blend)
+    {
+        _highlightBlend = blend;
+        if (_selected is HighlighterAnnotation highlight && highlight.Blend != blend)
+        {
+            highlight.Blend = blend;
+            Commit();
+        }
+        Canvas.Invalidate();
+    }
+
     // ---- More colors -------------------------------------------------------------------
 
     private void InitializeMoreColors()

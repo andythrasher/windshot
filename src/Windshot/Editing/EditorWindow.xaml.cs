@@ -54,6 +54,7 @@ public sealed partial class EditorWindow : Window
     // The highlighter keeps its own color: yellow highlights shouldn't turn your arrows yellow.
     private Color _highlightColor;
     private bool _pixelate;
+    private HighlightBlend _highlightBlend;
     private bool _textBoxed;
     private string _font;
     private bool _beautify;
@@ -106,6 +107,7 @@ public sealed partial class EditorWindow : Window
         _color = Themes.InSet(ColorExtensions.TryParseHex(prefs.Editor.Color, out var color) ? color : _palette[0].Color, _palette);
         _highlightColor = Themes.InSet(ColorExtensions.TryParseHex(prefs.Editor.HighlighterColor, out var highlight) ? highlight : _palette[2].Color, _palette);
         _pixelate = prefs.Editor.Pixelate;
+        _highlightBlend = prefs.Editor.HighlighterBlend;
         _textBoxed = prefs.Editor.TextBackground;
         _font = string.IsNullOrWhiteSpace(prefs.Editor.Font) ? TextAnnotation.DefaultFontFamily : prefs.Editor.Font;
         _beautify = prefs.Beautify.OnByDefault;
@@ -118,6 +120,7 @@ public sealed partial class EditorWindow : Window
         WeightSlider.ValueChanged += WeightSlider_ValueChanged;
         InitializeColorSets();
         InitializeFonts();
+        InitializeBlend();
         InitializeMoreColors();
         BuildSwatches();
         BuildBackdropControls();
@@ -144,6 +147,7 @@ public sealed partial class EditorWindow : Window
         prefs.Editor.Color = _color.ToHex();
         prefs.Editor.HighlighterColor = _highlightColor.ToHex();
         prefs.Editor.Pixelate = _pixelate;
+        prefs.Editor.HighlighterBlend = _highlightBlend;
         prefs.Editor.TextBackground = _textBoxed;
         prefs.Editor.Font = _font;
         prefs.Editor.ShowLayers = _layersOpen;
@@ -228,6 +232,7 @@ public sealed partial class EditorWindow : Window
         {
             SyncSlider();
             SyncPixelate();
+            SyncBlend();
             SyncTextBackground();
             SyncFont();
             SyncColor();
@@ -259,6 +264,7 @@ public sealed partial class EditorWindow : Window
         SyncSlider();
         SyncColor();
         SyncPixelate();
+        SyncBlend();
         SyncTextBackground();
         SyncFont();
         Canvas.Invalidate();
@@ -778,7 +784,7 @@ public sealed partial class EditorWindow : Window
             Tool.Arrow => new ArrowAnnotation(p, _color, weight, Unit),
             Tool.Blur => new BlurAnnotation(p, _pixelate, weight, Unit),
             Tool.Spotlight => new SpotlightAnnotation(p, weight, Unit),
-            Tool.Highlighter => new HighlighterAnnotation(p, _highlightColor, weight, Unit),
+            Tool.Highlighter => new HighlighterAnnotation(p, _highlightColor, weight, Unit) { Blend = _highlightBlend },
             _ => new RectangleAnnotation(p, _color, weight, Unit),
         };
         AddLayer(shape);

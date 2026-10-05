@@ -1,18 +1,33 @@
 using System.Numerics;
 using Microsoft.Graphics.Canvas;
+using Microsoft.Graphics.Canvas.Effects;
 using Microsoft.Graphics.Canvas.Geometry;
 using Windows.Foundation;
 using Windows.UI;
 
 namespace Windshot.Editing;
 
+/// <summary>How a highlight mixes with what's under it, like a layer's blend mode in a photo editor.</summary>
+internal enum HighlightBlend
+{
+    /// <summary>Like real highlighter ink: everything under it darkens by the ink's color, text included.</summary>
+    Multiply,
+    /// <summary>Keeps the darker of the ink and what's under it: black text stays black, lighter text turns ink-colored.</summary>
+    Darken,
+    /// <summary>Tints and adds contrast: darks get darker and lights lighter.</summary>
+    Overlay,
+    /// <summary>For dark backgrounds: lightens what's under it by the ink's color.</summary>
+    Screen,
+}
+
 /// <summary>
-/// A straight, marker-style stroke. It blends with "darken" (per-channel minimum) into
-/// whatever is beneath it in the layer stack, so text underneath stays fully black instead of
-/// being tinted, the way real highlighter ink behaves. It never grows the canvas.
+/// A straight, marker-style stroke that blends into whatever is beneath it in the layer
+/// stack (<see cref="Blend"/>). It never grows the canvas.
 /// </summary>
 internal sealed class HighlighterAnnotation : TwoPointAnnotation
 {
+    public HighlightBlend Blend { get; set; } = HighlightBlend.Multiply;
+
     private const float SnapDegrees = 5;
     private static readonly float SnapSlope = MathF.Tan(SnapDegrees * MathF.PI / 180);
 
@@ -27,8 +42,13 @@ internal sealed class HighlighterAnnotation : TwoPointAnnotation
 
     public float Thickness => (8 + Weight * 3) * Unit;
 
-    /// <summary>The palette color softened toward white, like highlighter ink.</summary>
-    private Color Ink => Color.FromArgb(255, Soften(Color.R), Soften(Color.G), Soften(Color.B));
+    /// <summary>
+    /// The palette color softened toward white, like highlighter ink, for the darkening modes;
+    /// at full strength, the softer ink would make Overlay and Screen too faint.
+    /// </summary>
+    private Color Ink => Blend is HighlightBlend.Multiply or HighlightBlend.Darken
+        ? Color.FromArgb(255, Soften(Color.R), Soften(Color.G), Soften(Color.B))
+        : Color;
 
     private static byte Soften(byte channel) => (byte)(channel + (255 - channel) * 0.4);
 
@@ -68,15 +88,22 @@ internal sealed class HighlighterAnnotation : TwoPointAnnotation
 
     public override ICanvasImage ApplyTo(LayerContext context, ICanvasImage below)
     {
-        var result = context.NewList();
-        using var s = result.CreateDrawingSession();
-        s.DrawImage(below);
-        // Over transparent canvas the minimum is transparent, so ink only lands on what's there.
-        using var stroke = CanvasGeometry.CreatePolygon(s, Outline());
-        s.Blend = CanvasBlend.Min;
-        s.FillGeometry(stroke, Ink);
-        return result;
+        var ink = context.NewList();
+        using (var s = ink.CreateDrawingSession())
+        using (var stroke = CanvasGeometry.CreatePolygon(s, Outline()))
+            s.FillGeometry(stroke, Ink);
+        var blended = context.Own(new BlendEffect { Background = below, Foreground = ink, Mode = Mode(Blend) });
+        // Kept to what's there, so ink never lands on the transparent canvas around the image.
+        return context.Own(new CompositeEffect { Mode = CanvasComposite.SourceAtop, Sources = { below, blended } });
     }
+
+    private static BlendEffectMode Mode(HighlightBlend blend) => blend switch
+    {
+        HighlightBlend.Darken => BlendEffectMode.Darken,
+        HighlightBlend.Overlay => BlendEffectMode.Overlay,
+        HighlightBlend.Screen => BlendEffectMode.Screen,
+        _ => BlendEffectMode.Multiply,
+    };
 
     public override bool HitTest(Vector2 point, float tolerance)
     {

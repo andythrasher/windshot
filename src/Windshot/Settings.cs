@@ -25,7 +25,7 @@ internal sealed class Settings
         ReadCommentHandling = JsonCommentHandling.Skip,
         AllowTrailingCommas = true,
         PropertyNameCaseInsensitive = true,
-        Converters = { new JsonStringEnumConverter<Tool>() },
+        Converters = { new JsonStringEnumConverter<Tool>(), new JsonStringEnumConverter<HighlightBlend>() },
     });
 
     public HotkeySettings Hotkeys { get; set; } = new();
@@ -85,6 +85,9 @@ internal sealed class Settings
         public string Color { get; set; } = Palette.Colors[0].Color.ToHex();
         public string HighlighterColor { get; set; } = Palette.Colors[2].Color.ToHex();
         public bool Pixelate { get; set; } = true;
+
+        /// <summary>How highlights mix with what's under them: Multiply, Darken, Overlay or Screen.</summary>
+        public HighlightBlend HighlighterBlend { get; set; } = HighlightBlend.Multiply;
         public bool TextBackground { get; set; }
 
         /// <summary>The font new text uses, by family name, e.g. "Segoe UI Variable Display" or "Consolas".</summary>

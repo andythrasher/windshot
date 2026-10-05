@@ -70,6 +70,9 @@
                 Visibility="Collapsed"
                 Click="TextBackgroundButton_Click"
                 ToolTipService.ToolTip="Text background: set the text on a box of the current color" />
+            <AppBarElementContainer x:Name="BlendContainer" Visibility="Collapsed" VerticalContentAlignment="Center" ToolTipService.ToolTip="How the highlight mixes with what's under it">
+                <ComboBox x:Name="BlendPicker" Width="128" Margin="8,0,4,0" VerticalAlignment="Center" />
+            </AppBarElementContainer>
             <AppBarElementContainer x:Name="FontContainer" Visibility="Collapsed" VerticalContentAlignment="Center" ToolTipService.ToolTip="Font">
                 <!-- Each font is listed in its own typeface. -->
                 <ComboBox x:Name="FontPicker" Width="156" Margin="8,0,4,0" VerticalAlignment="Center" />
