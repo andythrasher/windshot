@@ -48,8 +48,23 @@ public sealed partial class EditorWindow
             FontPicker.Items.Add(FontItem(name, family));
         FontPicker.SelectionChanged += (_, _) =>
         {
-            if (!_syncingStyle && FontPicker.SelectedItem is ComboBoxItem { Tag: string family })
+            if (_syncingStyle || FontPicker.SelectedItem is not ComboBoxItem { Tag: string family })
+                return;
+            if (Supporter.IsUnlocked || family == TextAnnotation.DefaultFontFamily)
+            {
                 SetFont(family);
+                return;
+            }
+            // Fonts are a supporter extra: put the list back, and offer to unlock them.
+            DispatcherQueue.TryEnqueue(async () =>
+            {
+                SyncFont();
+                if (await RequireSupporter("Fonts are"))
+                {
+                    SetFont(family);
+                    SyncFont();
+                }
+            });
         };
     }
 
@@ -135,9 +150,17 @@ public sealed partial class EditorWindow
 
     private void InitializeMoreColors()
     {
-        MoreColorsButton.Click += (_, _) =>
+        MoreColorsButton.Click += async (_, _) =>
         {
             bool show = MoreColorsButton.IsChecked == true;
+            if (show && !Supporter.IsUnlocked)
+            {
+                // The color wheel is a supporter extra; once unlocked, it's there when the menu reopens.
+                MoreColorsButton.IsChecked = false;
+                ColorFlyout.Hide();
+                await RequireSupporter("The color wheel is");
+                return;
+            }
             if (show)
                 ShowColorInWheel();
             MoreColors.Visibility = show ? Visibility.Visible : Visibility.Collapsed;

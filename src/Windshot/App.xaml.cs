@@ -72,6 +72,8 @@ public partial class App : Application
         Log.Write($"Started{(AppPackage.IsPackaged ? " (Store package)" : "")}{(atSignIn ? " at sign-in" : "")}; {hotkeys}" + (pins > 0 ? $"; restored {pins} pins" : ""));
         if (commandLine.Contains(SettingsArgument))
             OpenSettings();
+        // In the background: the remembered answer stands in until the Store replies.
+        _ = Supporter.RefreshAsync();
     }
 
     /// <summary>Which shortcuts registered. An empty shortcut is off, which isn't a failure.</summary>

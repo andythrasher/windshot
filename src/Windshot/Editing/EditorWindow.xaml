@@ -150,7 +150,8 @@
                         <Flyout x:Name="ColorFlyout" Placement="Bottom" ShouldConstrainToRootBounds="False">
                             <StackPanel x:Name="ColorFlyoutContent" Spacing="12">
                                 <!-- Switching sets recolors what's drawn to the new set's matching colors. -->
-                                <Grid ColumnSpacing="12">
+                                <!-- For supporters (shown in code). -->
+                                <Grid x:Name="ColorSetRow" ColumnSpacing="12">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />

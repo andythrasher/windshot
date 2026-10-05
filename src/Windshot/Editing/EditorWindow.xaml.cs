@@ -108,12 +108,13 @@ public sealed partial class EditorWindow : Window
         _highlightColor = Themes.InSet(ColorExtensions.TryParseHex(prefs.Editor.HighlighterColor, out var highlight) ? highlight : _palette[2].Color, _palette);
         _pixelate = prefs.Editor.Pixelate;
         _highlightBlend = prefs.Editor.HighlighterBlend;
-        _shapeKind = prefs.Editor.Shape;
+        _shapeKind = prefs.Editor.Shape == ShapeKind.Sticker && !Supporter.IsUnlocked ? ShapeKind.Rectangle : prefs.Editor.Shape;
         _fillShapes = prefs.Editor.FillShapes;
         if (Stickers.All.Any(s => s.Icon == prefs.Editor.Sticker))
             _sticker = prefs.Editor.Sticker;
         _textBoxed = prefs.Editor.TextBackground;
-        _font = string.IsNullOrWhiteSpace(prefs.Editor.Font) ? TextAnnotation.DefaultFontFamily : prefs.Editor.Font;
+        // Fonts and stickers are supporter extras; without them, the remembered choice waits.
+        _font = string.IsNullOrWhiteSpace(prefs.Editor.Font) || !Supporter.IsUnlocked ? TextAnnotation.DefaultFontFamily : prefs.Editor.Font;
         _beautify = prefs.Beautify.OnByDefault;
         _backdropPreset = Math.Max(0, Array.FindIndex(BackdropPresets.All,
             p => p.Name.Equals(prefs.Beautify.Preset, StringComparison.OrdinalIgnoreCase)));
@@ -153,11 +154,14 @@ public sealed partial class EditorWindow : Window
         prefs.Editor.HighlighterColor = _highlightColor.ToHex();
         prefs.Editor.Pixelate = _pixelate;
         prefs.Editor.HighlighterBlend = _highlightBlend;
-        prefs.Editor.Shape = _shapeKind;
+        if (Supporter.IsUnlocked || prefs.Editor.Shape != ShapeKind.Sticker)
+            prefs.Editor.Shape = _shapeKind;
         prefs.Editor.FillShapes = _fillShapes;
         prefs.Editor.Sticker = _sticker;
         prefs.Editor.TextBackground = _textBoxed;
-        prefs.Editor.Font = _font;
+        // Without the extras, the free choices stood in: keep the remembered ones for later.
+        if (Supporter.IsUnlocked)
+            prefs.Editor.Font = _font;
         prefs.Editor.ShowLayers = _layersOpen;
         prefs.Beautify.Preset = BackdropPresets.All[_backdropPreset].Name;
         prefs.Beautify.Padding = _backdropPadding;
@@ -388,6 +392,7 @@ public sealed partial class EditorWindow : Window
         foreach (var theme in Themes.All)
             ColorSetPicker.Items.Add(theme.Name);
         ColorSetPicker.SelectedIndex = Array.FindIndex(Themes.All, t => t.Colors == _palette);
+        ColorSetRow.Visibility = Supporter.IsUnlocked ? Visibility.Visible : Visibility.Collapsed;
         ColorSetPicker.SelectionChanged += (_, _) =>
         {
             if (ColorSetPicker.SelectedIndex >= 0)
@@ -419,8 +424,10 @@ public sealed partial class EditorWindow : Window
         }
         if (recolored)
             Commit();
-        // Remembered like the other editor preferences, for the next editors too.
-        Settings.Current.Appearance.Colors = theme.Name;
+        // Remembered like the other editor preferences, for the next editors too. (Only a
+        // supporter's own pick: going back to the standard colors when locked isn't one.)
+        if (Supporter.IsUnlocked)
+            Settings.Current.Appearance.Colors = theme.Name;
         BuildSwatches();
         Canvas.Invalidate();
     }

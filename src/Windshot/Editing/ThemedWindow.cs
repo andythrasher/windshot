@@ -135,6 +135,9 @@ internal sealed class ThemedWindow
         {
             resources["AppBarToggleButtonBackgroundChecked" + suffix] = new SolidColorBrush(color);
             resources["AppBarToggleButtonForegroundChecked" + suffix] = new SolidColorBrush(on);
+            resources["AccentButtonBackground" + suffix] = new SolidColorBrush(color);
+            resources["AccentButtonForeground" + suffix] = new SolidColorBrush(on);
+            resources["AccentButtonBorderBrush" + suffix] = new SolidColorBrush(color);
             resources["ToggleButtonBackgroundChecked" + suffix] = new SolidColorBrush(color);
             resources["ToggleButtonForegroundChecked" + suffix] = new SolidColorBrush(on);
             resources["ToggleButtonBorderBrushChecked" + suffix] = new SolidColorBrush(color);

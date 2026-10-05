@@ -98,6 +98,12 @@ internal static class Themes
              ("Slushie", Rgb(0x0000FF)), ("Grape", Rgb(0xFF00FF)), ("Charcoal", Rgb(0x000000)), ("Napkin", Rgb(0xFFFFFF))]),
     ];
 
+    /// <summary>The editor theme in use: the one picked in Settings, for supporters; otherwise the standard one.</summary>
+    public static Theme EffectiveWindow => Supporter.IsUnlocked ? Find(Settings.Current.Appearance.Window) : All[0];
+
+    /// <summary>The color set in use, likewise.</summary>
+    public static Theme EffectiveColors => Supporter.IsUnlocked ? Find(Settings.Current.Appearance.Colors) : All[0];
+
     /// <summary>The theme with this name, or the standard one.</summary>
     public static Theme Find(string? name) =>
         All.FirstOrDefault(t => t.Name.Equals(name, StringComparison.OrdinalIgnoreCase)) ?? All[0];
