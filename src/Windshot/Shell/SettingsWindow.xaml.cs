@@ -30,9 +30,12 @@ public sealed partial class SettingsWindow : Window
     /// <summary>Set while showing values, so the controls' change events don't save them straight back.</summary>
     private bool _loading;
 
+    private readonly ThemedWindow _theming;
+
     private SettingsWindow()
     {
         InitializeComponent();
+        _theming = new ThemedWindow(this, Root);
         var defaults = new Settings.HotkeySettings();
         _rows =
         [
@@ -70,6 +73,7 @@ public sealed partial class SettingsWindow : Window
                 return;
             var theme = Themes.All[WindowTheme.SelectedIndex];
             ShowStrip(WindowThemePreview, theme.WindowSwatches, 18);
+            _theming.Apply(theme); // this window previews the editor theme
             Save(s => s.Appearance.Window = theme.Name);
         };
         ColorSet.SelectionChanged += (_, _) =>

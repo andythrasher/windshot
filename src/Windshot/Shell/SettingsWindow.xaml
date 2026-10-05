@@ -9,7 +9,7 @@
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <Grid>
+    <Grid x:Name="Root">
         <Grid.Resources>
             <!-- One setting per card, like Windows Settings: what it is on the left, the control on the right. -->
             <Style x:Key="Card" TargetType="Border">
@@ -166,7 +166,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="Editor theme" />
-                            <TextBlock Style="{StaticResource Description}" Text="The editor window's colors, in light and dark mode. Applies to editors you open next." />
+                            <TextBlock Style="{StaticResource Description}" Text="The editor window's colors, in light and dark mode. This window previews it; editors you open next use it." />
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
                             <StackPanel x:Name="WindowThemePreview" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center" />
