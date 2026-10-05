@@ -157,6 +157,40 @@
                     </Grid>
                 </Border>
 
+                <TextBlock Text="Appearance" Style="{StaticResource Section}" />
+                <Border Style="{StaticResource Card}">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Editor theme" />
+                            <TextBlock Style="{StaticResource Description}" Text="The editor window's colors, in light and dark mode. Applies to editors you open next." />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                            <StackPanel x:Name="WindowThemePreview" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center" />
+                            <ComboBox x:Name="WindowTheme" MinWidth="168" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+                <Border Style="{StaticResource Card}">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Annotation colors" />
+                            <TextBlock Style="{StaticResource Description}" Text="The eight colors in the editor's color menu. Any set goes with any theme." />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                            <StackPanel x:Name="ColorSetPreview" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center" />
+                            <ComboBox x:Name="ColorSet" MinWidth="168" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
                 <TextBlock Text="Beautify" Style="{StaticResource Section}" />
                 <Border Style="{StaticResource Card}">
                     <Grid ColumnSpacing="16">

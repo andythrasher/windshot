@@ -59,6 +59,27 @@ public sealed partial class SettingsWindow : Window
         // Added as items rather than bound: binding a .NET list fails in the trimmed build.
         foreach (var preset in BackdropPresets.All)
             BeautifyPreset.Items.Add(preset.Name);
+        foreach (var theme in Themes.All)
+        {
+            WindowTheme.Items.Add(theme.Name);
+            ColorSet.Items.Add(theme.Name);
+        }
+        WindowTheme.SelectionChanged += (_, _) =>
+        {
+            if (WindowTheme.SelectedIndex < 0)
+                return;
+            var theme = Themes.All[WindowTheme.SelectedIndex];
+            ShowStrip(WindowThemePreview, theme.WindowSwatches, 18);
+            Save(s => s.Appearance.Window = theme.Name);
+        };
+        ColorSet.SelectionChanged += (_, _) =>
+        {
+            if (ColorSet.SelectedIndex < 0)
+                return;
+            var theme = Themes.All[ColorSet.SelectedIndex];
+            ShowStrip(ColorSetPreview, theme.Colors.Select(c => c.Color).ToArray(), 10);
+            Save(s => s.Appearance.Colors = theme.Name);
+        };
         StartWithWindows.Toggled += async (_, _) =>
         {
             if (_loading)
@@ -136,7 +157,28 @@ public sealed partial class SettingsWindow : Window
         BeautifyPreset.SelectedIndex = Math.Max(0, Array.FindIndex(BackdropPresets.All,
             p => p.Name.Equals(s.Beautify.Preset, StringComparison.OrdinalIgnoreCase)));
         BeautifyPadding.Value = Math.Clamp(s.Beautify.Padding, 16, 160);
+        WindowTheme.SelectedIndex = Array.IndexOf(Themes.All, Themes.Find(s.Appearance.Window));
+        ColorSet.SelectedIndex = Array.IndexOf(Themes.All, Themes.Find(s.Appearance.Colors));
         _loading = false;
+    }
+
+    /// <summary>Shows a theme's colors beside its picker.</summary>
+    private static void ShowStrip(StackPanel strip, Windows.UI.Color[] colors, double swatchWidth)
+    {
+        strip.Children.Clear();
+        foreach (var color in colors)
+        {
+            strip.Children.Add(new Microsoft.UI.Xaml.Shapes.Rectangle
+            {
+                Width = swatchWidth,
+                Height = 14,
+                RadiusX = 2,
+                RadiusY = 2,
+                Fill = new Microsoft.UI.Xaml.Media.SolidColorBrush(color),
+                Stroke = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["ControlStrokeColorDefaultBrush"],
+                StrokeThickness = 1,
+            });
+        }
     }
 
     private async Task LoadStartWithWindowsAsync()

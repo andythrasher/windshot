@@ -41,7 +41,6 @@ public sealed partial class EditorWindow : Window
     private const float HitTolerance = 6;
     private const float HandleRadius = 5;
     private const float MinShapeSize = 3;
-    private static readonly Color AccentColor = Color.FromArgb(255, 0, 120, 212);
 
     private readonly Document _document;
     private readonly System.Drawing.Rectangle _desktopBounds;
@@ -94,6 +93,7 @@ public sealed partial class EditorWindow : Window
     {
         InitializeComponent();
         InitializeIcons();
+        ApplyTheme();
         _document = new Document(capture);
         _desktopBounds = capture.DesktopBounds;
         _startAtTop = capture.IsScrolling;
@@ -101,8 +101,9 @@ public sealed partial class EditorWindow : Window
 
         var prefs = Settings.Current;
         _toolWeights = new Dictionary<Tool, int>(prefs.Editor.Sizes);
-        _color = ColorExtensions.TryParseHex(prefs.Editor.Color, out var color) ? color : Palette.Colors[0].Color;
-        _highlightColor = ColorExtensions.TryParseHex(prefs.Editor.HighlighterColor, out var highlight) ? highlight : Palette.Colors[2].Color;
+        // Remembered colors from another color set become their counterparts in this one.
+        _color = Themes.InSet(ColorExtensions.TryParseHex(prefs.Editor.Color, out var color) ? color : _palette[0].Color, _palette);
+        _highlightColor = Themes.InSet(ColorExtensions.TryParseHex(prefs.Editor.HighlighterColor, out var highlight) ? highlight : _palette[2].Color, _palette);
         _pixelate = prefs.Editor.Pixelate;
         _textBoxed = prefs.Editor.TextBackground;
         _beautify = prefs.Beautify.OnByDefault;
@@ -350,9 +351,9 @@ public sealed partial class EditorWindow : Window
 
     private void BuildSwatches()
     {
-        for (int i = 0; i < Palette.Colors.Length; i++)
+        for (int i = 0; i < _palette.Length; i++)
         {
-            var (name, color) = Palette.Colors[i];
+            var (name, color) = _palette[i];
             var swatch = new Microsoft.UI.Xaml.Controls.Button
             {
                 Width = 28,
@@ -395,7 +396,7 @@ public sealed partial class EditorWindow : Window
         var color = ActiveColor;
         ColorSwatch.Fill = new SolidColorBrush(color);
         for (int i = 0; i < _swatches.Count; i++)
-            _swatches[i].BorderThickness = new Thickness(Palette.Colors[i].Color == color ? 3 : 1);
+            _swatches[i].BorderThickness = new Thickness(_palette[i].Color == color ? 3 : 1);
     }
 
     /// <summary>
@@ -480,7 +481,7 @@ public sealed partial class EditorWindow : Window
             case VirtualKey.Number1 or VirtualKey.NumberPad1 when ctrl: SetZoom(1, CanvasCenter); break;
             case VirtualKey.Z when ctrl: StepHistory(undo: !shift); break;
             case VirtualKey.Y when ctrl: StepHistory(undo: false); break;
-            case var _ when colorIndex >= 0 && !ctrl: SetColor(Palette.Colors[colorIndex].Color); break;
+            case var _ when colorIndex >= 0 && !ctrl: SetColor(_palette[colorIndex].Color); break;
             case VirtualKey.C when ctrl && shift: CopyText_Click(this, new RoutedEventArgs()); break;
             case VirtualKey.P when ctrl: Pin_Click(this, new RoutedEventArgs()); break;
             case VirtualKey.C when ctrl: Copy_Click(this, new RoutedEventArgs()); break;

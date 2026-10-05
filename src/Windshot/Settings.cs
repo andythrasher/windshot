@@ -39,6 +39,16 @@ internal sealed class Settings
     }
     public BeautifySettings Beautify { get; set; } = new();
     public ClipboardSettings Clipboard { get; set; } = new();
+    public AppearanceSettings Appearance { get; set; } = new();
+
+    public sealed class AppearanceSettings
+    {
+        /// <summary>The editor window's theme, by name, e.g. "Windshot", "Moss" or "Hot Dog Stand".</summary>
+        public string Window { get; set; } = Themes.All[0].Name;
+
+        /// <summary>The theme whose eight annotation colors the editor offers.</summary>
+        public string Colors { get; set; } = Themes.All[0].Name;
+    }
 
     public sealed class ClipboardSettings
     {
@@ -171,6 +181,7 @@ internal sealed class Settings
         Editor ??= new EditorSettings();
         Beautify ??= new BeautifySettings();
         Clipboard ??= new ClipboardSettings();
+        Appearance ??= new AppearanceSettings();
 
         var sizes = Editor.Sizes ?? [];
         Editor.Sizes = new EditorSettings().Sizes;
