@@ -154,7 +154,7 @@ Durable, lifetime "Forever". In Partner Center: Windshot > Add-ons > Supporter P
 - **Description (200 max):** Support Windshot and unlock seven more editor themes, matching color sets, a color wheel, fonts for text and 24 stickers. A one-time purchase; Windshot itself stays free.
 - **Keywords:** themes · colors · fonts · stickers · supporter
 - **Icon (optional, 300×300):** the app icon works; the Store falls back to it.
-- **Price:** your choice. (Something like $3.99–$4.99 fits a "thank you" purchase.)
+- **Price:** $4.99, with a launch sale at $1.99 until October 31, 2026. (The app shows whatever the Store's current price is, sale included.)
 - **Age rating:** inherits the app's; the app's questionnaire now answers yes to in-app purchases.
 
 ## Submission options
