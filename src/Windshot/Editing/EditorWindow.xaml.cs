@@ -167,7 +167,7 @@ public sealed partial class EditorWindow : Window
         // rescales the window, which would undo a size set first.
         AppWindow.Move(new PointInt32(workArea.X, workArea.Y));
         int chromeWidth = (int)(2 * ViewPadding * capture.Scale + 120);
-        int chromeHeight = (int)((2 * ViewPadding + 90) * capture.Scale);
+        int chromeHeight = (int)((2 * ViewPadding + 138) * capture.Scale);
         // The minimum keeps the whole toolbar visible.
         int width = Math.Clamp(capture.Width + chromeWidth, (int)(1060 * capture.Scale), (int)(workArea.Width * 0.85));
         int height = Math.Clamp(capture.Height + chromeHeight, (int)(360 * capture.Scale), (int)(workArea.Height * 0.85));
@@ -237,6 +237,7 @@ public sealed partial class EditorWindow : Window
             SyncFont();
             SyncColor();
         }
+        SyncOptions();
         UpdateCursor(null);
     }
 
@@ -267,14 +268,14 @@ public sealed partial class EditorWindow : Window
         SyncBlend();
         SyncTextBackground();
         SyncFont();
+        SyncOptions();
         Canvas.Invalidate();
     }
 
-    /// <summary>The text background toggle only appears for the text tool or selected text.</summary>
+    /// <summary>The text background toggle (on the options bar for text).</summary>
     private void SyncTextBackground()
     {
         var text = _selected as TextAnnotation;
-        TextBackgroundButton.Visibility = text is not null || _tool == Tool.Text ? Visibility.Visible : Visibility.Collapsed;
         TextBackgroundButton.IsChecked = text?.Boxed ?? _textBoxed;
     }
 
@@ -291,11 +292,10 @@ public sealed partial class EditorWindow : Window
         Canvas.Invalidate();
     }
 
-    /// <summary>The Pixelate toggle only appears for the blur tool or a selected blur.</summary>
+    /// <summary>The Pixelate toggle (on the options bar for blur).</summary>
     private void SyncPixelate()
     {
         var blur = _selected as BlurAnnotation;
-        PixelateButton.Visibility = blur is not null || _tool == Tool.Blur ? Visibility.Visible : Visibility.Collapsed;
         PixelateButton.IsChecked = blur?.Pixelate ?? _pixelate;
     }
 
@@ -1437,7 +1437,7 @@ public sealed partial class EditorWindow : Window
         // Raised before the items move; IsInOverflow is up to date once this layout pass is done.
         DispatcherQueue.TryEnqueue(() =>
         {
-            foreach (var element in Toolbar.PrimaryCommands.OfType<Control>())
+            foreach (var element in sender.PrimaryCommands.OfType<Control>())
             {
                 bool inMenu = ((ICommandBarElement)element).IsInOverflow;
                 if (element is AppBarButton or AppBarToggleButton)
@@ -1455,8 +1455,7 @@ public sealed partial class EditorWindow : Window
                     element.Padding = new Thickness(inMenu ? indent : 0, 0, 0, 0);
                 }
             }
-            // The color and Beautify buttons are bare icons on the bar; in the menu they need words.
-            ColorLabel.Visibility = ColorContainer.IsInOverflow ? Visibility.Visible : Visibility.Collapsed;
+            // The Beautify button is a bare icon on the bar; in the menu it needs words.
             _beautifyLabel.Visibility = BeautifyContainer.IsInOverflow ? Visibility.Visible : Visibility.Collapsed;
         });
     }

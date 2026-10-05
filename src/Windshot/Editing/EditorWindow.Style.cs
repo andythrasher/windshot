@@ -10,6 +10,32 @@ public sealed partial class EditorWindow
     /// <summary>Set while showing a value in a picker, so its change event doesn't apply it back.</summary>
     private bool _syncingStyle;
 
+    // ---- Options bar -------------------------------------------------------------------
+
+    /// <summary>
+    /// Shows what the options bar has to offer for the selected layer or, with nothing selected,
+    /// for the current tool; with nothing to set (selecting or cropping), a hint instead.
+    /// </summary>
+    private void SyncOptions()
+    {
+        var subject = _selected is { } selected ? ToolFor(selected) : _tool;
+        bool sized = _toolWeights.ContainsKey(subject);
+        bool colored = subject is Tool.Arrow or Tool.Rectangle or Tool.Text or Tool.Step or Tool.Highlighter;
+        Show(SizeContainer, sized);
+        Show(ColorContainer, colored);
+        Show(BlendContainer, subject == Tool.Highlighter);
+        Show(FontContainer, subject == Tool.Text);
+        Show(TextBackgroundButton, subject == Tool.Text);
+        Show(PixelateButton, subject == Tool.Blur);
+
+        OptionsHint.Text = subject == Tool.Crop
+            ? "Drag the edges or draw a new area. Enter applies, Esc cancels."
+            : "Click a layer to change it, or pick a tool to draw.";
+        Show(HintContainer, !sized && !colored);
+
+        static void Show(UIElement element, bool show) => element.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     // ---- Fonts -------------------------------------------------------------------------
 
     private void InitializeFonts()
@@ -27,11 +53,10 @@ public sealed partial class EditorWindow
     private static ComboBoxItem FontItem(string name, string family) =>
         new() { Content = name, FontFamily = new FontFamily(family), Tag = family };
 
-    /// <summary>The font picker only appears for the text tool or selected text.</summary>
+    /// <summary>The font picker (on the options bar for text).</summary>
     private void SyncFont()
     {
         var text = _selected as TextAnnotation;
-        FontContainer.Visibility = text is not null || _tool == Tool.Text ? Visibility.Visible : Visibility.Collapsed;
         string family = text?.FontFamily ?? _font;
         var item = FontPicker.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (string)i.Tag == family);
         if (item is null)
@@ -82,11 +107,10 @@ public sealed partial class EditorWindow
         };
     }
 
-    /// <summary>The blend picker only appears for the highlighter or a selected highlight.</summary>
+    /// <summary>The blend picker (on the options bar for highlights).</summary>
     private void SyncBlend()
     {
         var highlight = _selected as HighlighterAnnotation;
-        BlendContainer.Visibility = highlight is not null || _tool == Tool.Highlighter ? Visibility.Visible : Visibility.Collapsed;
         _syncingStyle = true;
         BlendPicker.SelectedIndex = Array.FindIndex(Blends, b => b.Blend == (highlight?.Blend ?? _highlightBlend));
         _syncingStyle = false;

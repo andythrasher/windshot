@@ -14,6 +14,7 @@
     <Grid x:Name="Root" KeyDown="Root_KeyDown" PreviewKeyDown="Root_PreviewKeyDown" PreviewKeyUp="Root_PreviewKeyUp">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -58,25 +59,48 @@
             <AppBarToggleButton Label="Spotlight" Click="ToolButton_Click" Tag="Spotlight" ToolTipService.ToolTip="Spotlight (S)" />
             <AppBarToggleButton Label="Crop" Click="ToolButton_Click" Tag="Crop" ToolTipService.ToolTip="Crop (C). Drag the edges or draw a new area; Enter applies, Esc cancels." />
             <AppBarSeparator />
-            <AppBarToggleButton
-                x:Name="PixelateButton"
-                Label="Pixelate"
-                Visibility="Collapsed"
-                Click="PixelateButton_Click"
-                ToolTipService.ToolTip="Pixelate (P). Safer than a smooth blur for hiding text." />
-            <AppBarToggleButton
-                x:Name="TextBackgroundButton"
-                Label="Text background"
-                Visibility="Collapsed"
-                Click="TextBackgroundButton_Click"
-                ToolTipService.ToolTip="Text background: set the text on a box of the current color" />
-            <AppBarElementContainer x:Name="BlendContainer" Visibility="Collapsed" VerticalContentAlignment="Center" ToolTipService.ToolTip="How the highlight mixes with what's under it">
-                <ComboBox x:Name="BlendPicker" Width="128" Margin="8,0,4,0" VerticalAlignment="Center" />
+            <AppBarElementContainer x:Name="BeautifyContainer" VerticalContentAlignment="Center">
+                <!-- Toggle on the left part; the arrow opens backdrop presets and padding. -->
+                <ToggleSplitButton
+                    x:Name="BeautifyButton"
+                    Margin="4,0"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    IsCheckedChanged="BeautifyButton_IsCheckedChanged"
+                    ToolTipService.ToolTip="Beautify: gradient backdrop, rounded corners and shadow">
+                    <ToggleSplitButton.Flyout>
+                        <!-- Unconfined like the color menu, so it opens above the "…" menu too. -->
+                        <Flyout Placement="Bottom" ShouldConstrainToRootBounds="False">
+                            <StackPanel x:Name="BeautifyFlyoutContent" Width="236" Spacing="8">
+                                <TextBlock Text="Backdrop" Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                                <VariableSizedWrapGrid x:Name="BackdropSwatches" Orientation="Horizontal" MaximumRowsOrColumns="4" />
+                                <TextBlock Text="Padding" />
+                                <Slider x:Name="PaddingSlider" Minimum="16" Maximum="160" StepFrequency="8" />
+                            </StackPanel>
+                        </Flyout>
+                    </ToggleSplitButton.Flyout>
+                </ToggleSplitButton>
             </AppBarElementContainer>
-            <AppBarElementContainer x:Name="FontContainer" Visibility="Collapsed" VerticalContentAlignment="Center" ToolTipService.ToolTip="Font">
-                <!-- Each font is listed in its own typeface. -->
-                <ComboBox x:Name="FontPicker" Width="156" Margin="8,0,4,0" VerticalAlignment="Center" />
-            </AppBarElementContainer>
+            <AppBarSeparator />
+            <AppBarButton x:Name="PinButton" Label="Pin" Click="Pin_Click" ToolTipService.ToolTip="Pin to screen (Ctrl+P)" />
+            <AppBarButton x:Name="CopyTextButton" Label="Copy text" Click="CopyText_Click" ToolTipService.ToolTip="Copy text (Ctrl+Shift+C)" />
+        </CommandBar>
+            <CommandBar Grid.Column="1" Background="Transparent" DefaultLabelPosition="Collapsed" OverflowButtonVisibility="Collapsed">
+                <AppBarToggleButton x:Name="LayersButton" Label="Layers" Click="LayersButton_Click" ToolTipService.ToolTip="Layers (L)" />
+            </CommandBar>
+        </Grid>
+
+        <!-- The options bar: settings for the selected layer, or else for the current tool,
+             like the options bar in photo editors. It's always there, so the canvas doesn't
+             jump when the selection changes; what's on it does. -->
+        <CommandBar
+            x:Name="OptionsBar"
+            Grid.Row="1"
+            HorizontalAlignment="Left"
+            Background="Transparent"
+            DefaultLabelPosition="Right"
+            IsDynamicOverflowEnabled="True"
+            DynamicOverflowItemsChanging="Toolbar_DynamicOverflowItemsChanging">
             <AppBarElementContainer x:Name="SizeContainer" VerticalContentAlignment="Center" ToolTipService.ToolTip="Size ([ and ])">
                 <StackPanel Orientation="Horizontal" Spacing="8" Margin="12,0">
                     <TextBlock Text="Size" VerticalAlignment="Center" />
@@ -104,8 +128,7 @@
                             Height="18"
                             Stroke="{ThemeResource ControlStrokeColorDefaultBrush}"
                             StrokeThickness="1" />
-                        <!-- Labels like this one show only in the "…" menu. -->
-                        <TextBlock x:Name="ColorLabel" Text="Color" Visibility="Collapsed" VerticalAlignment="Center" />
+                        <TextBlock x:Name="ColorLabel" Text="Color" VerticalAlignment="Center" />
                     </StackPanel>
                     <DropDownButton.Flyout>
                         <!-- Free to extend past the window's bottom: confined to the window, it
@@ -138,38 +161,37 @@
                     </DropDownButton.Flyout>
                 </DropDownButton>
             </AppBarElementContainer>
-            <AppBarElementContainer x:Name="BeautifyContainer" VerticalContentAlignment="Center">
-                <!-- Toggle on the left part; the arrow opens backdrop presets and padding. -->
-                <ToggleSplitButton
-                    x:Name="BeautifyButton"
-                    Margin="4,0"
-                    Background="Transparent"
-                    BorderThickness="0"
-                    IsCheckedChanged="BeautifyButton_IsCheckedChanged"
-                    ToolTipService.ToolTip="Beautify: gradient backdrop, rounded corners and shadow">
-                    <ToggleSplitButton.Flyout>
-                        <!-- Unconfined like the color menu, so it opens above the "…" menu too. -->
-                        <Flyout Placement="Bottom" ShouldConstrainToRootBounds="False">
-                            <StackPanel x:Name="BeautifyFlyoutContent" Width="236" Spacing="8">
-                                <TextBlock Text="Backdrop" Style="{ThemeResource BodyStrongTextBlockStyle}" />
-                                <VariableSizedWrapGrid x:Name="BackdropSwatches" Orientation="Horizontal" MaximumRowsOrColumns="4" />
-                                <TextBlock Text="Padding" />
-                                <Slider x:Name="PaddingSlider" Minimum="16" Maximum="160" StepFrequency="8" />
-                            </StackPanel>
-                        </Flyout>
-                    </ToggleSplitButton.Flyout>
-                </ToggleSplitButton>
+            <AppBarElementContainer x:Name="BlendContainer" Visibility="Collapsed" VerticalContentAlignment="Center" ToolTipService.ToolTip="How the highlight mixes with what's under it">
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="12,0,4,0">
+                    <TextBlock Text="Blend" VerticalAlignment="Center" />
+                    <ComboBox x:Name="BlendPicker" Width="128" VerticalAlignment="Center" />
+                </StackPanel>
             </AppBarElementContainer>
-            <AppBarSeparator />
-            <AppBarButton x:Name="PinButton" Label="Pin" Click="Pin_Click" ToolTipService.ToolTip="Pin to screen (Ctrl+P)" />
-            <AppBarButton x:Name="CopyTextButton" Label="Copy text" Click="CopyText_Click" ToolTipService.ToolTip="Copy text (Ctrl+Shift+C)" />
+            <AppBarElementContainer x:Name="FontContainer" Visibility="Collapsed" VerticalContentAlignment="Center">
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="12,0,4,0">
+                    <TextBlock Text="Font" VerticalAlignment="Center" />
+                    <!-- Each font is listed in its own typeface. -->
+                    <ComboBox x:Name="FontPicker" Width="168" VerticalAlignment="Center" />
+                </StackPanel>
+            </AppBarElementContainer>
+            <AppBarToggleButton
+                x:Name="TextBackgroundButton"
+                Label="Text background"
+                Visibility="Collapsed"
+                Click="TextBackgroundButton_Click"
+                ToolTipService.ToolTip="Text background: set the text on a box of the current color" />
+            <AppBarToggleButton
+                x:Name="PixelateButton"
+                Label="Pixelate"
+                Visibility="Collapsed"
+                Click="PixelateButton_Click"
+                ToolTipService.ToolTip="Pixelate (P). Safer than a smooth blur for hiding text." />
+            <AppBarElementContainer x:Name="HintContainer" Visibility="Collapsed" VerticalContentAlignment="Center">
+                <TextBlock x:Name="OptionsHint" Margin="12,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </AppBarElementContainer>
         </CommandBar>
-            <CommandBar Grid.Column="1" Background="Transparent" DefaultLabelPosition="Collapsed" OverflowButtonVisibility="Collapsed">
-                <AppBarToggleButton x:Name="LayersButton" Label="Layers" Click="LayersButton_Click" ToolTipService.ToolTip="Layers (L)" />
-            </CommandBar>
-        </Grid>
 
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
