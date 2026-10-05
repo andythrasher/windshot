@@ -93,18 +93,18 @@ First release.
 
 screenshot · snipping tool · screen capture · annotate screenshot · scrolling screenshot · copy text from screen · screenshot editor
 
-### Screenshots (1–10; 3840×2160 or 1920×1080 PNG recommended)
+### Screenshots (1–10; 3840×2160 PNG)
 
-To make with a neutral demo window (not anyone's real screen):
+In `store/screenshots`, made by `tools/screenshots` from a fictional demo app. Upload in this
+order; the headline is in each image, and the caption (optional, 200 characters) adds detail:
 
-1. The editor with arrows, a numbered step and a text callout over an app UI
-2. The layers panel open, with a blur above an arrow
-3. A scrolling capture of a long page in the editor
-4. Beautify on: the capture on a gradient backdrop
-5. A pinned capture floating over a desktop
-6. The settings window
-
-Captions (optional, 200 characters each) can reuse the product features above.
+1. `01-annotate.png`: Arrows, boxes, text, numbered steps, highlighter and blur, all still editable.
+2. `02-capture.png`: Drag a region or click a window. A magnifier and color picker help you land on the exact pixel.
+3. `03-layers.png`: Restack, hide, rename and fade annotations in the layers panel.
+4. `04-scrolling.png`: Scrolling capture stitches a long page into one image.
+5. `05-beautify.png`: A gradient backdrop with rounded corners and a shadow, ready to share.
+6. `06-pin.png`: Float a capture above your other windows while you work.
+7. `07-settings.png`: Change any shortcut, including Print Screen, and start with Windows.
 
 ### Store logos
 
