@@ -138,7 +138,20 @@ function Park { MoveAbs ($work.Right - 40) ($work.Bottom - 40); Pump 400 }
 # Clicks an editor control by its automation ID (x:Name).
 function ClickControl($id) {
   $el = FindIn $script:editor $id; if ($null -eq $el) { throw "$id not found; aborting." }
-  Click (Center $el); Pump 300
+  if ($el.Current.BoundingRectangle.Width -le 0) { throw "$id isn't showing; aborting." }
+  $toggle = $null
+  $isToggle = $el.TryGetCurrentPattern([Windows.Automation.TogglePattern]::Pattern, [ref]$toggle)
+  # Hover first, like a hand would: a click the instant the pointer lands on a button that has
+  # just appeared can go unregistered. A toggle that didn't turn on gets one more try.
+  foreach ($try in 1, 2) {
+    $c = Center $el; MoveAbs $c[0] $c[1]; Pump 300
+    Click $c; Pump 300
+    if (-not $isToggle -or $toggle.Current.ToggleState -eq [Windows.Automation.ToggleState]::On) { return }
+  }
+  # Some simulated clicks on the options bar don't register; toggling through automation does.
+  $toggle.Toggle(); Pump 300
+  if ($toggle.Current.ToggleState -ne [Windows.Automation.ToggleState]::On) { throw "$id didn't turn on; aborting." }
+  "($id toggled through automation)"
 }
 # Clicks something by its accessible name in any of Windshot's windows; flyouts are windows of their own.
 function ClickNamed($name) {

@@ -5,6 +5,8 @@
 #   powershell -File tools/screenshots/run-all.ps1 [-Runs editor,shapes,themes,scroll]
 param([string[]]$Runs = @('editor', 'shapes', 'themes', 'scroll'))
 $ErrorActionPreference = 'Stop'
+# From the command line (-File), a comma-separated list arrives as one string.
+$Runs = $Runs -split ','
 $settings = "$env:LOCALAPPDATA\Windshot\settings.json"
 $backup = "$settings.shots-backup"
 $exe = "$env:LOCALAPPDATA\Programs\Windshot\Windshot.exe"
@@ -38,6 +40,14 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "run-$run failed" }
     }
 } finally {
+    # Close any editor a failed run left open first: closing saves its preferences into the
+    # settings, which would otherwise land on top of yours.
+    Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
+    foreach ($p in @(Get-Process Windshot -ErrorAction SilentlyContinue | Where-Object MainWindowTitle -eq 'Windshot')) {
+        $w = [Windows.Automation.AutomationElement]::FromHandle($p.MainWindowHandle)
+        $w.GetCurrentPattern([Windows.Automation.WindowPattern]::Pattern).Close()
+    }
+    Start-Sleep -Milliseconds 800
     Copy-Item $backup $settings -Force
     Remove-Item $backup
     Restart-Windshot

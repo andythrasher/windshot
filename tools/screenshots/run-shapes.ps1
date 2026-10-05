@@ -6,10 +6,11 @@ $stage = Show-Stage
 try {
   Open-BoardEditor
 
-  Key @(0x52); Pump 300                                          # Shapes tool
+  Key @(0x52); Pump 800                                          # Shapes tool (its buttons appear on the options bar)
   ClickControl 'ShapeEllipseButton'
   Key @(0x31); Drag (B 1458 280) (B 1600 342)                    # coral ellipse around "2 at risk"
-  Key @(0x1B)                                                    # deselect, or the next shape button converts it
+  # Deselect by switching tools (Esc goes to the focused shape button), or the next shape button converts it.
+  Key @(0x56); Key @(0x52); Pump 300
   Guard
   ClickControl 'ShapeRectangleButton'
   Key @(0x37); Key @(0x46)                                       # ink, filled

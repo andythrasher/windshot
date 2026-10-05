@@ -13,14 +13,15 @@ try {
   Key @(0x54); Click (B 1120 455); Pump 300
   [Windows.Forms.SendKeys]::SendWait('Ship it{!}'); Pump 200; Key @(0x1B)
   Guard
-  Key @(0x52); Pump 300
+  Key @(0x52); Pump 800
   ClickControl 'ShapeStickerButton'; Pump 300; ClickNamed 'Heart'
   Key @(0x1B); foreach ($i in 1..2) { Key @(0xDD) }
   Key @(0x31); Click (B 778 98); Key @(0x1B)                     # a rust heart beside the title
   Guard
 
-  Key @(0x4C); Pump 400                                          # layers panel
-  Key @(0x56); Click (B 1150 455); Park                          # select the text: Font shows
+  # Select the text (Font shows on the options bar), then open layers: that refits the image.
+  Key @(0x56); Click (B 1150 455)
+  Key @(0x4C); Park
   GrabEditor 'raw-themes' 'Make it yours with supporter themes.' '07-themes'
   CloseEditor
 } finally { $stage.Close() }
