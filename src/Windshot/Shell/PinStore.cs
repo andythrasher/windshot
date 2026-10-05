@@ -87,22 +87,70 @@ internal static class PinStore
                     Delete(id);
                     continue;
                 }
+                // Values come from a file, so keep them sane: a NaN zoom would make a NaN-sized window.
+                float zoom = float.IsFinite(state.Zoom) ? Math.Clamp(state.Zoom, 0.1f, 8f) : 1;
+                double opacity = double.IsFinite(state.Opacity) ? state.Opacity : 1;
+                double scale = double.IsFinite(state.Scale) && state.Scale is >= 0.5 and <= 8 ? state.Scale : 1;
+
+                if (ImageSize(ImagePath(id)) is not (int width, int height) || width > MaxSide || height > MaxSide || (long)width * height > MaxPixels)
+                    throw new InvalidDataException("not a PNG Windshot could have saved");
 
                 Bitmap image;
                 using (var loaded = new Bitmap(ImagePath(id)))
                     image = new Bitmap(loaded); // detach from the file so it can be deleted later
 
-                var size = new Size(Math.Max(1, (int)(image.Width * state.Zoom)), Math.Max(1, (int)(image.Height * state.Zoom)));
+                var size = new Size(Math.Max(1, (int)(image.Width * zoom)), Math.Max(1, (int)(image.Height * zoom)));
                 var location = OnScreen(new Rectangle(new Point(state.X, state.Y), size));
-                new PinWindow(image, location, state.Scale, edit, id, state.Zoom, state.Opacity).Show();
+                new PinWindow(image, location, scale, edit, id, zoom, opacity).Show();
                 restored++;
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException)
+            catch (Exception ex)
             {
-                Log.Write($"Couldn't restore pin {id}: {ex.Message}");
+                // Anything at all (GDI+ reports a corrupt image as out of memory): set the pin
+                // aside rather than fail, and fail again, at every start.
+                Log.Write($"Couldn't restore pin {id}, set it aside: {ex.Message}");
+                SetAside(id);
             }
         }
         return restored;
+    }
+
+    /// <summary>Larger than any capture the editor can hold (Direct2D's bitmap limit).</summary>
+    private const int MaxSide = 16384;
+    private const long MaxPixels = 100_000_000;
+
+    /// <summary>A PNG's width and height from its header, without decoding it (which could need gigabytes).</summary>
+    private static (int Width, int Height)? ImageSize(string path)
+    {
+        Span<byte> header = stackalloc byte[24];
+        using var file = File.OpenRead(path);
+        if (file.ReadAtLeast(header, header.Length, throwOnEndOfStream: false) < header.Length)
+            return null;
+        ReadOnlySpan<byte> signature = [0x89, (byte)'P', (byte)'N', (byte)'G', 0x0D, 0x0A, 0x1A, 0x0A];
+        if (!header[..8].SequenceEqual(signature) || !header[12..16].SequenceEqual("IHDR"u8))
+            return null;
+        int width = System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(header[16..20]);
+        int height = System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(header[20..24]);
+        return width > 0 && height > 0 ? (width, height) : null;
+    }
+
+    /// <summary>Moves a pin's files into pins\unreadable, so they stop being loaded but aren't lost.</summary>
+    private static void SetAside(string id)
+    {
+        try
+        {
+            string folder = Path.Combine(Folder, "unreadable");
+            Directory.CreateDirectory(folder);
+            foreach (string path in new[] { ImagePath(id), StatePath(id) })
+            {
+                if (File.Exists(path))
+                    File.Move(path, Path.Combine(folder, Path.GetFileName(path)), overwrite: true);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log.Write($"Couldn't set pin {id} aside: {ex.Message}");
+        }
     }
 
     /// <summary>Where to put a pin so enough of it is visible to grab, e.g. after a monitor was unplugged.</summary>

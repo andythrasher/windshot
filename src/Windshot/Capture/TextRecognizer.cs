@@ -3,7 +3,6 @@ using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.WindowsRuntime;
-using Windows.ApplicationModel.DataTransfer;
 using Windows.Graphics.Imaging;
 using Windows.Media.Ocr;
 
@@ -22,10 +21,8 @@ internal static class TextRecognizer
             if (string.IsNullOrWhiteSpace(text))
                 return "No text found";
 
-            var package = new DataPackage();
-            package.SetText(text);
-            Clipboard.SetContent(package);
-            Clipboard.Flush();
+            if (!Shell.ClipboardWriter.TrySetText(text))
+                return "Couldn't copy: the clipboard is busy";
 
             int words = text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
             return words == 1 ? "Copied 1 word" : $"Copied {words} words";

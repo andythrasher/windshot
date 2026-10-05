@@ -1179,18 +1179,34 @@ public sealed partial class EditorWindow : Window
             SetTool(Tool.Select);
     }
 
+    // Export handlers are async void, so an exception escaping one would take down the whole
+    // app, every other open editor included. Each catches its own and says what went wrong.
+
     private async void Copy_Click(object sender, RoutedEventArgs e)
     {
-        FinishEditing();
-        var png = await _document.EncodePngAsync();
-        var package = new DataPackage();
-        package.SetBitmap(RandomAccessStreamReference.CreateFromStream(png));
-        // The bitmap format drops transparency (rounded window corners, unfilled canvas);
-        // most apps that paste images look for PNG first and keep it.
-        package.SetData("PNG", png.CloneStream());
-        Clipboard.SetContent(package);
-        Clipboard.Flush();
-        CloseAfterExport("Copied");
+        try
+        {
+            FinishEditing();
+            var png = await _document.EncodePngAsync();
+            if (!Shell.ClipboardWriter.TrySetPng(png))
+            {
+                ShowMessage("Couldn't copy: the clipboard is busy. Try again.");
+                return;
+            }
+            CloseAfterExport("Copied");
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Copy failed: {ex}");
+            ShowMessage("Couldn't copy the image");
+        }
+    }
+
+    /// <summary>A short message centered on this window.</summary>
+    private void ShowMessage(string message)
+    {
+        var window = new System.Drawing.Rectangle(AppWindow.Position.X, AppWindow.Position.Y, AppWindow.Size.Width, AppWindow.Size.Height);
+        Shell.Hud.Show(message, window, Content.XamlRoot.RasterizationScale);
     }
 
     /// <summary>After a copy or save, close the editor (unless turned off in settings), saying what happened.</summary>
@@ -1198,21 +1214,26 @@ public sealed partial class EditorWindow : Window
     {
         if (!Settings.Current.Editor.CloseAfterSaveOrCopy)
             return;
-        var window = new System.Drawing.Rectangle(AppWindow.Position.X, AppWindow.Position.Y, AppWindow.Size.Width, AppWindow.Size.Height);
-        Shell.Hud.Show(message, window, Content.XamlRoot.RasterizationScale);
+        ShowMessage(message);
         Close();
     }
 
     /// <summary>Reads the text in the original screenshot (annotations ignored) and copies it.</summary>
     private async void CopyText_Click(object sender, RoutedEventArgs e)
     {
-        FinishEditing();
-        var size = _document.Image.SizeInPixels;
-        string message = await TextRecognizer.CopyToClipboardAsync(
-            _document.Image.GetPixelBytes(), (int)size.Width, (int)size.Height, _document.SourceScale);
-
-        var window = new System.Drawing.Rectangle(AppWindow.Position.X, AppWindow.Position.Y, AppWindow.Size.Width, AppWindow.Size.Height);
-        Shell.Hud.Show(message, window, Content.XamlRoot.RasterizationScale);
+        try
+        {
+            FinishEditing();
+            var size = _document.Image.SizeInPixels;
+            // Reports its own failures as the message.
+            ShowMessage(await TextRecognizer.CopyToClipboardAsync(
+                _document.Image.GetPixelBytes(), (int)size.Width, (int)size.Height, _document.SourceScale));
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Copy text failed: {ex}");
+            ShowMessage("Couldn't read text");
+        }
     }
 
     /// <summary>
@@ -1221,19 +1242,27 @@ public sealed partial class EditorWindow : Window
     /// </summary>
     private async void Pin_Click(object sender, RoutedEventArgs e)
     {
-        FinishEditing();
-        using var png = await _document.EncodePngAsync();
-        using var stream = png.AsStreamForRead();
-        System.Drawing.Bitmap image;
-        using (var decoded = new System.Drawing.Bitmap(stream))
-            image = new System.Drawing.Bitmap(decoded); // detach from the stream
+        try
+        {
+            FinishEditing();
+            using var png = await _document.EncodePngAsync();
+            using var stream = png.AsStreamForRead();
+            System.Drawing.Bitmap image;
+            using (var decoded = new System.Drawing.Bitmap(stream))
+                image = new System.Drawing.Bitmap(decoded); // detach from the stream
 
-        // The canvas can extend past the capture (annotations, backdrop); offset so the
-        // screenshot itself lands back on the pixels it came from.
-        var bounds = _document.Bounds;
-        var location = new System.Drawing.Point(_desktopBounds.X + (int)bounds.X, _desktopBounds.Y + (int)bounds.Y);
-        new Shell.PinWindow(image, location, _document.SourceScale, App.OpenEditor).Show();
-        Close();
+            // The canvas can extend past the capture (annotations, backdrop); offset so the
+            // screenshot itself lands back on the pixels it came from.
+            var bounds = _document.Bounds;
+            var location = new System.Drawing.Point(_desktopBounds.X + (int)bounds.X, _desktopBounds.Y + (int)bounds.Y);
+            new Shell.PinWindow(image, location, _document.SourceScale, App.OpenEditor).Show();
+            Close();
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Pin failed: {ex}");
+            ShowMessage("Couldn't pin the image");
+        }
     }
 
     // ---- Beautify ----------------------------------------------------------------------
@@ -1401,25 +1430,35 @@ public sealed partial class EditorWindow : Window
 
     private async void Save_Click(object sender, RoutedEventArgs e)
     {
-        FinishEditing();
-        var picker = new FileSavePicker
+        Windows.Storage.StorageFile? file = null;
+        try
         {
-            SuggestedStartLocation = PickerLocationId.PicturesLibrary,
-            SuggestedFileName = $"Windshot {DateTime.Now:yyyy-MM-dd HHmmss}",
-        };
-        picker.FileTypeChoices.Add("PNG image", new List<string> { ".png" });
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
+            FinishEditing();
+            var picker = new FileSavePicker
+            {
+                SuggestedStartLocation = PickerLocationId.PicturesLibrary,
+                SuggestedFileName = $"Windshot {DateTime.Now:yyyy-MM-dd HHmmss}",
+            };
+            picker.FileTypeChoices.Add("PNG image", new List<string> { ".png" });
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
 
-        var file = await picker.PickSaveFileAsync();
-        if (file is null)
-            return;
+            file = await picker.PickSaveFileAsync();
+            if (file is null)
+                return;
 
-        using var png = await _document.EncodePngAsync();
-        using (var output = await file.OpenAsync(Windows.Storage.FileAccessMode.ReadWrite))
-        {
-            output.Size = 0;
-            await RandomAccessStream.CopyAndCloseAsync(png.GetInputStreamAt(0), output.GetOutputStreamAt(0));
+            using var png = await _document.EncodePngAsync();
+            using (var output = await file.OpenAsync(Windows.Storage.FileAccessMode.ReadWrite))
+            {
+                output.Size = 0;
+                await RandomAccessStream.CopyAndCloseAsync(png.GetInputStreamAt(0), output.GetOutputStreamAt(0));
+            }
+            CloseAfterExport($"Saved {file.Name}");
         }
-        CloseAfterExport($"Saved {file.Name}");
+        catch (Exception ex)
+        {
+            // E.g. the file is open in another app, the drive is full or read-only.
+            Log.Write($"Save failed: {ex}");
+            ShowMessage(file is null ? "Couldn't save" : $"Couldn't save {file.Name}");
+        }
     }
 }

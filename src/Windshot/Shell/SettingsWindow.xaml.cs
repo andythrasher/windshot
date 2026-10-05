@@ -60,6 +60,7 @@ public sealed partial class SettingsWindow : Window
         StartWithWindows.Toggled += (_, _) => { if (!_loading) Autostart.Set(StartWithWindows.IsOn); };
         ShowMagnifier.Toggled += (_, _) => Save(s => s.Capture.ShowMagnifier = ShowMagnifier.IsOn);
         CloseAfterExport.Toggled += (_, _) => Save(s => s.Editor.CloseAfterSaveOrCopy = CloseAfterExport.IsOn);
+        KeepOutOfHistory.Toggled += (_, _) => Save(s => s.Clipboard.KeepOutOfHistory = KeepOutOfHistory.IsOn);
         BeautifyByDefault.Toggled += (_, _) => Save(s => s.Beautify.OnByDefault = BeautifyByDefault.IsOn);
         BeautifyPreset.SelectionChanged += (_, _) =>
         {
@@ -119,6 +120,7 @@ public sealed partial class SettingsWindow : Window
         StartWithWindows.IsOn = Autostart.IsEnabled;
         ShowMagnifier.IsOn = s.Capture.ShowMagnifier;
         CloseAfterExport.IsOn = s.Editor.CloseAfterSaveOrCopy;
+        KeepOutOfHistory.IsOn = s.Clipboard.KeepOutOfHistory;
         BeautifyByDefault.IsOn = s.Beautify.OnByDefault;
         BeautifyPreset.SelectedItem = BackdropPresets.All.FirstOrDefault(p => p.Name.Equals(s.Beautify.Preset, StringComparison.OrdinalIgnoreCase)).Name
             ?? BackdropPresets.All[0].Name;

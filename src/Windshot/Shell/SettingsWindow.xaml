@@ -142,6 +142,19 @@
                         <ToggleSwitch x:Name="CloseAfterExport" Grid.Column="1" MinWidth="0" OnContent="" OffContent="" />
                     </Grid>
                 </Border>
+                <Border Style="{StaticResource Card}">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Keep copies out of clipboard history" />
+                            <TextBlock Style="{StaticResource Description}" Text="Copied captures and text won't appear in Win + V history or sync to your other devices. Pasting still works." />
+                        </StackPanel>
+                        <ToggleSwitch x:Name="KeepOutOfHistory" Grid.Column="1" MinWidth="0" OnContent="" OffContent="" />
+                    </Grid>
+                </Border>
 
                 <TextBlock Text="Beautify" Style="{StaticResource Section}" />
                 <Border Style="{StaticResource Card}">

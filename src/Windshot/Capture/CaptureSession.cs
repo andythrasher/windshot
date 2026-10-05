@@ -61,8 +61,16 @@ internal static class CaptureSession
             overlay.Selected += (source, desktopRect, window) =>
             {
                 Log.Write($"Selected {desktopRect} at scale {source.MonitorScale}" + (window is { } w ? $", a window with {w.Corners} corners" : ""));
-                var then = prepare(snapshot, desktopRect, source.MonitorScale, window);
-                End();
+                Action then;
+                try
+                {
+                    then = prepare(snapshot, desktopRect, source.MonitorScale, window);
+                }
+                finally
+                {
+                    // Whatever happens, never leave full-screen overlays up.
+                    End();
+                }
                 then();
             };
             overlay.Cancelled += End;

@@ -39,6 +39,13 @@ internal sealed class Settings
         public bool ShowMagnifier { get; set; } = true;
     }
     public BeautifySettings Beautify { get; set; } = new();
+    public ClipboardSettings Clipboard { get; set; } = new();
+
+    public sealed class ClipboardSettings
+    {
+        /// <summary>Leave copies out of Win+V clipboard history and cloud clipboard sync.</summary>
+        public bool KeepOutOfHistory { get; set; }
+    }
 
     public sealed class HotkeySettings
     {
@@ -163,6 +170,7 @@ internal sealed class Settings
         Capture ??= new CaptureSettings();
         Editor ??= new EditorSettings();
         Beautify ??= new BeautifySettings();
+        Clipboard ??= new ClipboardSettings();
 
         var sizes = Editor.Sizes ?? [];
         Editor.Sizes = new EditorSettings().Sizes;

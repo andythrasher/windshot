@@ -38,7 +38,10 @@ internal sealed class Hud : Form
             area.X + (area.Width - size.Width) / 2,
             area.Y + (area.Height - size.Height) / 2,
             size.Width, size.Height);
-        Region = Region.FromHrgn(CreateRoundRectRgn(0, 0, size.Width + 1, size.Height + 1, size.Height, size.Height));
+        // Region copies the shape, so the handle is ours to free.
+        var shape = CreateRoundRectRgn(0, 0, size.Width + 1, size.Height + 1, size.Height, size.Height);
+        Region = Region.FromHrgn(shape);
+        DeleteObject(shape);
     }
 
     /// <summary>Shows a message centered on a desktop-space area (physical pixels).</summary>
@@ -85,4 +88,7 @@ internal sealed class Hud : Form
 
     [DllImport("gdi32.dll")]
     private static extern IntPtr CreateRoundRectRgn(int left, int top, int right, int bottom, int widthEllipse, int heightEllipse);
+
+    [DllImport("gdi32.dll")]
+    private static extern bool DeleteObject(IntPtr obj);
 }

@@ -95,7 +95,7 @@ internal sealed class PinWindow : Form
     private ContextMenuStrip BuildMenu()
     {
         var menu = new ContextMenuStrip();
-        menu.Items.Add("Copy", null, (_, _) => Clipboard.SetImage(_image));
+        menu.Items.Add("Copy", null, (_, _) => Copy());
         menu.Items.Add("Edit", null, (_, _) => EditAndClose());
         var opacity = new ToolStripMenuItem("Opacity");
         foreach (int percent in new[] { 100, 75, 50, 25 })
@@ -263,7 +263,13 @@ internal sealed class PinWindow : Form
         if (e.KeyCode == Keys.Escape)
             Close();
         else if (e.Control && e.KeyCode == Keys.C)
-            Clipboard.SetImage(_image);
+            Copy();
+    }
+
+    private void Copy()
+    {
+        if (!ClipboardWriter.TrySetImage(_image))
+            Hud.Show("Couldn't copy: the clipboard is busy", Bounds, DeviceDpi / 96.0);
     }
 
     private void EditAndClose()

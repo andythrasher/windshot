@@ -23,6 +23,15 @@ public partial class App : Application
     {
         InitializeComponent();
         UnhandledException += (_, e) => Log.Write($"Unhandled: {e.Exception}");
+        // The WinForms parts (tray, overlay, pins) would otherwise show WinForms' own
+        // "Unhandled exception" dialog; log it and carry on, like the rest of the app does.
+        System.Windows.Forms.Application.SetUnhandledExceptionMode(System.Windows.Forms.UnhandledExceptionMode.CatchException);
+        System.Windows.Forms.Application.ThreadException += (_, e) => Log.Write($"Unhandled (WinForms): {e.Exception}");
+        TaskScheduler.UnobservedTaskException += (_, e) =>
+        {
+            Log.Write($"Unobserved task exception: {e.Exception}");
+            e.SetObserved();
+        };
     }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)

@@ -217,8 +217,7 @@ internal sealed class SelectionOverlay : Form
             return;
         var c = ColorAt(p);
         string hex = $"#{c.R:X2}{c.G:X2}{c.B:X2}";
-        Clipboard.SetText(hex);
-        Finish($"Copied {hex}", p);
+        Finish(Shell.ClipboardWriter.TrySetText(hex) ? $"Copied {hex}" : "Couldn't copy: the clipboard is busy", p);
     }
 
     /// <summary>Click in ruler mode: copy the measurement and finish.</summary>
@@ -227,8 +226,7 @@ internal sealed class SelectionOverlay : Form
         if (_measurement is not Measurement m)
             return;
         string text = $"{m.Width} × {m.Height}";
-        Clipboard.SetText(text);
-        Finish($"Copied {text}", m.Origin);
+        Finish(Shell.ClipboardWriter.TrySetText(text) ? $"Copied {text}" : "Couldn't copy: the clipboard is busy", m.Origin);
     }
 
     private void Finish(string message, Point client)
