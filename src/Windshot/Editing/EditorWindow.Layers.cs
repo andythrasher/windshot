@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -18,7 +17,13 @@ namespace Windshot.Editing;
 public sealed partial class EditorWindow
 {
 
-    private readonly ObservableCollection<Grid> _layerRows = new();
+    /// <summary>
+    /// The rows, topmost first. They live directly in the ListView's own item collection (which
+    /// supports drag-reordering too) rather than in a bound .NET collection: in the trimmed
+    /// Release build, handing WinUI an ObservableCollection fails for lack of the reflection
+    /// its interop glue needs.
+    /// </summary>
+    private IEnumerable<Grid> LayerRows => LayerList.Items.Cast<Grid>();
     /// <summary>Set while the panel is being updated from the document, so its events don't echo back.</summary>
     private bool _syncingLayers;
     /// <summary>The screenshot row is selected (for its opacity) rather than an object.</summary>
@@ -27,7 +32,6 @@ public sealed partial class EditorWindow
 
     private void InitializeLayers()
     {
-        LayerList.ItemsSource = _layerRows;
         LayerList.SelectionChanged += (_, _) =>
         {
             if (_syncingLayers || (LayerList.SelectedItem as FrameworkElement)?.Tag is not Annotation annotation)
@@ -113,7 +117,7 @@ public sealed partial class EditorWindow
 
     private void ApplyLayerOrder()
     {
-        var order = _layerRows.Select(row => (Annotation)row.Tag).Reverse().ToList();
+        var order = LayerRows.Select(row => (Annotation)row.Tag).Reverse().ToList();
         if (order.SequenceEqual(_document.Annotations))
             return;
         _document.Annotations.Clear();
@@ -158,14 +162,14 @@ public sealed partial class EditorWindow
         _document.NumberSteps();
         _syncingLayers = true;
         var order = _document.Annotations.AsEnumerable().Reverse().ToList();
-        if (order.SequenceEqual(_layerRows.Select(row => (Annotation)row.Tag)))
+        if (order.SequenceEqual(LayerRows.Select(row => (Annotation)row.Tag)))
         {
-            foreach (var row in _layerRows)
+            foreach (var row in LayerRows)
                 FillRow(row, (Annotation)row.Tag);
         }
         else
         {
-            _layerRows.Clear();
+            LayerList.Items.Clear();
             foreach (var annotation in order)
             {
                 var row = new Grid { Tag = annotation, Height = 40, ColumnSpacing = 10, Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent) };
@@ -178,7 +182,7 @@ public sealed partial class EditorWindow
                     e.Handled = true;
                 };
                 FillRow(row, annotation);
-                _layerRows.Add(row);
+                LayerList.Items.Add(row);
             }
         }
 
@@ -312,7 +316,7 @@ public sealed partial class EditorWindow
         if (!_layersOpen)
             return;
         _syncingLayers = true;
-        LayerList.SelectedItem = _layerRows.FirstOrDefault(row => row.Tag == _selected);
+        LayerList.SelectedItem = LayerRows.FirstOrDefault(row => row.Tag == _selected);
         ImageLayerRow.Background = _imageLayerSelected
             ? (Brush)Application.Current.Resources["SubtleFillColorSecondaryBrush"]
             : new SolidColorBrush(Microsoft.UI.Colors.Transparent);

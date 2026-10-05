@@ -43,7 +43,7 @@ internal static class PinStore
         {
             Directory.CreateDirectory(Folder);
             string temp = StatePath(id) + ".tmp";
-            File.WriteAllText(temp, JsonSerializer.Serialize(state));
+            File.WriteAllText(temp, JsonSerializer.Serialize(state, JsonContext.Default.PinState));
             File.Move(temp, StatePath(id), overwrite: true);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -80,7 +80,7 @@ internal static class PinStore
             string id = Path.GetFileNameWithoutExtension(statePath);
             try
             {
-                var state = JsonSerializer.Deserialize<PinState>(File.ReadAllText(statePath));
+                var state = JsonSerializer.Deserialize(File.ReadAllText(statePath), JsonContext.Default.PinState);
                 if (state is null || !File.Exists(ImagePath(id)))
                 {
                     Delete(id);

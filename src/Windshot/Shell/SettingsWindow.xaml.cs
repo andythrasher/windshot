@@ -56,7 +56,9 @@ public sealed partial class SettingsWindow : Window
             row.Reset.Click += (_, _) => Change(row, row.Default);
         }
 
-        BeautifyPreset.ItemsSource = BackdropPresets.All.Select(p => p.Name).ToList();
+        // Added as items rather than bound: binding a .NET list fails in the trimmed build.
+        foreach (var preset in BackdropPresets.All)
+            BeautifyPreset.Items.Add(preset.Name);
         StartWithWindows.Toggled += async (_, _) =>
         {
             if (_loading)
@@ -73,8 +75,8 @@ public sealed partial class SettingsWindow : Window
         BeautifyByDefault.Toggled += (_, _) => Save(s => s.Beautify.OnByDefault = BeautifyByDefault.IsOn);
         BeautifyPreset.SelectionChanged += (_, _) =>
         {
-            if (BeautifyPreset.SelectedItem is string preset)
-                Save(s => s.Beautify.Preset = preset);
+            if (BeautifyPreset.SelectedIndex >= 0)
+                Save(s => s.Beautify.Preset = BackdropPresets.All[BeautifyPreset.SelectedIndex].Name);
         };
         BeautifyPadding.ValueChanged += (_, e) => Save(s => s.Beautify.Padding = e.NewValue);
         OpenFile.Click += (_, _) => App.OpenSettingsFile();
@@ -131,8 +133,8 @@ public sealed partial class SettingsWindow : Window
         CloseAfterExport.IsOn = s.Editor.CloseAfterSaveOrCopy;
         KeepOutOfHistory.IsOn = s.Clipboard.KeepOutOfHistory;
         BeautifyByDefault.IsOn = s.Beautify.OnByDefault;
-        BeautifyPreset.SelectedItem = BackdropPresets.All.FirstOrDefault(p => p.Name.Equals(s.Beautify.Preset, StringComparison.OrdinalIgnoreCase)).Name
-            ?? BackdropPresets.All[0].Name;
+        BeautifyPreset.SelectedIndex = Math.Max(0, Array.FindIndex(BackdropPresets.All,
+            p => p.Name.Equals(s.Beautify.Preset, StringComparison.OrdinalIgnoreCase)));
         BeautifyPadding.Value = Math.Clamp(s.Beautify.Padding, 16, 160);
         _loading = false;
     }

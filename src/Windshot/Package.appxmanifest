@@ -3,8 +3,8 @@
   The Microsoft Store (MSIX) package. Only used by the packaged build (tools/package.ps1);
   the everyday build and tools/install.ps1 run unpackaged.
 
-  Identity Name, Publisher and PublisherDisplayName are placeholders: replace them with the
-  values Partner Center shows under Product identity once the app name is reserved.
+  Identity Name, Publisher and PublisherDisplayName come from Partner Center (Product
+  management > Product identity) and must match it exactly. Raise Version for every submission.
 -->
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
@@ -14,13 +14,13 @@
   IgnorableNamespaces="uap desktop rescap">
 
   <Identity
-    Name="Windshot.Dev"
-    Publisher="CN=Windshot Dev"
+    Name="AndyThrasher.Windshot"
+    Publisher="CN=0BF2785B-78A5-4726-A59C-2322EBED4C78"
     Version="1.0.0.0" />
 
   <Properties>
     <DisplayName>Windshot</DisplayName>
-    <PublisherDisplayName>Windshot (dev)</PublisherDisplayName>
+    <PublisherDisplayName>Andy Thrasher</PublisherDisplayName>
     <Logo>Assets\Package\StoreLogo.png</Logo>
   </Properties>
 

@@ -23,6 +23,16 @@
   </PropertyGroup>
 
   <!--
+    Release builds leave out the parts of .NET and the Windows API bindings that are never
+    used (320 MB → ~105 MB installed). WinForms isn't officially supported with trimming, so
+    the SDK refuses unless told otherwise; the tray, overlay, pins and HUD are covered by the
+    release test pass. JSON uses generated code (JsonContext) instead of reflection.
+  -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <PublishTrimmed>true</PublishTrimmed>
+    <_SuppressWinFormsTrimError>true</_SuppressWinFormsTrimError>  </PropertyGroup>
+
+  <!--
     The Microsoft Store package (tools/package.ps1 passes -p:StorePackage=true). It relies on
     the shared Windows App SDK runtime package, which the Store installs alongside, instead of
     carrying its own copy; .NET is still included. The Store signs the package on submission.

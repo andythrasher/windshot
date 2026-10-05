@@ -17,7 +17,7 @@ internal sealed class Settings
     /// <summary>When Windshot last wrote the file, so the file watcher can ignore our own saves.</summary>
     public static DateTime LastSavedUtc { get; private set; }
 
-    private static readonly JsonSerializerOptions Options = new()
+    private static readonly JsonContext Json = new(new JsonSerializerOptions
     {
         WriteIndented = true,
         // Keep "Ctrl+Shift+2" readable instead of escaping the plus signs.
@@ -25,8 +25,8 @@ internal sealed class Settings
         ReadCommentHandling = JsonCommentHandling.Skip,
         AllowTrailingCommas = true,
         PropertyNameCaseInsensitive = true,
-        Converters = { new JsonStringEnumConverter() },
-    };
+        Converters = { new JsonStringEnumConverter<Tool>() },
+    });
 
     public HotkeySettings Hotkeys { get; set; } = new();
     public CaptureSettings Capture { get; set; } = new();
@@ -128,7 +128,7 @@ internal sealed class Settings
 
         try
         {
-            Current = JsonSerializer.Deserialize<Settings>(File.ReadAllText(FilePath), Options) ?? new Settings();
+            Current = JsonSerializer.Deserialize(File.ReadAllText(FilePath), Json.Settings) ?? new Settings();
             Current.FillMissing();
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException or NotSupportedException)
@@ -153,7 +153,7 @@ internal sealed class Settings
             Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
             // Write then swap, so a crash mid-write can't leave a half-written file.
             string temp = FilePath + ".tmp";
-            File.WriteAllText(temp, JsonSerializer.Serialize(Current, Options));
+            File.WriteAllText(temp, JsonSerializer.Serialize(Current, Json.Settings));
             LastSavedUtc = DateTime.UtcNow;
             File.Move(temp, FilePath, overwrite: true);
         }
