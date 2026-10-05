@@ -25,9 +25,6 @@ public sealed partial class EditorWindow
         if (_theme.IsStandard)
             return;
 
-        if (!_theme.Light.Solid && _theme.Light.Tint is Color light && _theme.Dark.Tint is Color dark)
-            SystemBackdrop = new TintedMicaBackdrop(light, dark);
-
         // Controls take their accent from these. Overriding them here, around the editor's
         // content, recolors the editor alone (the selected tool, sliders, the selected layer).
         var resources = new ResourceDictionary();
@@ -45,15 +42,21 @@ public sealed partial class EditorWindow
     {
         var look = Root.ActualTheme == ElementTheme.Dark ? _theme.Dark : _theme.Light;
         CanvasHost.Background = new SolidColorBrush(look.Canvas ?? Microsoft.UI.Colors.Transparent);
-        if (look.Solid && look.Tint is Color solid)
-            Root.Background = new SolidColorBrush(solid);
+        // The tint covers the window, over Mica: nearly opaque, so Mica only softens it. (A
+        // tinted MicaController backdrop would be nicer, but a custom SystemBackdrop fails in
+        // the trimmed build.) The title bar, outside the content, gets the same color.
+        if (look.Tint is Color tint)
+            Root.Background = new SolidColorBrush(look.Solid ? tint : Color.FromArgb(0xE6, tint.R, tint.G, tint.B));
         if (look.Panel is Color panel)
             LayersPanel.Background = new SolidColorBrush(panel);
 
-        if (look.TitleBar is Color bar)
+        if ((look.TitleBar ?? look.Tint) is Color bar)
         {
             var text = look.TitleText ?? (bar.IsLight() ? Microsoft.UI.Colors.Black : Microsoft.UI.Colors.White);
-            var hover = Color.FromArgb(255, (byte)(bar.R * 0.8), (byte)(bar.G * 0.8), (byte)(bar.B * 0.8));
+            // Caption buttons darken on hover over a light bar and lighten over a dark one.
+            var hover = bar.IsLight() || look.TitleBar is not null
+                ? Color.FromArgb(255, (byte)(bar.R * 0.85), (byte)(bar.G * 0.85), (byte)(bar.B * 0.85))
+                : Color.FromArgb(255, (byte)(bar.R + (255 - bar.R) * 0.12), (byte)(bar.G + (255 - bar.G) * 0.12), (byte)(bar.B + (255 - bar.B) * 0.12));
             var titleBar = AppWindow.TitleBar;
             titleBar.BackgroundColor = bar;
             titleBar.ForegroundColor = text;

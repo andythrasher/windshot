@@ -6,7 +6,7 @@ namespace Windshot.Editing;
 /// How the editor window looks in light or dark mode. Null values keep the standard look:
 /// plain Mica, the Windows accent color and the standard title bar.
 /// </summary>
-/// <param name="Tint">Mica's tint, or the whole window's color when <paramref name="Solid"/>.</param>
+/// <param name="Tint">The window's color, laid nearly opaque over Mica, or fully opaque when <paramref name="Solid"/>.</param>
 /// <param name="Canvas">Around the image, where the window would otherwise show through.</param>
 /// <param name="OnAccent">Icons and text on the accent; by default black or white, whichever reads.</param>
 /// <param name="Panel">The layers panel's background.</param>
