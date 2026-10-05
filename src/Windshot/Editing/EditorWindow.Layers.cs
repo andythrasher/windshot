@@ -61,6 +61,7 @@ public sealed partial class EditorWindow
         _layersOpen = open;
         LayersButton.IsChecked = open;
         LayersPanel.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
+        ApplyMinimumSize();
         RefreshLayers();
     }
 

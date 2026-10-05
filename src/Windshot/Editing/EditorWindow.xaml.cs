@@ -158,6 +158,35 @@ public sealed partial class EditorWindow : Window
         AppWindow.Move(new PointInt32(
             workArea.X + (workArea.Width - width) / 2,
             workArea.Y + (workArea.Height - height) / 2));
+        _windowScale = capture.Scale;
+        ApplyMinimumSize();
+        Root.Loaded += (_, _) => Root.XamlRoot.Changed += (_, _) => ApplyMinimumSize();
+    }
+
+    /// <summary>The window's display scale; follows it between monitors.</summary>
+    private double _windowScale = 1;
+
+    /// <summary>
+    /// Keeps the window wide enough for the toolbar's essentials (the rest overflow into
+    /// "…") and, with the layers panel open, for the panel plus a usable canvas beside it.
+    /// Opening the panel in a narrower window widens the window to fit.
+    /// </summary>
+    private void ApplyMinimumSize()
+    {
+        if (AppWindow.Presenter is not OverlappedPresenter presenter)
+            return;
+        if (Root.XamlRoot is { } root)
+            _windowScale = root.RasterizationScale;
+        int minWidth = (int)((_layersOpen ? 640 : 480) * _windowScale);
+        presenter.PreferredMinimumWidth = minWidth;
+        presenter.PreferredMinimumHeight = (int)(320 * _windowScale);
+
+        if (AppWindow.Size.Width >= minWidth || presenter.State != OverlappedPresenterState.Restored)
+            return;
+        // Grow to the right, but stay on the screen.
+        var workArea = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Nearest).WorkArea;
+        int x = Math.Max(workArea.X, Math.Min(AppWindow.Position.X, workArea.X + workArea.Width - minWidth));
+        AppWindow.MoveAndResize(new RectInt32(x, AppWindow.Position.Y, minWidth, AppWindow.Size.Height));
     }
 
     // ---- Tools and size ----------------------------------------------------------------
