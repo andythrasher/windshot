@@ -115,15 +115,17 @@ internal sealed class TextAnnotation : Annotation, IDisposable
         }
     }
 
-    public override Rect Bounds => Boxed ? BoxBounds : TextBounds.Inflate(OutlineWidth);
+    public override Rect Frame => Boxed ? BoxBounds : TextBounds.Inflate(OutlineWidth);
 
-    public override void Draw(CanvasDrawingSession ds) => Draw(ds, chromeOnly: false);
+    protected override void DrawUnrotated(CanvasDrawingSession ds) => Draw(ds, chromeOnly: false);
 
-    /// <param name="chromeOnly">
-    /// Draws just the outline or box, for use behind the live text box while typing, so
-    /// editing looks the same as the finished text.
-    /// </param>
-    public void Draw(CanvasDrawingSession ds, bool chromeOnly)
+    /// <summary>
+    /// Just the outline or box, for use behind the live text box while typing, so editing
+    /// looks the same as the finished text.
+    /// </summary>
+    public void DrawChrome(CanvasDrawingSession ds) => DrawRotated(ds, s => Draw(s, chromeOnly: true));
+
+    private void Draw(CanvasDrawingSession ds, bool chromeOnly)
     {
         if (Boxed)
         {
@@ -143,22 +145,22 @@ internal sealed class TextAnnotation : Annotation, IDisposable
             ds.FillGeometry(geometry, Position, Color);
     }
 
-    public override bool HitTest(Vector2 point, float tolerance) =>
-        Bounds.Inflate(tolerance).Contains(point.ToPoint());
+    protected override bool HitTestUnrotated(Vector2 point, float tolerance) =>
+        Frame.Inflate(tolerance).Contains(point.ToPoint());
 
-    public override void MoveBy(Vector2 delta) => Position += delta;
+    protected override void Offset(Vector2 delta) => Position += delta;
 
     /// <summary>The smallest and largest font sizes reachable by dragging a corner, in DIPs.</summary>
     private const float MinResizeSize = 8, MaxResizeSize = 400;
 
     /// <summary>The four corners, clockwise from top-left: dragging one scales the text.</summary>
-    public override IReadOnlyList<Vector2> Handles
+    protected override IReadOnlyList<Vector2> UnrotatedHandles
     {
         get
         {
             if (string.IsNullOrEmpty(Text))
                 return [];
-            var b = Bounds;
+            var b = Frame;
             return [new((float)b.Left, (float)b.Top), new((float)b.Right, (float)b.Top),
                     new((float)b.Right, (float)b.Bottom), new((float)b.Left, (float)b.Bottom)];
         }
@@ -168,9 +170,9 @@ internal sealed class TextAnnotation : Annotation, IDisposable
     /// Scales the text (font size, and the wrapping width if there is one) so the dragged
     /// corner follows the pointer while the opposite corner stays put.
     /// </summary>
-    public override void MoveHandle(int index, Vector2 position)
+    protected override void MoveUnrotatedHandle(int index, Vector2 position)
     {
-        var corners = Handles;
+        var corners = UnrotatedHandles;
         if (corners.Count < 4)
             return;
         var anchor = corners[(index + 2) % 4];
@@ -187,7 +189,7 @@ internal sealed class TextAnnotation : Annotation, IDisposable
             WrapWidth = wrap * scale;
 
         // Shift so the opposite corner is back where it was.
-        Position += anchor - Handles[(index + 2) % 4];
+        Position += anchor - UnrotatedHandles[(index + 2) % 4];
     }
 
     protected override void OnCloned()

@@ -66,7 +66,7 @@ internal sealed class ShapeAnnotation : BoxAnnotation, IFillable
 
     public float Thickness => (1 + Weight) * Unit;
 
-    public override Rect Bounds => Kind == ShapeKind.Sticker ? Shape : Shape.Inflate(Thickness / 2);
+    public override Rect Frame => Kind == ShapeKind.Sticker ? Shape : Shape.Inflate(Thickness / 2);
 
     private CanvasGeometry Geometry(ICanvasResourceCreator creator)
     {
@@ -90,7 +90,7 @@ internal sealed class ShapeAnnotation : BoxAnnotation, IFillable
         }
     }
 
-    public override void Draw(CanvasDrawingSession ds)
+    protected override void DrawUnrotated(CanvasDrawingSession ds)
     {
         using var shape = Geometry(ds);
         // A sticker is the icon itself (outlined or solid, by Filled), not a line around it.
@@ -100,7 +100,7 @@ internal sealed class ShapeAnnotation : BoxAnnotation, IFillable
             ShapeDrawing.Draw(ds, shape, Color, Thickness, Filled);
     }
 
-    public override bool HitTest(Vector2 point, float tolerance)
+    protected override bool HitTestUnrotated(Vector2 point, float tolerance)
     {
         // Stickers are small and mostly holes, so they're grabbable anywhere in their box.
         if (Kind == ShapeKind.Sticker)
@@ -130,7 +130,7 @@ internal sealed class PolygonAnnotation : Annotation, IFillable
 
     public float Thickness => (1 + Weight) * Unit;
 
-    public override Rect Bounds
+    public override Rect Frame
     {
         get
         {
@@ -150,7 +150,7 @@ internal sealed class PolygonAnnotation : Annotation, IFillable
         return CanvasGeometry.CreatePath(path);
     }
 
-    public override void Draw(CanvasDrawingSession ds)
+    protected override void DrawUnrotated(CanvasDrawingSession ds)
     {
         if (Points.Count == 1)
         {
@@ -162,7 +162,7 @@ internal sealed class PolygonAnnotation : Annotation, IFillable
         ShapeDrawing.Draw(ds, shape, Color, Thickness, Filled && Closed);
     }
 
-    public override bool HitTest(Vector2 point, float tolerance)
+    protected override bool HitTestUnrotated(Vector2 point, float tolerance)
     {
         if (Points.Count == 1)
             return Vector2.Distance(point, Points[0]) <= Thickness / 2 + tolerance;
@@ -170,16 +170,24 @@ internal sealed class PolygonAnnotation : Annotation, IFillable
         return ShapeDrawing.HitTest(shape, point, Thickness, tolerance, Filled && Closed);
     }
 
-    public override void MoveBy(Vector2 delta)
+    protected override void Offset(Vector2 delta)
     {
         for (int i = 0; i < Points.Count; i++)
             Points[i] += delta;
     }
 
-    /// <summary>Every corner, once it's finished.</summary>
-    public override IReadOnlyList<Vector2> Handles => Closed ? Points : [];
+    /// <summary>Turns the corners themselves, so the angle stays zero.</summary>
+    public override void RotateBy(float radians, Vector2 around)
+    {
+        var turn = Matrix3x2.CreateRotation(radians, around);
+        for (int i = 0; i < Points.Count; i++)
+            Points[i] = Vector2.Transform(Points[i], turn);
+    }
 
-    public override void MoveHandle(int index, Vector2 position) => Points[index] = position;
+    /// <summary>Every corner, once it's finished.</summary>
+    protected override IReadOnlyList<Vector2> UnrotatedHandles => Closed ? Points : [];
+
+    protected override void MoveUnrotatedHandle(int index, Vector2 position) => Points[index] = position;
 
     protected override void OnCloned()
     {

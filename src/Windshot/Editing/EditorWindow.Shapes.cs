@@ -156,8 +156,11 @@ public sealed partial class EditorWindow
         Canvas.Invalidate();
     }
 
-    /// <summary>A click while clicking out a polygon: another corner, or on the first corner, done.</summary>
-    private void PolygonPressed(Vector2 p)
+    /// <summary>
+    /// A click while clicking out a polygon: another corner (with Shift, at a multiple of 45°
+    /// from the last), or on the first corner, done.
+    /// </summary>
+    private void PolygonPressed(Vector2 p, bool shift)
     {
         var draft = _polygonDraft!;
         float reach = (HandleRadius + HitTolerance) / _view.M11;
@@ -166,6 +169,8 @@ public sealed partial class EditorWindow
             FinishPolygon();
             return;
         }
+        if (shift)
+            p = SnapTo45(draft.Points[^1], p);
         // The second click of a double-click lands on the last corner; that finishes instead.
         if (Vector2.Distance(p, draft.Points[^1]) > reach / 2)
             draft.Points.Add(p);

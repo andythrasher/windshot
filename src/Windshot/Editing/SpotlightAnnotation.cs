@@ -27,14 +27,14 @@ internal sealed class SpotlightAnnotation : BoxAnnotation
 
     private float CornerRadius => 8 * Unit;
 
-    public override Rect Bounds => Shape;
+    public override Rect Frame => Shape;
 
     /// <summary>Drawn by <see cref="Dim"/>, as part of the layer stack.</summary>
-    public override void Draw(CanvasDrawingSession ds)
+    protected override void DrawUnrotated(CanvasDrawingSession ds)
     {
     }
 
-    public override bool HitTest(Vector2 point, float tolerance) =>
+    protected override bool HitTestUnrotated(Vector2 point, float tolerance) =>
         Shape.Inflate(tolerance).Contains(point.ToPoint());
 
     /// <summary>
@@ -58,7 +58,7 @@ internal sealed class SpotlightAnnotation : BoxAnnotation
             if (region.Width < 1 || region.Height < 1)
                 continue;
             using var hole = CanvasGeometry.CreateRoundedRectangle(s, region, spot.CornerRadius, spot.CornerRadius);
-            var next = dimmed.CombineWith(hole, Matrix3x2.Identity, CanvasGeometryCombine.Exclude);
+            var next = dimmed.CombineWith(hole, spot.Rotation, CanvasGeometryCombine.Exclude);
             dimmed.Dispose();
             dimmed = next;
         }

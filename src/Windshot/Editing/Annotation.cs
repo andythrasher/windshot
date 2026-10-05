@@ -9,6 +9,13 @@ namespace Windshot.Editing;
 /// A vector object drawn over the screenshot. Annotations stay editable until export;
 /// they are never baked into the bitmap. Coordinates are in image pixels.
 /// </summary>
+/// <remarks>
+/// Each type describes itself in its own frame, unrotated; <see cref="Angle"/> turns that
+/// frame on the canvas. The public members (bounds, drawing, hit-testing, handles) work in
+/// canvas coordinates and do the turning; the protected ones they wrap work in the frame.
+/// Types made of free points (arrows, highlights, polygons) turn their points instead and
+/// keep an angle of zero.
+/// </remarks>
 internal abstract class Annotation
 {
     public const int MinWeight = 1;
@@ -64,18 +71,116 @@ internal abstract class Annotation
     /// <summary>Whether sticking out past the image grows the canvas (the "reverse crop").</summary>
     public virtual bool ExtendsCanvas => !IsAreaEffect;
 
-    public abstract Rect Bounds { get; }
+    // ---- Rotation ----------------------------------------------------------------------
 
-    public abstract void Draw(CanvasDrawingSession ds);
+    /// <summary>How far the frame is turned, in radians, clockwise on screen; between -π and π.</summary>
+    public float Angle { get; private set; }
 
-    public abstract bool HitTest(Vector2 point, float tolerance);
+    /// <summary>The point the frame turns about, in canvas coordinates (it stays put when turned).</summary>
+    private Vector2 _pivot;
 
-    public abstract void MoveBy(Vector2 delta);
+    /// <summary>From the frame to the canvas.</summary>
+    public Matrix3x2 Rotation => Angle == 0 ? Matrix3x2.Identity : Matrix3x2.CreateRotation(Angle, _pivot);
+
+    public Vector2 ToCanvas(Vector2 framePoint) => Angle == 0 ? framePoint : Vector2.Transform(framePoint, Rotation);
+
+    public Vector2 ToFrame(Vector2 canvasPoint) =>
+        Angle == 0 ? canvasPoint : Vector2.Transform(canvasPoint, Matrix3x2.CreateRotation(-Angle, _pivot));
+
+    /// <summary>Turns the layer by <paramref name="radians"/> about <paramref name="around"/> (canvas coordinates).</summary>
+    public virtual void RotateBy(float radians, Vector2 around)
+    {
+        float angle = Angle + radians;
+        angle = MathF.IEEERemainder(angle, MathF.Tau);
+        // Turned back to straight (give or take rounding): exactly straight, so it takes the plain path.
+        Angle = MathF.Abs(angle) < 1e-4f ? 0 : angle;
+        // Turning about another point is turning about the pivot, then moving over by how far
+        // the pivot itself swings around that point.
+        var pivot = _pivot;
+        MoveBy(Vector2.Transform(pivot, Matrix3x2.CreateRotation(radians, around)) - pivot);
+    }
+
+    // ---- Geometry, in canvas coordinates -----------------------------------------------
+
+    /// <summary>The bounds in the layer's own frame, before turning.</summary>
+    public abstract Rect Frame { get; }
+
+    /// <summary>The axis-aligned bounds on the canvas, of the turned frame.</summary>
+    public Rect Bounds
+    {
+        get
+        {
+            var frame = Frame;
+            if (Angle == 0)
+                return frame;
+            var corners = Corners(frame);
+            float minX = corners.Min(p => p.X), minY = corners.Min(p => p.Y);
+            return new Rect(minX, minY, corners.Max(p => p.X) - minX, corners.Max(p => p.Y) - minY);
+        }
+    }
+
+    /// <summary>The corners of a rectangle in the frame, on the canvas: clockwise from top-left.</summary>
+    public Vector2[] Corners(Rect frame) =>
+    [
+        ToCanvas(new((float)frame.Left, (float)frame.Top)), ToCanvas(new((float)frame.Right, (float)frame.Top)),
+        ToCanvas(new((float)frame.Right, (float)frame.Bottom)), ToCanvas(new((float)frame.Left, (float)frame.Bottom)),
+    ];
+
+    public void Draw(CanvasDrawingSession ds) => DrawRotated(ds, DrawUnrotated);
+
+    /// <summary>Draws in the frame, turned onto the canvas.</summary>
+    protected void DrawRotated(CanvasDrawingSession ds, Action<CanvasDrawingSession> draw)
+    {
+        if (Angle == 0)
+        {
+            draw(ds);
+            return;
+        }
+        var transform = ds.Transform;
+        ds.Transform = Rotation * transform;
+        try
+        {
+            draw(ds);
+        }
+        finally
+        {
+            ds.Transform = transform;
+        }
+    }
+
+    public bool HitTest(Vector2 point, float tolerance) => HitTestUnrotated(ToFrame(point), tolerance);
+
+    /// <summary>Moves the layer across the canvas.</summary>
+    public void MoveBy(Vector2 delta)
+    {
+        Offset(delta);
+        _pivot += delta;
+    }
 
     /// <summary>Draggable control points (endpoints, corners). Empty if the object can only be moved.</summary>
-    public virtual IReadOnlyList<Vector2> Handles => [];
+    public IReadOnlyList<Vector2> Handles
+    {
+        get
+        {
+            var handles = UnrotatedHandles;
+            return Angle == 0 ? handles : handles.Select(ToCanvas).ToList();
+        }
+    }
 
-    public virtual void MoveHandle(int index, Vector2 position)
+    public void MoveHandle(int index, Vector2 position) => MoveUnrotatedHandle(index, ToFrame(position));
+
+    // ---- Geometry, in the frame --------------------------------------------------------
+
+    protected abstract void DrawUnrotated(CanvasDrawingSession ds);
+
+    protected abstract bool HitTestUnrotated(Vector2 point, float tolerance);
+
+    /// <summary>Moves the layer's points within its frame.</summary>
+    protected abstract void Offset(Vector2 delta);
+
+    protected virtual IReadOnlyList<Vector2> UnrotatedHandles => [];
+
+    protected virtual void MoveUnrotatedHandle(int index, Vector2 position)
     {
     }
 
@@ -108,9 +213,9 @@ internal abstract class TwoPointAnnotation : Annotation
     public Vector2 Start { get; set; }
     public Vector2 End { get; set; }
 
-    public override IReadOnlyList<Vector2> Handles => [Start, End];
+    protected override IReadOnlyList<Vector2> UnrotatedHandles => [Start, End];
 
-    public override void MoveHandle(int index, Vector2 position)
+    protected override void MoveUnrotatedHandle(int index, Vector2 position)
     {
         if (index == 0)
             Start = position;
@@ -118,14 +223,22 @@ internal abstract class TwoPointAnnotation : Annotation
             End = position;
     }
 
-    public override void MoveBy(Vector2 delta)
+    protected override void Offset(Vector2 delta)
     {
         Start += delta;
         End += delta;
     }
+
+    /// <summary>For lines (arrows, highlights): turns the two points themselves, so the angle stays zero.</summary>
+    protected void RotatePoints(float radians, Vector2 around)
+    {
+        var turn = Matrix3x2.CreateRotation(radians, around);
+        Start = Vector2.Transform(Start, turn);
+        End = Vector2.Transform(End, turn);
+    }
 }
 
-/// <summary>A two-point annotation that is an axis-aligned box, resizable from any corner.</summary>
+/// <summary>A two-point annotation that is a box (in its frame), resizable from any corner.</summary>
 internal abstract class BoxAnnotation : TwoPointAnnotation
 {
     protected BoxAnnotation(Vector2 start, Color color, int weight, float unit)
@@ -133,13 +246,14 @@ internal abstract class BoxAnnotation : TwoPointAnnotation
     {
     }
 
+    /// <summary>The box, in the frame.</summary>
     public Rect Shape => new(Start.ToPoint(), End.ToPoint());
 
-    /// <summary>All four corners: Start, End, then the two mixed corners.</summary>
-    public override IReadOnlyList<Vector2> Handles =>
+    /// <summary>All four corners: Start, End, then the two mixed corners. Each one's opposite is its index ^ 1.</summary>
+    protected override IReadOnlyList<Vector2> UnrotatedHandles =>
         [Start, End, new Vector2(Start.X, End.Y), new Vector2(End.X, Start.Y)];
 
-    public override void MoveHandle(int index, Vector2 position)
+    protected override void MoveUnrotatedHandle(int index, Vector2 position)
     {
         switch (index)
         {

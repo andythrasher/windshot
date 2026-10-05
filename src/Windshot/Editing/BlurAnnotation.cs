@@ -32,10 +32,10 @@ internal sealed class BlurAnnotation : BoxAnnotation
 
     private float BlurAmount => (3 + Weight * 1.5f) * Unit;
 
-    public override Rect Bounds => Shape;
+    public override Rect Frame => Shape;
 
     /// <summary>Drawn by <see cref="ApplyTo"/>, as part of the layer stack.</summary>
-    public override void Draw(CanvasDrawingSession ds)
+    protected override void DrawUnrotated(CanvasDrawingSession ds)
     {
     }
 
@@ -44,7 +44,12 @@ internal sealed class BlurAnnotation : BoxAnnotation
         var region = Shape;
         if (region.Width < 1 || region.Height < 1)
             return below;
-        var obscured = Pixelate ? Pixelated(context, below, region) : Blurred(context, below, region);
+        // Turned, the region is obscured in its own frame: what's beneath, turned the other way.
+        var rotation = Rotation;
+        var source = below;
+        if (Angle != 0 && Matrix3x2.Invert(rotation, out var toFrame))
+            source = context.Own(new Transform2DEffect { Source = below, TransformMatrix = toFrame });
+        var obscured = Pixelate ? Pixelated(context, source, region) : Blurred(context, source, region);
 
         // What's beneath is drawn with a hole where the region is, and the obscured pixels go
         // in the hole: they replace the originals outright, so nothing can show through.
@@ -56,11 +61,12 @@ internal sealed class BlurAnnotation : BoxAnnotation
             var everywhere = new Rect(-1e6, -1e6, 2e6, 2e6);
             using (var all = CanvasGeometry.CreateRectangle(s, everywhere))
             using (var hole = CanvasGeometry.CreateRectangle(s, region))
-            using (var around = all.CombineWith(hole, Matrix3x2.Identity, CanvasGeometryCombine.Exclude))
+            using (var around = all.CombineWith(hole, rotation, CanvasGeometryCombine.Exclude))
             using (s.CreateLayer(1, around))
             {
                 s.DrawImage(below);
             }
+            s.Transform = rotation;
             s.DrawImage(obscured.Image, region, obscured.Source, 1, obscured.Interpolation);
         }
         return result;
@@ -94,6 +100,6 @@ internal sealed class BlurAnnotation : BoxAnnotation
         return (blocks, new Rect(0, 0, columns, rows), CanvasImageInterpolation.NearestNeighbor);
     }
 
-    public override bool HitTest(Vector2 point, float tolerance) =>
+    protected override bool HitTestUnrotated(Vector2 point, float tolerance) =>
         Shape.Inflate(tolerance).Contains(point.ToPoint());
 }

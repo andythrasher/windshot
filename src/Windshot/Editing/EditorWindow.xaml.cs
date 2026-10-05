@@ -76,14 +76,38 @@ public sealed partial class EditorWindow : Window
     private bool _editingIsNew;
     private string _textBeforeEdit = "";
 
-    /// <param name="Handle">Index into <see cref="Annotation.Handles"/>, or -1 to move the whole object.</param>
-    private sealed record DragState(uint PointerId, Annotation Target, int Handle, bool Creating)
+    /// <param name="Handle">
+    /// Index into <see cref="Annotation.Handles"/>, -1 (<see cref="MoveWhole"/>) to move the whole
+    /// object, or <see cref="RotateHandle"/> to turn it.
+    /// </param>
+    /// <param name="Start">Where the drag began, in document coordinates.</param>
+    private sealed record DragState(uint PointerId, Annotation Target, int Handle, bool Creating, Vector2 Start)
     {
-        public Vector2 Last { get; set; }
+        /// <summary>How far the whole object has been moved so far (Shift keeps it to one axis).</summary>
+        public Vector2 Moved { get; set; }
 
         /// <summary>Whether anything changed; a click that only selects shouldn't add an undo step.</summary>
-        public bool Moved { get; set; }
+        public bool Changed { get; set; }
+
+        /// <summary>Width over height kept by a Shift-drag of a box's corner.</summary>
+        public float Aspect { get; init; } = 1;
+
+        /// <summary>
+        /// For turning: the point turned about, the pointer's angle around it at the start, the
+        /// object's own angle at the start, and how far it's turned so far.
+        /// </summary>
+        public Vector2 Pivot { get; init; }
+        public float StartAngle { get; init; }
+        public float FromAngle { get; init; }
+        public float Turned { get; set; }
     }
+
+    private const int MoveWhole = -1;
+    private const int RotateHandle = -2;
+    /// <summary>How far above the top edge the rotate handle sits, in DIPs.</summary>
+    private const float RotateHandleReach = 28;
+    /// <summary>Shift-turning steps by this much, in degrees.</summary>
+    private const float RotateStep = 15;
 
     /// <summary>A text box being dragged out with the text tool (document coordinates).</summary>
     private sealed record TextDrag(uint PointerId, Vector2 Start)
@@ -658,7 +682,7 @@ public sealed partial class EditorWindow : Window
             ds.FillRectangle(_document.Bounds, _checkerBrush);
 
         _document.Render(ds, skip: _editingText);
-        _editingText?.Draw(ds, chromeOnly: true); // the text box draws the letters on top
+        _editingText?.DrawChrome(ds); // the text box draws the letters on top
 
         if (_selected is { Visible: true } && _selected != _editingText)
             DrawSelection(ds, _selected);
@@ -680,15 +704,36 @@ public sealed partial class EditorWindow : Window
         // Text has no edge of its own, and neither does a blur; outline both so the extent is clear.
         if (annotation.Handles.Count == 0 || annotation.IsAreaEffect || annotation is TextAnnotation)
         {
+            // Turned with the object, so it hugs it.
             using var dashed = new CanvasStrokeStyle { DashStyle = CanvasDashStyle.Dash };
-            ds.DrawRectangle(annotation.Bounds.Inflate(2 * px), AccentColor, 1.5f * px, dashed);
+            using var outline = CanvasGeometry.CreatePolygon(ds, annotation.Corners(annotation.Frame.Inflate(2 * px)));
+            ds.DrawGeometry(outline, AccentColor, 1.5f * px, dashed);
         }
 
-        foreach (var handle in annotation.Handles)
+        // The rotate handle, on a stalk from the middle of the top edge.
+        var (stalk, rotate) = RotateHandleAt(annotation);
+        ds.DrawLine(stalk, rotate, AccentColor, 1.5f * px);
+        foreach (var handle in annotation.Handles.Append(rotate))
         {
             ds.FillCircle(handle, HandleRadius * px, Color.FromArgb(255, 255, 255, 255));
             ds.DrawCircle(handle, HandleRadius * px, AccentColor, 1.5f * px);
         }
+    }
+
+    /// <summary>The rotate handle (and the foot of its stalk): above the middle of the top edge, turned with the object.</summary>
+    private (Vector2 Stalk, Vector2 Handle) RotateHandleAt(Annotation annotation)
+    {
+        var frame = annotation.Frame;
+        var stalk = annotation.ToCanvas(new Vector2((float)(frame.X + frame.Width / 2), (float)frame.Top));
+        var up = Vector2.TransformNormal(-Vector2.UnitY, Matrix3x2.CreateRotation(annotation.Angle));
+        return (stalk, stalk + up * (RotateHandleReach / _view.M11));
+    }
+
+    /// <summary>The middle of the object, which turning goes around.</summary>
+    private static Vector2 MiddleOf(Annotation annotation)
+    {
+        var frame = annotation.Frame;
+        return annotation.ToCanvas(new Vector2((float)(frame.X + frame.Width / 2), (float)(frame.Y + frame.Height / 2)));
     }
 
     private Matrix3x2 FitView(CanvasControl canvas)
@@ -767,7 +812,7 @@ public sealed partial class EditorWindow : Window
 
         if (_polygonDraft is not null)
         {
-            PolygonPressed(p);
+            PolygonPressed(p, Shifted(e));
             return;
         }
 
@@ -786,7 +831,7 @@ public sealed partial class EditorWindow : Window
             // Clicking an existing object grabs it, whichever tool is active; text too, so
             // it can be moved with the text tool. Double-clicking text edits it.
             Select(hit);
-            StartDrag(e, hit, handle: -1, creating: false, p);
+            StartDrag(e, hit, MoveWhole, creating: false, p);
         }
         else
         {
@@ -824,7 +869,7 @@ public sealed partial class EditorWindow : Window
             var step = new StepAnnotation(p, _color, weight, Unit);
             AddLayer(step);
             Select(step);
-            StartDrag(e, step, handle: -1, creating: true, p);
+            StartDrag(e, step, MoveWhole, creating: true, p);
             return;
         }
 
@@ -869,6 +914,7 @@ public sealed partial class EditorWindow : Window
         BeginTextEdit(text, isNew: true);
     }
 
+    /// <summary>The handle under <paramref name="p"/>: an index into the handles, <see cref="RotateHandle"/>, or null.</summary>
     private int? HitHandle(Annotation annotation, Vector2 p)
     {
         float reach = (HandleRadius + HitTolerance) / _view.M11;
@@ -878,14 +924,87 @@ public sealed partial class EditorWindow : Window
             if (Vector2.Distance(handles[i], p) <= reach)
                 return i;
         }
+        if (Vector2.Distance(RotateHandleAt(annotation).Handle, p) <= reach)
+            return RotateHandle;
         return null;
     }
 
     private void StartDrag(PointerRoutedEventArgs e, Annotation target, int handle, bool creating, Vector2 p)
     {
-        _drag = new DragState(e.Pointer.PointerId, target, handle, creating) { Last = p };
+        var pivot = MiddleOf(target);
+        _drag = new DragState(e.Pointer.PointerId, target, handle, creating, p)
+        {
+            Aspect = DragAspect(target, creating),
+            Pivot = pivot,
+            StartAngle = MathF.Atan2(p.Y - pivot.Y, p.X - pivot.X),
+            FromAngle = target.Angle,
+        };
         CanvasHost.CapturePointer(e.Pointer);
         Canvas.Invalidate();
+    }
+
+    private static bool Shifted(PointerRoutedEventArgs e) => e.KeyModifiers.HasFlag(Windows.System.VirtualKeyModifiers.Shift);
+
+    /// <summary>
+    /// The proportions a Shift-drag keeps: a new shape is drawn even (a square, a circle, a
+    /// triangle with equal sides); an existing box keeps the proportions it has.
+    /// </summary>
+    private static float DragAspect(Annotation target, bool creating)
+    {
+        if (creating)
+            return target is ShapeAnnotation { Kind: ShapeKind.Triangle } ? 2 / MathF.Sqrt(3) : 1;
+        if (target is BoxAnnotation box && box.Shape is { Width: > 0, Height: > 0 } shape)
+            return (float)(shape.Width / shape.Height);
+        return 1;
+    }
+
+    /// <summary>
+    /// Where a dragged handle goes with Shift held: a box's corner keeps its proportions
+    /// (see <see cref="DragAspect"/>), and an end of an arrow or highlight snaps to a multiple of 45°.
+    /// </summary>
+    private static Vector2 Constrain(DragState drag, Vector2 p)
+    {
+        switch (drag.Target)
+        {
+            case BoxAnnotation box:
+            {
+                // In the box's own frame, so a turned box keeps its proportions along its own sides.
+                var anchor = box.ToFrame(box.Handles[drag.Handle ^ 1]);
+                var d = box.ToFrame(p) - anchor;
+                float width = Math.Max(Math.Abs(d.X), Math.Abs(d.Y) * drag.Aspect);
+                var size = new Vector2(width, width / drag.Aspect);
+                return box.ToCanvas(anchor + new Vector2(d.X < 0 ? -size.X : size.X, d.Y < 0 ? -size.Y : size.Y));
+            }
+            case TwoPointAnnotation line:
+                return SnapTo45(drag.Handle == 0 ? line.End : line.Start, p);
+            default:
+                return p;
+        }
+    }
+
+    /// <summary><paramref name="p"/> moved onto the nearest line from <paramref name="anchor"/> at a multiple of 45°.</summary>
+    private static Vector2 SnapTo45(Vector2 anchor, Vector2 p)
+    {
+        var d = p - anchor;
+        float step = MathF.PI / 4;
+        float angle = MathF.Round(MathF.Atan2(d.Y, d.X) / step) * step;
+        var direction = new Vector2(MathF.Cos(angle), MathF.Sin(angle));
+        return anchor + direction * Vector2.Dot(d, direction);
+    }
+
+    /// <summary>Turns the dragged object to follow the pointer around its middle; Shift steps by <see cref="RotateStep"/>°.</summary>
+    private static void Turn(DragState drag, Vector2 p, bool shift)
+    {
+        var target = drag.Target;
+        float turned = MathF.Atan2(p.Y - drag.Pivot.Y, p.X - drag.Pivot.X) - drag.StartAngle;
+        if (shift)
+        {
+            // Snap the angle it ends up at (for lines, which keep no angle, how far they turn).
+            float step = RotateStep * MathF.PI / 180;
+            turned = MathF.Round((drag.FromAngle + turned) / step) * step - drag.FromAngle;
+        }
+        target.RotateBy(turned - drag.Turned, drag.Pivot);
+        drag.Turned = turned;
     }
 
     private void Canvas_PointerMoved(object sender, PointerRoutedEventArgs e)
@@ -905,7 +1024,7 @@ public sealed partial class EditorWindow : Window
 
         if (_polygonDraft is not null)
         {
-            _polygonCursor = p;
+            _polygonCursor = Shifted(e) ? SnapTo45(_polygonDraft.Points[^1], p) : p;
             Canvas.Invalidate();
         }
 
@@ -930,12 +1049,25 @@ public sealed partial class EditorWindow : Window
             return;
         }
 
-        if (_drag.Handle >= 0)
-            _drag.Target.MoveHandle(_drag.Handle, p);
+        bool shift = Shifted(e);
+        if (_drag.Handle == RotateHandle)
+        {
+            Turn(_drag, p, shift);
+        }
+        else if (_drag.Handle >= 0)
+        {
+            _drag.Target.MoveHandle(_drag.Handle, shift ? Constrain(_drag, p) : p);
+        }
         else
-            _drag.Target.MoveBy(p - _drag.Last);
-        _drag.Moved |= p != _drag.Last;
-        _drag.Last = p;
+        {
+            // Shift keeps a move straight across or straight up and down.
+            var moved = p - _drag.Start;
+            if (shift)
+                moved = Math.Abs(moved.X) >= Math.Abs(moved.Y) ? new Vector2(moved.X, 0) : new Vector2(0, moved.Y);
+            _drag.Target.MoveBy(moved - _drag.Moved);
+            _drag.Moved = moved;
+        }
+        _drag.Changed |= p != _drag.Start;
 
         Canvas.Invalidate();
         e.Handled = true;
@@ -989,7 +1121,7 @@ public sealed partial class EditorWindow : Window
             _document.Annotations.Remove(shape);
             Select(null);
         }
-        else if (_drag.Moved || _drag.Creating)
+        else if (_drag.Changed || _drag.Creating)
         {
             Commit();
         }
@@ -1010,6 +1142,15 @@ public sealed partial class EditorWindow : Window
             return;
         }
         var p = ToDocument(e.GetPosition(Canvas).ToVector2());
+        if (_selected is { Angle: not 0 } turned && HitHandle(turned, p) == RotateHandle)
+        {
+            // Double-clicking the rotate handle straightens it.
+            turned.RotateBy(-turned.Angle, MiddleOf(turned));
+            Commit();
+            Canvas.Invalidate();
+            e.Handled = true;
+            return;
+        }
         if (_document.HitTest(p, HitTolerance / _view.M11, includeAreaEffects: false) is TextAnnotation text)
         {
             Select(text);
@@ -1161,6 +1302,7 @@ public sealed partial class EditorWindow : Window
     private readonly InputCursor _resizeNeSwCursor = InputSystemCursor.Create(InputSystemCursorShape.SizeNortheastSouthwest);
     private readonly InputCursor _resizeNsCursor = InputSystemCursor.Create(InputSystemCursorShape.SizeNorthSouth);
     private readonly InputCursor _resizeWeCursor = InputSystemCursor.Create(InputSystemCursorShape.SizeWestEast);
+    private readonly InputCursor _rotateCursor = InputSystemCursor.Create(InputSystemCursorShape.Hand);
     private InputCursor? _openHandCursor, _grabHandCursor;
 
     /// <summary>Ready to pan (Space held): an open hand. Made on first use, when the display scale is known.</summary>
@@ -1202,17 +1344,30 @@ public sealed partial class EditorWindow : Window
     }
 
     /// <summary>
-    /// Corners of boxes and text resize diagonally, so they get the matching diagonal arrow;
-    /// the ends of arrows and highlights go anywhere, so they get the move cursor.
+    /// Corners of boxes and text resize diagonally, so they get the resize arrow pointing that
+    /// way (turned with the object); the ends of arrows and highlights go anywhere, so they get
+    /// the move cursor; the rotate handle gets a hand.
     /// </summary>
     private InputCursor HandleCursor(Annotation annotation, int handle)
     {
+        if (handle == RotateHandle)
+            return _rotateCursor;
         var handles = annotation.Handles;
         if (handles.Count != 4)
             return _moveCursor;
-        var center = (handles[0] + handles[1] + handles[2] + handles[3]) / 4;
-        var offset = handles[handle] - center;
-        return offset.X * offset.Y >= 0 ? _resizeNwSeCursor : _resizeNeSwCursor;
+        // The corner's diagonal in the object's frame, turned onto the screen.
+        var center = annotation.ToFrame((handles[0] + handles[1] + handles[2] + handles[3]) / 4);
+        var offset = annotation.ToFrame(handles[handle]) - center;
+        var diagonal = Vector2.TransformNormal(new Vector2(Math.Sign(offset.X), Math.Sign(offset.Y)), Matrix3x2.CreateRotation(annotation.Angle));
+        // Nearest of the four resize arrows, by 45° steps from horizontal (y points down).
+        int step = (int)MathF.Round(MathF.Atan2(diagonal.Y, diagonal.X) / (MathF.PI / 4));
+        return (((step % 4) + 4) % 4) switch
+        {
+            0 => _resizeWeCursor,
+            1 => _resizeNwSeCursor,
+            2 => _resizeNsCursor,
+            _ => _resizeNeSwCursor,
+        };
     }
 
     // ---- Inline text editing -----------------------------------------------------------
@@ -1252,9 +1407,12 @@ public sealed partial class EditorWindow : Window
             box.Resources[$"TextControlForeground{state}"] = color;
         }
 
-        var position = Vector2.Transform(text.Position, _view);
+        // Turned text is typed turned: the box turns about its top-left, where the text starts.
+        var position = Vector2.Transform(text.ToCanvas(text.Position), _view);
         Microsoft.UI.Xaml.Controls.Canvas.SetLeft(box, position.X);
         Microsoft.UI.Xaml.Controls.Canvas.SetTop(box, position.Y);
+        if (text.Angle != 0)
+            box.RenderTransform = new RotateTransform { Angle = text.Angle * 180 / Math.PI };
 
         box.TextChanged += (_, _) =>
         {

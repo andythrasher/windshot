@@ -52,14 +52,16 @@ internal sealed class HighlighterAnnotation : TwoPointAnnotation
 
     private static byte Soften(byte channel) => (byte)(channel + (255 - channel) * 0.25);
 
-    public override void MoveHandle(int index, Vector2 position)
+    public override void RotateBy(float radians, Vector2 around) => RotatePoints(radians, around);
+
+    protected override void MoveUnrotatedHandle(int index, Vector2 position)
     {
         // Highlights almost always run along a line of text, so snap near-horizontal strokes flat.
         var anchor = index == 0 ? End : Start;
         var delta = position - anchor;
         if (delta.X != 0 && Math.Abs(delta.Y) <= Math.Abs(delta.X) * SnapSlope)
             position.Y = anchor.Y;
-        base.MoveHandle(index, position);
+        base.MoveUnrotatedHandle(index, position);
     }
 
     private Vector2[] Outline()
@@ -71,7 +73,7 @@ internal sealed class HighlighterAnnotation : TwoPointAnnotation
         return [Start + half, End + half, End - half, Start - half];
     }
 
-    public override Rect Bounds
+    public override Rect Frame
     {
         get
         {
@@ -82,7 +84,7 @@ internal sealed class HighlighterAnnotation : TwoPointAnnotation
     }
 
     /// <summary>Drawn by <see cref="ApplyTo"/>, as part of the layer stack.</summary>
-    public override void Draw(CanvasDrawingSession ds)
+    protected override void DrawUnrotated(CanvasDrawingSession ds)
     {
     }
 
@@ -105,7 +107,7 @@ internal sealed class HighlighterAnnotation : TwoPointAnnotation
         _ => BlendEffectMode.Multiply,
     };
 
-    public override bool HitTest(Vector2 point, float tolerance)
+    protected override bool HitTestUnrotated(Vector2 point, float tolerance)
     {
         // Distance from the point to the stroke's center line.
         var segment = End - Start;

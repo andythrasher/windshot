@@ -69,7 +69,9 @@ internal sealed class ArrowAnnotation : TwoPointAnnotation
     /// <summary>A thin same-color stroke with round joins softens the polygon's corners.</summary>
     private static float SoftenWidth(Shape s) => s.Neck * 0.4f;
 
-    public override Rect Bounds
+    public override void RotateBy(float radians, Vector2 around) => RotatePoints(radians, around);
+
+    public override Rect Frame
     {
         get
         {
@@ -83,7 +85,7 @@ internal sealed class ArrowAnnotation : TwoPointAnnotation
         }
     }
 
-    public override void Draw(CanvasDrawingSession ds)
+    protected override void DrawUnrotated(CanvasDrawingSession ds)
     {
         if (Measure() is not Shape s)
             return;
@@ -93,7 +95,7 @@ internal sealed class ArrowAnnotation : TwoPointAnnotation
         ds.DrawGeometry(geometry, Color, SoftenWidth(s), RoundJoin);
     }
 
-    public override bool HitTest(Vector2 point, float tolerance)
+    protected override bool HitTestUnrotated(Vector2 point, float tolerance)
     {
         if (Measure() is not Shape s)
             return Vector2.Distance(point, Start) <= tolerance;

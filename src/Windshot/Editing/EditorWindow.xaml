@@ -50,8 +50,8 @@
             <AppBarButton x:Name="RedoButton" Label="Redo" Click="Redo_Click" IsEnabled="False" ToolTipService.ToolTip="Redo (Ctrl+Y)" />
             <AppBarSeparator />
             <AppBarToggleButton Label="Select" Click="ToolButton_Click" Tag="Select" ToolTipService.ToolTip="Select (V)" />
-            <AppBarToggleButton Label="Arrow" Click="ToolButton_Click" Tag="Arrow" ToolTipService.ToolTip="Arrow (A)" />
-            <AppBarToggleButton Label="Shapes" Click="ToolButton_Click" Tag="Rectangle" ToolTipService.ToolTip="Shapes (R): rectangle, ellipse, triangle or polygon" />
+            <AppBarToggleButton Label="Arrow" Click="ToolButton_Click" Tag="Arrow" ToolTipService.ToolTip="Arrow (A). Hold Shift to keep it at 45° steps." />
+            <AppBarToggleButton Label="Shapes" Click="ToolButton_Click" Tag="Rectangle" ToolTipService.ToolTip="Shapes (R): rectangle, ellipse, triangle or polygon. Hold Shift for squares and circles." />
             <AppBarToggleButton Label="Text" Click="ToolButton_Click" Tag="Text" ToolTipService.ToolTip="Text (T)" />
             <AppBarToggleButton Label="Blur" Click="ToolButton_Click" Tag="Blur" ToolTipService.ToolTip="Blur (B)" />
             <AppBarToggleButton Label="Step" Click="ToolButton_Click" Tag="Step" ToolTipService.ToolTip="Numbered step (N)" />
@@ -102,10 +102,10 @@
             IsDynamicOverflowEnabled="True"
             DynamicOverflowItemsChanging="Toolbar_DynamicOverflowItemsChanging">
             <!-- The shape tool's shapes, icon-only like the tools; icons are assigned in code. -->
-            <AppBarToggleButton x:Name="ShapeRectangleButton" Width="44" LabelPosition="Collapsed" Label="Rectangle" Click="ShapeButton_Click" Tag="Rectangle" ToolTipService.ToolTip="Rectangle" />
-            <AppBarToggleButton x:Name="ShapeEllipseButton" Width="44" LabelPosition="Collapsed" Label="Ellipse" Click="ShapeButton_Click" Tag="Ellipse" ToolTipService.ToolTip="Ellipse" />
-            <AppBarToggleButton x:Name="ShapeTriangleButton" Width="44" LabelPosition="Collapsed" Label="Triangle" Click="ShapeButton_Click" Tag="Triangle" ToolTipService.ToolTip="Triangle" />
-            <AppBarToggleButton x:Name="ShapePolygonButton" Width="44" LabelPosition="Collapsed" Label="Polygon" Click="ShapeButton_Click" Tag="Polygon" ToolTipService.ToolTip="Polygon: click each corner; click the first corner, double-click or press Enter to finish" />
+            <AppBarToggleButton x:Name="ShapeRectangleButton" Width="44" LabelPosition="Collapsed" Label="Rectangle" Click="ShapeButton_Click" Tag="Rectangle" ToolTipService.ToolTip="Rectangle (Shift: square)" />
+            <AppBarToggleButton x:Name="ShapeEllipseButton" Width="44" LabelPosition="Collapsed" Label="Ellipse" Click="ShapeButton_Click" Tag="Ellipse" ToolTipService.ToolTip="Ellipse (Shift: circle)" />
+            <AppBarToggleButton x:Name="ShapeTriangleButton" Width="44" LabelPosition="Collapsed" Label="Triangle" Click="ShapeButton_Click" Tag="Triangle" ToolTipService.ToolTip="Triangle (Shift: equal sides)" />
+            <AppBarToggleButton x:Name="ShapePolygonButton" Width="44" LabelPosition="Collapsed" Label="Polygon" Click="ShapeButton_Click" Tag="Polygon" ToolTipService.ToolTip="Polygon: click each corner; click the first corner, double-click or press Enter to finish. Shift keeps sides at 45° steps." />
             <AppBarToggleButton x:Name="ShapeStickerButton" Width="44" LabelPosition="Collapsed" Label="Sticker" Click="ShapeButton_Click" Tag="Sticker" ToolTipService.ToolTip="Stickers: pick one, then click to place it or drag to size it">
                 <FlyoutBase.AttachedFlyout>
                     <Flyout x:Name="StickerFlyout" Placement="Bottom" ShouldConstrainToRootBounds="False">

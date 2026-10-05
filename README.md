@@ -66,6 +66,10 @@ one is deleted), **S** spotlight (dims everything else), **H** highlighter (keep
 default), **C** crop, **V** select. **[** and **]** (or the
 Size slider) and **1–8** (colors) change the selected object, or the next one drawn. Drag
 handles to reshape arrows and rectangles, or a text box's corners to scale its text; double-click text to edit it.
+Drag the round handle above a selected object to rotate it (double-click that handle to straighten it).
+Hold **Shift** while dragging for squares, circles and even triangles (an existing shape keeps its
+proportions), arrows, highlights and polygon sides at 45° steps, rotation in 15° steps, and moves
+straight across or up and down.
 **Crop** shows the whole canvas with the crop marked: drag its edges or corners, drag inside to
 move it, or drag out a new area; Enter (or another tool) applies it and Esc cancels. Nothing is
 thrown away, so picking Crop again lets you loosen it, and undo covers it. **Ctrl+Z** /

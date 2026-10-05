@@ -28,7 +28,7 @@ internal sealed class StepAnnotation : Annotation
 
     private float RingWidth => Radius * 0.14f;
 
-    public override Rect Bounds
+    public override Rect Frame
     {
         get
         {
@@ -37,7 +37,7 @@ internal sealed class StepAnnotation : Annotation
         }
     }
 
-    public override void Draw(CanvasDrawingSession ds)
+    protected override void DrawUnrotated(CanvasDrawingSession ds)
     {
         var contrast = Color.Contrasting();
         ds.FillCircle(Center, Radius + RingWidth, contrast);
@@ -57,8 +57,8 @@ internal sealed class StepAnnotation : Annotation
         ds.DrawText(label, new Rect(Center.X - Radius, Center.Y - Radius, Radius * 2, Radius * 2), contrast, format);
     }
 
-    public override bool HitTest(Vector2 point, float tolerance) =>
+    protected override bool HitTestUnrotated(Vector2 point, float tolerance) =>
         Vector2.Distance(point, Center) <= Radius + RingWidth + tolerance;
 
-    public override void MoveBy(Vector2 delta) => Center += delta;
+    protected override void Offset(Vector2 delta) => Center += delta;
 }
