@@ -105,8 +105,10 @@
                         <TextBlock x:Name="ColorLabel" Text="Color" Visibility="Collapsed" VerticalAlignment="Center" />
                     </StackPanel>
                     <DropDownButton.Flyout>
-                        <Flyout x:Name="ColorFlyout" Placement="Bottom">
-                            <StackPanel Spacing="12">
+                        <!-- Free to extend past the window's bottom: confined to the window, it
+                             would slide up over the toolbar once the color wheel is open. -->
+                        <Flyout x:Name="ColorFlyout" Placement="Bottom" ShouldConstrainToRootBounds="False">
+                            <StackPanel x:Name="ColorFlyoutContent" Spacing="12">
                                 <!-- Switching sets recolors what's drawn to the new set's matching colors. -->
                                 <Grid ColumnSpacing="12">
                                     <Grid.ColumnDefinitions>
@@ -143,7 +145,7 @@
                     ToolTipService.ToolTip="Beautify: gradient backdrop, rounded corners and shadow">
                     <ToggleSplitButton.Flyout>
                         <Flyout Placement="Bottom">
-                            <StackPanel Width="236" Spacing="8">
+                            <StackPanel x:Name="BeautifyFlyoutContent" Width="236" Spacing="8">
                                 <TextBlock Text="Backdrop" Style="{ThemeResource BodyStrongTextBlockStyle}" />
                                 <VariableSizedWrapGrid x:Name="BackdropSwatches" Orientation="Horizontal" MaximumRowsOrColumns="4" />
                                 <TextBlock Text="Padding" />

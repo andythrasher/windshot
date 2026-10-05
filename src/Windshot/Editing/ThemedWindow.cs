@@ -16,6 +16,8 @@ internal sealed class ThemedWindow
     /// <summary>Window-specific colors, e.g. the editor's canvas; called with each change.</summary>
     private readonly Action<WindowLook>? _applyMore;
     private ResourceDictionary? _resources;
+    /// <summary>Flyout contents: they're shown outside the window's content, so out of reach of its resources.</summary>
+    private readonly List<(FrameworkElement Element, ResourceDictionary? Resources)> _extras = new();
 
     public ThemedWindow(Window window, Panel root, Action<WindowLook>? applyMore = null)
     {
@@ -27,22 +29,17 @@ internal sealed class ThemedWindow
 
     public Theme Theme { get; private set; } = Themes.All[0];
 
+    /// <summary>Also gives this element (a flyout's content) the theme's accent. Call before <see cref="Apply"/>.</summary>
+    public void Include(FrameworkElement element) => _extras.Add((element, null));
+
     public void Apply(Theme theme)
     {
         Theme = theme;
-        if (_resources is not null)
-            _root.Resources.MergedDictionaries.Remove(_resources);
-        _resources = null;
-        if (!theme.IsStandard)
-        {
-            // Controls take their accent from these. Overriding them around the window's
-            // content recolors this window alone (selected tool, switches, sliders, links).
-            _resources = new ResourceDictionary();
-            _resources.ThemeDictionaries["Light"] = AccentResources(theme.Light);
-            _resources.ThemeDictionaries["Dark"] = AccentResources(theme.Dark);
-            _resources.ThemeDictionaries["Default"] = AccentResources(theme.Dark);
-            _root.Resources.MergedDictionaries.Add(_resources);
-        }
+        // Controls take their accent from these. Overriding them around the window's content
+        // recolors this window alone (selected tool, switches, sliders, links).
+        _resources = Replace(_root, _resources, theme);
+        for (int i = 0; i < _extras.Count; i++)
+            _extras[i] = (_extras[i].Element, Replace(_extras[i].Element, _extras[i].Resources, theme));
 
         if (_root.IsLoaded)
         {
@@ -52,6 +49,21 @@ internal sealed class ThemedWindow
             _root.RequestedTheme = ElementTheme.Default;
         }
         ApplyColors();
+    }
+
+    /// <summary>Swaps the accent resources an element has for this theme's (none for the standard theme).</summary>
+    private static ResourceDictionary? Replace(FrameworkElement element, ResourceDictionary? old, Theme theme)
+    {
+        if (old is not null)
+            element.Resources.MergedDictionaries.Remove(old);
+        if (theme.IsStandard)
+            return null;
+        var resources = new ResourceDictionary();
+        resources.ThemeDictionaries["Light"] = AccentResources(theme.Light);
+        resources.ThemeDictionaries["Dark"] = AccentResources(theme.Dark);
+        resources.ThemeDictionaries["Default"] = AccentResources(theme.Dark);
+        element.Resources.MergedDictionaries.Add(resources);
+        return resources;
     }
 
     /// <summary>The colors that depend on light or dark mode and aren't resources.</summary>
@@ -123,6 +135,9 @@ internal sealed class ThemedWindow
         {
             resources["AppBarToggleButtonBackgroundChecked" + suffix] = new SolidColorBrush(color);
             resources["AppBarToggleButtonForegroundChecked" + suffix] = new SolidColorBrush(on);
+            resources["ToggleButtonBackgroundChecked" + suffix] = new SolidColorBrush(color);
+            resources["ToggleButtonForegroundChecked" + suffix] = new SolidColorBrush(on);
+            resources["ToggleButtonBorderBrushChecked" + suffix] = new SolidColorBrush(color);
             resources["ToggleSplitButtonBackgroundChecked" + suffix] = new SolidColorBrush(color);
             resources["ToggleSplitButtonForegroundChecked" + suffix] = new SolidColorBrush(on);
             resources["SliderTrackValueFill" + suffix] = new SolidColorBrush(accent);

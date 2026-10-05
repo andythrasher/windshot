@@ -26,6 +26,8 @@ public sealed partial class EditorWindow
             if (look.Panel is Color panel)
                 LayersPanel.Background = new SolidColorBrush(panel);
         });
+        _theming.Include(ColorFlyoutContent);
+        _theming.Include(BeautifyFlyoutContent);
         _theming.Apply(Themes.Find(appearance.Window));
     }
 }
