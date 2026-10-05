@@ -74,7 +74,13 @@ Windshot lives in the notification area and starts in a blink. It can start with
 
 ### What's new in this version
 
-First release.
+1.0.1:
+• Works with monitors you connect or disconnect while Windshot is running.
+• Select a region across more than one monitor.
+• The editor opens on the monitor you captured from.
+• Pins on a disconnected monitor move back into view.
+
+(1.0: First release.)
 
 ### Product features (up to 20, 200 characters each)
 

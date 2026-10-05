@@ -16,7 +16,7 @@
   <Identity
     Name="AndyThrasher.Windshot"
     Publisher="CN=0BF2785B-78A5-4726-A59C-2322EBED4C78"
-    Version="1.0.0.0" />
+    Version="1.0.1.0" />
 
   <Properties>
     <DisplayName>Windshot</DisplayName>
