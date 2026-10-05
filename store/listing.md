@@ -23,7 +23,7 @@ Draft text for Partner Center, field by field. Character limits are Partner Cent
 
 Category: Utility/productivity app. Every content question is "No": no violence, sexual content,
 language, controlled substances, gambling, user-generated content shared with others, location
-sharing, personal-information sharing, or purchases (until the supporter add-on). Expect the
+sharing, or personal-information sharing. In-app purchases: Yes (the supporter add-on). Expect the
 lowest rating in every region (e.g. ESRB Everyone, PEGI 3).
 
 ## Store listing (English, United States)
@@ -68,7 +68,7 @@ PIN TO SCREEN
 
 PRIVATE BY DESIGN
 • No account, no analytics, no ads.
-• Windshot makes no network connections. Your captures go only where you copy, save or pin them.
+• Windshot makes no network connections of its own. Your captures go only where you copy, save or pin them.
 
 Windshot lives in the notification area and starts in a blink. It can start with Windows, and every shortcut can be changed in Settings.
 
@@ -93,7 +93,7 @@ Windshot lives in the notification area and starts in a blink. It can start with
 7. Pin captures above other windows; they survive restarts
 8. Crop, pixelate and beautify before you share
 9. Every shortcut is customizable, including Print Screen
-10. No account, no tracking, no network connections
+10. No account, no tracking, no network connections of its own
 
 ### Search terms (7 max, 30 characters each)
 
@@ -129,7 +129,7 @@ Leave empty (the standard Microsoft Store license applies).
 
 ### Restricted capability: runFullTrust (justification)
 
-Windshot is a Windows desktop app built with WinUI 3 and .NET on the Windows App SDK. It runs as a full-trust desktop process because its core features use desktop APIs: system-wide keyboard shortcuts (RegisterHotKey), capturing the screen across all monitors, a notification-area icon, and always-on-top windows for pinned captures. It makes no network connections and collects no data.
+Windshot is a Windows desktop app built with WinUI 3 and .NET on the Windows App SDK. It runs as a full-trust desktop process because its core features use desktop APIs: system-wide keyboard shortcuts (RegisterHotKey), capturing the screen across all monitors, a notification-area icon, and always-on-top windows for pinned captures. It makes no network connections of its own (the optional supporter add-on is checked and bought through Microsoft Store) and collects no data.
 
 ### Notes for certification
 
