@@ -50,7 +50,7 @@ internal sealed class HighlighterAnnotation : TwoPointAnnotation
         ? Color.FromArgb(255, Soften(Color.R), Soften(Color.G), Soften(Color.B))
         : Color;
 
-    private static byte Soften(byte channel) => (byte)(channel + (255 - channel) * 0.4);
+    private static byte Soften(byte channel) => (byte)(channel + (255 - channel) * 0.25);
 
     public override void MoveHandle(int index, Vector2 position)
     {

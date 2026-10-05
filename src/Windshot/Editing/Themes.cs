@@ -110,6 +110,9 @@ internal static class Themes
     {
         if (set.Any(c => c.Color == color))
             return color;
+        // Colors earlier versions offered, by their slot: Mustard became Marigold.
+        if (color == Rgb(0xE9BE46) && set.Length > 2)
+            return set[2].Color;
         foreach (var theme in All)
         {
             int slot = Array.FindIndex(theme.Colors, c => c.Color == color);
