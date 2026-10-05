@@ -452,6 +452,7 @@ public sealed partial class EditorWindow : Window
             swatch.Resources["ButtonBackgroundPointerOver"] = swatch.Background;
             swatch.Resources["ButtonBackgroundPressed"] = swatch.Background;
             ToolTipService.SetToolTip(swatch, $"{name} ({i + 1})");
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(swatch, name); // for screen readers
             swatch.Click += (_, _) =>
             {
                 SetColor(color);

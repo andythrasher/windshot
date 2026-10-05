@@ -19,7 +19,7 @@ try {
   $h = EditorHandle
   Key @(0x11, 0x30); MoveAbs ($work.Right - 40) ($work.Bottom - 40); Pump 800    # zoom to fit
   if ($null -eq (WindowRect 'Windshot')) { throw 'Editor not visible in front; aborting.' }
-  $g = Grab (FrameBounds $h); $g.Save("$shots\raw-scrolling.png"); Compose $g 'Capture the whole page.' '04-scrolling'
+  $g = Grab (FrameBounds $h); $g.Save("$shots\raw-scrolling.png"); Compose $g 'Capture the whole page.' '05-scrolling'
   CloseEditor
 } finally { $stage.Close() }
 

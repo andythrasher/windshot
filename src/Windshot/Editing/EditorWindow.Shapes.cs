@@ -51,6 +51,7 @@ public sealed partial class EditorWindow
                 Content = Shell.FluentIcons.Create(icon, filled: false),
             };
             ToolTipService.SetToolTip(button, name);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, name); // for screen readers: it's icon-only
             button.Click += (_, _) =>
             {
                 StickerFlyout.Hide();

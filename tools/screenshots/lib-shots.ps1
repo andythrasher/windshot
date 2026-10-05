@@ -116,5 +116,43 @@ function Compose([Drawing.Bitmap]$grab, [string]$headline, [string]$name, [doubl
 }
 
 function EditorHandle { [Wt]::FindWindow([NullString]::Value, 'Windshot') }
+
+# Captures the whole demo board, then works out where it is on screen: at 100% the image is
+# centered in the canvas area, below the options bar. After this, B maps board pixels to the screen.
+function Open-BoardEditor {
+  Start-Process $exe; Pump 1500
+  if (-not ((Get-Content $log -Tail 1) -match 'Overlays shown')) { throw 'Capture overlay did not appear; aborting.' }
+  Drag @($boardRect.X, $boardRect.Y) @($boardRect.Right, $boardRect.Bottom); Pump 2000
+  if ($null -eq (WindowRect 'Windshot')) { throw 'Editor not visible in front; aborting.' }
+  $script:editor = EditorHandle
+  $frame = FrameBounds $script:editor; $bar = (FindIn $script:editor 'OptionsBar').Current.BoundingRectangle
+  if ($bar.Height -le 0) { throw 'Options bar not found; aborting.' }
+  $script:ix = [int]($frame.X + ($frame.Width - $boardRect.Width) / 2)
+  $script:iy = [int]($bar.Bottom + ($frame.Bottom - $bar.Bottom - $boardRect.Height) / 2)
+  $corner = B 0 0; if (-not $frame.Contains($corner[0], $corner[1])) { throw 'Image position is outside the editor; aborting.' }
+}
+function B($bx, $by) { @(($script:ix + $bx), ($script:iy + $by)) }
+function Guard { if ($null -eq (WindowRect 'Windshot')) { throw 'Editor not visible in front; aborting.' } }
+# Parks the mouse on the stage, away from the editor, so no hover effects or tooltips show.
+function Park { MoveAbs ($work.Right - 40) ($work.Bottom - 40); Pump 400 }
+# Clicks an editor control by its automation ID (x:Name).
+function ClickControl($id) {
+  $el = FindIn $script:editor $id; if ($null -eq $el) { throw "$id not found; aborting." }
+  Click (Center $el); Pump 300
+}
+# Clicks something by its accessible name in any of Windshot's windows; flyouts are windows of their own.
+function ClickNamed($name) {
+  $windshot = @(Get-Process Windshot).Id
+  foreach ($w in $A::RootElement.FindAll([Windows.Automation.TreeScope]::Children, [Windows.Automation.Condition]::TrueCondition)) {
+    if ($windshot -notcontains $w.Current.ProcessId) { continue }
+    $el = $w.FindFirst([Windows.Automation.TreeScope]::Descendants, (New-Object Windows.Automation.PropertyCondition -ArgumentList $A::NameProperty, $name))
+    if ($el) { Click (Center $el); Pump 400; return }
+  }
+  throw "'$name' not found; aborting."
+}
+function GrabEditor($raw, $headline, $name) {
+  Guard
+  $g = Grab (FrameBounds $script:editor); $g.Save("$shots\$raw.png"); Compose $g $headline $name
+}
 function CloseEditor { $h = EditorHandle; if ($h -ne [IntPtr]::Zero) { $A::FromHandle($h).GetCurrentPattern([Windows.Automation.WindowPattern]::Pattern).Close(); Pump 600 } }
 function FindIn([IntPtr]$h, [string]$id) { $A::FromHandle($h).FindFirst([Windows.Automation.TreeScope]::Descendants, (New-Object Windows.Automation.PropertyCondition $A::AutomationIdProperty, $id)) }
