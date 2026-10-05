@@ -17,9 +17,15 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Icon-only, like Snipping Tool; labels live in the tooltips. -->
-        <CommandBar x:Name="Toolbar" HorizontalAlignment="Left" DefaultLabelPosition="Collapsed" IsDynamicOverflowEnabled="False">
-            <CommandBar.Resources>
+        <!-- Icon-only, like Snipping Tool; labels live in the tooltips. When the window is too
+             narrow, commands move from the right end into the "…" menu (where they show their
+             labels); the Layers toggle stays pinned to the window's right edge. -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Grid.Resources>
                 <!-- Compact, Snipping Tool-sized buttons; the defaults leave room for labels. -->
                 <Style TargetType="AppBarButton" BasedOn="{StaticResource DefaultAppBarButtonStyle}">
                     <Setter Property="Width" Value="44" />
@@ -27,7 +33,14 @@
                 <Style TargetType="AppBarToggleButton" BasedOn="{StaticResource DefaultAppBarToggleButtonStyle}">
                     <Setter Property="Width" Value="44" />
                 </Style>
-            </CommandBar.Resources>
+            </Grid.Resources>
+        <CommandBar
+            x:Name="Toolbar"
+            HorizontalAlignment="Left"
+            Background="Transparent"
+            DefaultLabelPosition="Collapsed"
+            IsDynamicOverflowEnabled="True"
+            DynamicOverflowItemsChanging="Toolbar_DynamicOverflowItemsChanging">
             <!-- Icons are Fluent System Icons, assigned in code (see InitializeIcons). -->
             <AppBarButton x:Name="SaveButton" Label="Save" Click="Save_Click" ToolTipService.ToolTip="Save (Ctrl+S)" />
             <AppBarButton x:Name="CopyButton" Label="Copy" Click="Copy_Click" ToolTipService.ToolTip="Copy image (Ctrl+C)" />
@@ -57,7 +70,7 @@
                 Visibility="Collapsed"
                 Click="TextBackgroundButton_Click"
                 ToolTipService.ToolTip="Text background: set the text on a box of the current color" />
-            <AppBarElementContainer VerticalContentAlignment="Center" ToolTipService.ToolTip="Size ([ and ])">
+            <AppBarElementContainer x:Name="SizeContainer" VerticalContentAlignment="Center" ToolTipService.ToolTip="Size ([ and ])">
                 <StackPanel Orientation="Horizontal" Spacing="8" Margin="12,0">
                     <TextBlock Text="Size" VerticalAlignment="Center" />
                     <Slider
@@ -70,19 +83,23 @@
                         IsThumbToolTipEnabled="True" />
                 </StackPanel>
             </AppBarElementContainer>
-            <AppBarElementContainer VerticalContentAlignment="Center">
+            <AppBarElementContainer x:Name="ColorContainer" VerticalContentAlignment="Center">
                 <DropDownButton
                     Background="Transparent"
                     BorderThickness="0"
                     Margin="4,0"
                     ToolTipService.ToolTip="Color (1–8)">
-                    <!-- Outlined so the white swatch stays visible on a light toolbar. -->
-                    <Ellipse
-                        x:Name="ColorSwatch"
-                        Width="18"
-                        Height="18"
-                        Stroke="{ThemeResource ControlStrokeColorDefaultBrush}"
-                        StrokeThickness="1" />
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <!-- Outlined so the white swatch stays visible on a light toolbar. -->
+                        <Ellipse
+                            x:Name="ColorSwatch"
+                            Width="18"
+                            Height="18"
+                            Stroke="{ThemeResource ControlStrokeColorDefaultBrush}"
+                            StrokeThickness="1" />
+                        <!-- Labels like this one show only in the "…" menu. -->
+                        <TextBlock x:Name="ColorLabel" Text="Color" Visibility="Collapsed" VerticalAlignment="Center" />
+                    </StackPanel>
                     <DropDownButton.Flyout>
                         <Flyout x:Name="ColorFlyout" Placement="Bottom">
                             <StackPanel x:Name="SwatchPanel" Orientation="Horizontal" Spacing="8" />
@@ -90,7 +107,7 @@
                     </DropDownButton.Flyout>
                 </DropDownButton>
             </AppBarElementContainer>
-            <AppBarElementContainer VerticalContentAlignment="Center">
+            <AppBarElementContainer x:Name="BeautifyContainer" VerticalContentAlignment="Center">
                 <!-- Toggle on the left part; the arrow opens backdrop presets and padding. -->
                 <ToggleSplitButton
                     x:Name="BeautifyButton"
@@ -114,9 +131,11 @@
             <AppBarSeparator />
             <AppBarButton x:Name="PinButton" Label="Pin" Click="Pin_Click" ToolTipService.ToolTip="Pin to screen (Ctrl+P)" />
             <AppBarButton x:Name="CopyTextButton" Label="Copy text" Click="CopyText_Click" ToolTipService.ToolTip="Copy text (Ctrl+Shift+C)" />
-            <AppBarSeparator />
-            <AppBarToggleButton x:Name="LayersButton" Label="Layers" Click="LayersButton_Click" ToolTipService.ToolTip="Layers (L)" />
         </CommandBar>
+            <CommandBar Grid.Column="1" Background="Transparent" DefaultLabelPosition="Collapsed" OverflowButtonVisibility="Collapsed">
+                <AppBarToggleButton x:Name="LayersButton" Label="Layers" Click="LayersButton_Click" ToolTipService.ToolTip="Layers (L)" />
+            </CommandBar>
+        </Grid>
 
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>

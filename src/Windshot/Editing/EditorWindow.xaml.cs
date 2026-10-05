@@ -1300,8 +1300,48 @@ public sealed partial class EditorWindow : Window
         BindIcon(PinButton, "pin");
         BindIcon(CopyTextButton, "scan_text");
         BindIcon(LayersButton, "layer");
-        BeautifyButton.Content = Shell.FluentIcons.Create("sparkle", filled: false);
+        var beautify = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
+        beautify.Children.Add(Shell.FluentIcons.Create("sparkle", filled: false));
+        beautify.Children.Add(_beautifyLabel);
+        BeautifyButton.Content = beautify;
     }
+
+    /// <summary>
+    /// The compact 44px button width (from the toolbar's style) would clip labels in the "…"
+    /// menu, so buttons there size to the menu instead, and get it back when they return.
+    /// </summary>
+    private void Toolbar_DynamicOverflowItemsChanging(CommandBar sender, DynamicOverflowItemsChangingEventArgs args)
+    {
+        // Raised before the items move; IsInOverflow is up to date once this layout pass is done.
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            foreach (var element in Toolbar.PrimaryCommands.OfType<Control>())
+            {
+                bool inMenu = ((ICommandBarElement)element).IsInOverflow;
+                if (element is AppBarButton or AppBarToggleButton)
+                {
+                    if (inMenu)
+                        element.Width = double.NaN;
+                    else
+                        element.ClearValue(FrameworkElement.WidthProperty);
+                }
+                else if (element is AppBarElementContainer)
+                {
+                    // Line the controls up with the menu items' icons.
+                    // (The Size label has no button padding of its own, so it needs a little more.)
+                    double indent = element == SizeContainer ? OverflowIndent + 4 : OverflowIndent;
+                    element.Padding = new Thickness(inMenu ? indent : 0, 0, 0, 0);
+                }
+            }
+            // The color and Beautify buttons are bare icons on the bar; in the menu they need words.
+            ColorLabel.Visibility = ColorContainer.IsInOverflow ? Visibility.Visible : Visibility.Collapsed;
+            _beautifyLabel.Visibility = BeautifyContainer.IsInOverflow ? Visibility.Visible : Visibility.Collapsed;
+        });
+    }
+
+    private const double OverflowIndent = 24;
+
+    private readonly TextBlock _beautifyLabel = new() { Text = "Beautify", FontSize = 14, Visibility = Visibility.Collapsed, VerticalAlignment = VerticalAlignment.Center };
 
     private void BindIcon(AppBarButton button, string icon)
     {
