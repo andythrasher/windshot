@@ -114,6 +114,7 @@ public sealed partial class EditorWindow : Window
         // Hooked up here rather than in XAML: setting Minimum during load fires ValueChanged
         // before the rest of the window exists.
         WeightSlider.ValueChanged += WeightSlider_ValueChanged;
+        InitializeColorSets();
         BuildSwatches();
         BuildBackdropControls();
         InitializeLayers();
@@ -349,8 +350,53 @@ public sealed partial class EditorWindow : Window
 
     // ---- Color -------------------------------------------------------------------------
 
+    private void InitializeColorSets()
+    {
+        // Added as items rather than bound: binding a .NET list fails in the trimmed build.
+        foreach (var theme in Themes.All)
+            ColorSetPicker.Items.Add(theme.Name);
+        ColorSetPicker.SelectedIndex = Array.FindIndex(Themes.All, t => t.Colors == _palette);
+        ColorSetPicker.SelectionChanged += (_, _) =>
+        {
+            if (ColorSetPicker.SelectedIndex >= 0)
+                SetColorSet(Themes.All[ColorSetPicker.SelectedIndex]);
+        };
+    }
+
+    /// <summary>
+    /// Offers another theme's colors, and moves the current colors and everything drawn to
+    /// their counterparts in it (Coral becomes Chili, and so on), as one undo step.
+    /// </summary>
+    private void SetColorSet(Theme theme)
+    {
+        if (theme.Colors == _palette)
+            return;
+        CommitTextEdit();
+        _palette = theme.Colors;
+        _color = Themes.InSet(_color, _palette);
+        _highlightColor = Themes.InSet(_highlightColor, _palette);
+        bool recolored = false;
+        foreach (var annotation in _document.Annotations.Where(a => !a.IsAreaEffect))
+        {
+            var color = Themes.InSet(annotation.Color, _palette);
+            if (color != annotation.Color)
+            {
+                annotation.Color = color;
+                recolored = true;
+            }
+        }
+        if (recolored)
+            Commit();
+        // Remembered like the other editor preferences, for the next editors too.
+        Settings.Current.Appearance.Colors = theme.Name;
+        BuildSwatches();
+        Canvas.Invalidate();
+    }
+
     private void BuildSwatches()
     {
+        _swatches.Clear();
+        SwatchPanel.Children.Clear();
         for (int i = 0; i < _palette.Length; i++)
         {
             var (name, color) = _palette[i];
