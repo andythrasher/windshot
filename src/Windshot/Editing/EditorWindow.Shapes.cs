@@ -14,40 +14,85 @@ public sealed partial class EditorWindow
 {
     private ShapeKind _shapeKind;
     private bool _fillShapes;
+    /// <summary>The sticker the tool places, by icon name.</summary>
+    private string _sticker = Stickers.All[0].Icon;
 
     /// <summary>A polygon being clicked out; it's a layer already, finished by <see cref="FinishPolygon"/>.</summary>
     private PolygonAnnotation? _polygonDraft;
     /// <summary>Where the next corner would go: the end of the line from the last one.</summary>
     private Vector2 _polygonCursor;
 
-    private AppBarToggleButton[] ShapeButtons => [ShapeRectangleButton, ShapeEllipseButton, ShapeTriangleButton, ShapePolygonButton];
+    private AppBarToggleButton[] ShapeButtons => [ShapeRectangleButton, ShapeEllipseButton, ShapeTriangleButton, ShapePolygonButton, ShapeStickerButton];
 
     private static string ShapeIcon(ShapeKind kind) => kind switch
     {
-        ShapeKind.Ellipse => "shape_ellipse",
-        ShapeKind.Triangle => "shape_triangle",
-        ShapeKind.Polygon => "shape_polygon",
+        ShapeKind.Ellipse => "oval",
+        ShapeKind.Triangle => "triangle",
+        ShapeKind.Polygon => "pentagon",
+        ShapeKind.Sticker => "sticker",
         _ => "rectangle_landscape",
     };
 
     private void InitializeShapes()
     {
-        foreach (var button in ShapeButtons)
+        foreach (var button in ShapeButtons.Where(b => b != ShapeStickerButton))
             BindIcon(button, ShapeIcon(Enum.Parse<ShapeKind>((string)button.Tag)));
-        BindIcon(FillButton, "shape_fill");
+        BindIcon(FillButton, "paint_bucket");
+        foreach (var (icon, name) in Stickers.All)
+        {
+            var button = new Button
+            {
+                Width = 44,
+                Height = 44,
+                Margin = new Thickness(2),
+                Padding = new Thickness(0),
+                Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent),
+                BorderThickness = new Thickness(0),
+                Content = Shell.FluentIcons.Create(icon, filled: false),
+            };
+            ToolTipService.SetToolTip(button, name);
+            button.Click += (_, _) =>
+            {
+                StickerFlyout.Hide();
+                SetSticker(icon);
+            };
+            StickerGrid.Children.Add(button);
+        }
     }
 
-    private void ShapeButton_Click(object sender, RoutedEventArgs e) =>
-        SetShapeKind(Enum.Parse<ShapeKind>((string)((FrameworkElement)sender).Tag));
+    private void ShapeButton_Click(object sender, RoutedEventArgs e)
+    {
+        var kind = Enum.Parse<ShapeKind>((string)((FrameworkElement)sender).Tag);
+        SetShapeKind(kind);
+        // The sticker button also opens the stickers to pick from.
+        if (kind == ShapeKind.Sticker)
+            Microsoft.UI.Xaml.Controls.Primitives.FlyoutBase.ShowAttachedFlyout(ShapeStickerButton);
+    }
+
+    private void SetSticker(string icon)
+    {
+        _sticker = icon;
+        if (_selected is ShapeAnnotation { Kind: ShapeKind.Sticker } sticker && sticker.StickerIcon != icon)
+        {
+            sticker.StickerIcon = icon;
+            Commit();
+        }
+        SetShapeKind(ShapeKind.Sticker);
+    }
+
+    /// <summary>A sticker's side when placed with a click, from the size setting, in image pixels.</summary>
+    private float StickerSide(int weight) => (24 + weight * 6) * Unit;
 
     /// <summary>The shape the tool draws next; a selected rectangle, ellipse or triangle becomes it too.</summary>
     private void SetShapeKind(ShapeKind kind)
     {
         FinishPolygon();
         _shapeKind = kind;
-        if (_selected is ShapeAnnotation shape && kind != ShapeKind.Polygon && shape.Kind != kind)
+        if (_selected is ShapeAnnotation shape && kind != ShapeKind.Polygon &&
+            (shape.Kind != kind || (kind == ShapeKind.Sticker && shape.StickerIcon != _sticker)))
         {
             shape.Kind = kind;
+            shape.StickerIcon = _sticker;
             Commit();
         }
         SyncShapes();
@@ -79,6 +124,9 @@ public sealed partial class EditorWindow
         };
         foreach (var button in ShapeButtons)
             button.IsChecked = (string)button.Tag == kind.ToString();
+        // The sticker button shows the sticker it places, or the selected one.
+        string sticker = _selected is ShapeAnnotation { Kind: ShapeKind.Sticker } selected ? selected.StickerIcon : _sticker;
+        ShapeStickerButton.Icon = Shell.FluentIcons.Create(sticker, filled: kind == ShapeKind.Sticker);
         FillButton.IsChecked = (_selected as IFillable)?.Filled ?? _fillShapes;
     }
 

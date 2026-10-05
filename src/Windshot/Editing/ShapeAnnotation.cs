@@ -13,6 +13,8 @@ internal enum ShapeKind
     Triangle,
     /// <summary>Clicked out point by point; see <see cref="PolygonAnnotation"/>.</summary>
     Polygon,
+    /// <summary>An icon from <see cref="Stickers"/>, fitted into the box.</summary>
+    Sticker,
 }
 
 /// <summary>
@@ -45,7 +47,7 @@ internal static class ShapeDrawing
         shape.StrokeContainsPoint(point, thickness + tolerance * 2, RoundJoin);
 }
 
-/// <summary>A rectangle, ellipse or triangle, dragged out as a box.</summary>
+/// <summary>A rectangle, ellipse, triangle or sticker, dragged out as a box.</summary>
 internal sealed class ShapeAnnotation : BoxAnnotation, IFillable
 {
     public ShapeAnnotation(Vector2 start, ShapeKind kind, Color color, int weight, float unit)
@@ -54,14 +56,17 @@ internal sealed class ShapeAnnotation : BoxAnnotation, IFillable
         Kind = kind;
     }
 
-    /// <summary>Rectangle, Ellipse or Triangle; they share the box, so one can become another.</summary>
+    /// <summary>Rectangle, Ellipse, Triangle or Sticker; they share the box, so one can become another.</summary>
     public ShapeKind Kind { get; set; }
+
+    /// <summary>For a sticker: its icon's name in <see cref="Stickers.All"/>.</summary>
+    public string StickerIcon { get; set; } = Stickers.All[0].Icon;
 
     public bool Filled { get; set; }
 
     public float Thickness => (1 + Weight) * Unit;
 
-    public override Rect Bounds => Shape.Inflate(Thickness / 2);
+    public override Rect Bounds => Kind == ShapeKind.Sticker ? Shape : Shape.Inflate(Thickness / 2);
 
     private CanvasGeometry Geometry(ICanvasResourceCreator creator)
     {
@@ -71,6 +76,11 @@ internal sealed class ShapeAnnotation : BoxAnnotation, IFillable
             case ShapeKind.Ellipse:
                 return CanvasGeometry.CreateEllipse(creator, (float)(box.X + box.Width / 2), (float)(box.Y + box.Height / 2),
                     (float)box.Width / 2, (float)box.Height / 2);
+            case ShapeKind.Sticker:
+                // As large as fits the box, centered in it, keeping the icon's proportions.
+                float scale = (float)Math.Min(box.Width, box.Height) / Stickers.GridSize;
+                var offset = new Vector2((float)(box.X + (box.Width - Stickers.GridSize * scale) / 2), (float)(box.Y + (box.Height - Stickers.GridSize * scale) / 2));
+                return Stickers.Geometry(creator, StickerIcon, Filled, Matrix3x2.CreateScale(scale) * Matrix3x2.CreateTranslation(offset));
             case ShapeKind.Triangle:
                 // Pointing up, with its base along the bottom of the box.
                 float left = (float)box.Left, right = (float)box.Right, top = (float)box.Top, bottom = (float)box.Bottom;
@@ -83,11 +93,18 @@ internal sealed class ShapeAnnotation : BoxAnnotation, IFillable
     public override void Draw(CanvasDrawingSession ds)
     {
         using var shape = Geometry(ds);
-        ShapeDrawing.Draw(ds, shape, Color, Thickness, Filled);
+        // A sticker is the icon itself (outlined or solid, by Filled), not a line around it.
+        if (Kind == ShapeKind.Sticker)
+            ds.FillGeometry(shape, Color);
+        else
+            ShapeDrawing.Draw(ds, shape, Color, Thickness, Filled);
     }
 
     public override bool HitTest(Vector2 point, float tolerance)
     {
+        // Stickers are small and mostly holes, so they're grabbable anywhere in their box.
+        if (Kind == ShapeKind.Sticker)
+            return Shape.Inflate(tolerance).Contains(point.ToPoint());
         using var shape = Geometry(CanvasDevice.GetSharedDevice());
         return ShapeDrawing.HitTest(shape, point, Thickness, tolerance, Filled);
     }

@@ -14,7 +14,14 @@ $icons = @(
     'save', 'copy', 'arrow_undo', 'arrow_redo',
     'cursor', 'arrow_up_right', 'rectangle_landscape', 'text_t', 'blur',
     'number_circle_1', 'highlight', 'flashlight',
-    'crop', 'arrow_reset', 'layer', 'eye', 'eye_off', 'image', 'delete', 'grid_dots', 'color_background', 'sparkle', 'pin', 'scan_text'
+    'crop', 'arrow_reset', 'layer', 'eye', 'eye_off', 'image', 'delete', 'grid_dots', 'color_background', 'sparkle', 'pin', 'scan_text',
+    # Shapes tool
+    'shapes', 'oval', 'triangle', 'pentagon', 'paint_bucket', 'sticker',
+    # Stickers (Editing/Stickers.cs)
+    'checkmark_circle', 'dismiss_circle', 'warning', 'info', 'question_circle', 'prohibited',
+    'star', 'heart', 'thumb_like', 'thumb_dislike', 'emoji', 'emoji_sad',
+    'chat', 'lightbulb', 'flag', 'bookmark', 'alert', 'lock_closed',
+    'hand_point', 'cursor_click', 'target', 'fire', 'bug'
 )
 
 New-Item -ItemType Directory -Force $FontDir | Out-Null

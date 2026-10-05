@@ -94,6 +94,9 @@ internal sealed class Settings
 
         /// <summary>Fill new shapes with their color.</summary>
         public bool FillShapes { get; set; }
+
+        /// <summary>The sticker the shape tool places, by Fluent icon name, e.g. "checkmark_circle".</summary>
+        public string Sticker { get; set; } = Stickers.All[0].Icon;
         public bool TextBackground { get; set; }
 
         /// <summary>The font new text uses, by family name, e.g. "Segoe UI Variable Display" or "Consolas".</summary>

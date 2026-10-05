@@ -110,6 +110,8 @@ public sealed partial class EditorWindow : Window
         _highlightBlend = prefs.Editor.HighlighterBlend;
         _shapeKind = prefs.Editor.Shape;
         _fillShapes = prefs.Editor.FillShapes;
+        if (Stickers.All.Any(s => s.Icon == prefs.Editor.Sticker))
+            _sticker = prefs.Editor.Sticker;
         _textBoxed = prefs.Editor.TextBackground;
         _font = string.IsNullOrWhiteSpace(prefs.Editor.Font) ? TextAnnotation.DefaultFontFamily : prefs.Editor.Font;
         _beautify = prefs.Beautify.OnByDefault;
@@ -153,6 +155,7 @@ public sealed partial class EditorWindow : Window
         prefs.Editor.HighlighterBlend = _highlightBlend;
         prefs.Editor.Shape = _shapeKind;
         prefs.Editor.FillShapes = _fillShapes;
+        prefs.Editor.Sticker = _sticker;
         prefs.Editor.TextBackground = _textBoxed;
         prefs.Editor.Font = _font;
         prefs.Editor.ShowLayers = _layersOpen;
@@ -358,6 +361,14 @@ public sealed partial class EditorWindow : Window
                 _selected.Weight = weight;
                 if (_selected is TextAnnotation text)
                     text.FontSizeOverride = null;
+                // A sticker's size is its box: the setting resizes it around its center.
+                if (_selected is ShapeAnnotation { Kind: ShapeKind.Sticker } sticker)
+                {
+                    var center = (sticker.Start + sticker.End) / 2;
+                    var half = new Vector2(StickerSide(weight) / 2);
+                    sticker.Start = center - half;
+                    sticker.End = center + half;
+                }
                 Commit(coalesceKey: ("weight", _selected));
             }
         }
@@ -815,7 +826,7 @@ public sealed partial class EditorWindow : Window
             Tool.Blur => new BlurAnnotation(p, _pixelate, weight, Unit),
             Tool.Spotlight => new SpotlightAnnotation(p, weight, Unit),
             Tool.Highlighter => new HighlighterAnnotation(p, _highlightColor, weight, Unit) { Blend = _highlightBlend },
-            _ => new ShapeAnnotation(p, _shapeKind, _color, weight, Unit) { Filled = _fillShapes },
+            _ => new ShapeAnnotation(p, _shapeKind, _color, weight, Unit) { Filled = _fillShapes, StickerIcon = _sticker },
         };
         AddLayer(shape);
         Select(shape);
@@ -953,6 +964,15 @@ public sealed partial class EditorWindow : Window
 
         if (_drag is null || e.Pointer.PointerId != _drag.PointerId)
             return;
+
+        // A sticker placed with a click (no drag) gets the size from the size setting.
+        if (_drag.Creating && _drag.Target is ShapeAnnotation { Kind: ShapeKind.Sticker } sticker &&
+            Math.Abs(sticker.End.X - sticker.Start.X) < MinShapeSize && Math.Abs(sticker.End.Y - sticker.Start.Y) < MinShapeSize)
+        {
+            var half = new Vector2(StickerSide(sticker.Weight) / 2);
+            sticker.Start -= half;
+            sticker.End = sticker.Start + half * 2;
+        }
 
         // A click without a drag shouldn't leave an invisible zero-size shape behind.
         if (_drag.Creating && _drag.Target is TwoPointAnnotation shape &&
@@ -1442,7 +1462,7 @@ public sealed partial class EditorWindow : Window
     {
         [nameof(Tool.Select)] = "cursor",
         [nameof(Tool.Arrow)] = "arrow_up_right",
-        [nameof(Tool.Rectangle)] = "rectangle_landscape",
+        [nameof(Tool.Rectangle)] = "shapes",
         [nameof(Tool.Text)] = "text_t",
         [nameof(Tool.Blur)] = "blur",
         [nameof(Tool.Step)] = "number_circle_1",

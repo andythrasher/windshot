@@ -256,6 +256,7 @@ public sealed partial class EditorWindow
         StepAnnotation step => $"Step {step.Number}",
         SpotlightAnnotation => "Spotlight",
         HighlighterAnnotation => "Highlight",
+        ShapeAnnotation { Kind: ShapeKind.Sticker } sticker => Stickers.NameOf(sticker.StickerIcon),
         ShapeAnnotation shape => shape.Kind.ToString(),
         PolygonAnnotation => "Polygon",
         _ => "Shape",
@@ -264,6 +265,7 @@ public sealed partial class EditorWindow
     /// <summary>A layer's icon: its tool's, or for shapes, its own shape.</summary>
     private static string LayerIcon(Annotation annotation) => annotation switch
     {
+        ShapeAnnotation { Kind: ShapeKind.Sticker } sticker => sticker.StickerIcon,
         ShapeAnnotation shape => ShapeIcon(shape.Kind),
         PolygonAnnotation => ShapeIcon(ShapeKind.Polygon),
         _ => ToolIcons[ToolFor(annotation).ToString()],

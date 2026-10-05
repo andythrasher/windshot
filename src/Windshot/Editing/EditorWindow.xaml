@@ -106,6 +106,13 @@
             <AppBarToggleButton x:Name="ShapeEllipseButton" Width="44" LabelPosition="Collapsed" Label="Ellipse" Click="ShapeButton_Click" Tag="Ellipse" ToolTipService.ToolTip="Ellipse" />
             <AppBarToggleButton x:Name="ShapeTriangleButton" Width="44" LabelPosition="Collapsed" Label="Triangle" Click="ShapeButton_Click" Tag="Triangle" ToolTipService.ToolTip="Triangle" />
             <AppBarToggleButton x:Name="ShapePolygonButton" Width="44" LabelPosition="Collapsed" Label="Polygon" Click="ShapeButton_Click" Tag="Polygon" ToolTipService.ToolTip="Polygon: click each corner; click the first corner, double-click or press Enter to finish" />
+            <AppBarToggleButton x:Name="ShapeStickerButton" Width="44" LabelPosition="Collapsed" Label="Sticker" Click="ShapeButton_Click" Tag="Sticker" ToolTipService.ToolTip="Stickers: pick one, then click to place it or drag to size it">
+                <FlyoutBase.AttachedFlyout>
+                    <Flyout x:Name="StickerFlyout" Placement="Bottom" ShouldConstrainToRootBounds="False">
+                        <VariableSizedWrapGrid x:Name="StickerGrid" Orientation="Horizontal" MaximumRowsOrColumns="6" />
+                    </Flyout>
+                </FlyoutBase.AttachedFlyout>
+            </AppBarToggleButton>
             <AppBarSeparator x:Name="ShapeSeparator" />
             <AppBarElementContainer x:Name="SizeContainer" VerticalContentAlignment="Center" ToolTipService.ToolTip="Size ([ and ])">
                 <StackPanel Orientation="Horizontal" Spacing="8" Margin="12,0">
