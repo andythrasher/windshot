@@ -21,10 +21,35 @@ internal abstract class Annotation
         Unit = unit;
     }
 
+    private static long _created;
+
     public Color Color { get; set; }
 
     /// <summary>Size level from <see cref="MinWeight"/> to <see cref="MaxWeight"/>; each type maps it to its own geometry.</summary>
     public int Weight { get; set; }
+
+    // ---- As a layer --------------------------------------------------------------------
+
+    /// <summary>Hidden layers aren't drawn, clicked, exported or counted toward the canvas size.</summary>
+    public bool Visible { get; set; } = true;
+
+    /// <summary>0 to 1: how strongly the layer shows over (or, for effects, changes) what's beneath it.</summary>
+    public float Opacity { get; set; } = 1;
+
+    /// <summary>A name given in the layers panel; null shows the default one.</summary>
+    public string? Name { get; set; }
+
+    /// <summary>Order of creation (copies keep it), which numbers steps independently of stacking.</summary>
+    public long Created { get; } = Interlocked.Increment(ref _created);
+
+    /// <summary>
+    /// Effects (blur, spotlight, highlight) change what's beneath them, like adjustment layers,
+    /// instead of drawing on top; see <see cref="ApplyTo"/>.
+    /// </summary>
+    public virtual bool IsEffect => false;
+
+    /// <summary>For effects: everything beneath, with this effect applied.</summary>
+    public virtual ICanvasImage ApplyTo(LayerContext context, ICanvasImage below) => below;
 
     /// <summary>Image pixels per DIP on the source monitor, so a weight looks the same on any display.</summary>
     public float Unit { get; }

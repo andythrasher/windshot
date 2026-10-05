@@ -66,6 +66,14 @@ the scrolling part of a window (not its sidebar or toolbar) gives the cleanest r
 captures open at the top, fitted to the window's width; there the wheel scrolls and
 Ctrl+wheel zooms.
 
+**Layers** (L, or the toolbar's Layers button) opens a panel listing every object, topmost
+first, with the screenshot at the bottom. Click a layer to select it, drag to restack it (or
+Ctrl+] and Ctrl+[, with Shift for top and bottom), use the eye to hide it (hidden layers aren't
+exported), set its opacity with the slider, and double-click to rename it. Blur, highlight and
+spotlight work like adjustment layers: they change everything beneath them, so a blur above an
+arrow blurs the arrow too. New ones start just above the screenshot. Step numbers follow the
+order they were placed, not the stacking. Hiding the screenshot exports just the annotations.
+
 **Zoom** with the scroll wheel (around the cursor) or **Ctrl+=** / **Ctrl+−**; **Ctrl+0** fits the
 window and **Ctrl+1** shows actual pixels. Pan with **Space+drag** or a middle-button drag. The
 zoom readout in the corner switches between fit and 100% when clicked. Above 150% pixels are
@@ -125,6 +133,9 @@ same icons by `tools/make-cursors.ps1`.
   offset comes close. Auto-scroll waits for each smooth-scroll animation to settle. Rows that
   stayed put at the bottom count as a footer, added once at the end. The border and panel are
   excluded from screen capture (`WDA_EXCLUDEFROMCAPTURE`), so they never land in a frame.
+- **Layers render bottom-up.** `Document.Compose` builds the stack as a chain of Win2D command
+  lists: shapes and text draw over what's beneath them, and effects take it as their input
+  (`Annotation.ApplyTo`). Opacity blends each layer's result with what was beneath it.
 - **Physical pixels everywhere on the capture side.** The process is Per-Monitor-V2 DPI aware,
   the desktop is snapshotted once, and each monitor gets its own overlay window in its own
   pixel space, which keeps mixed-DPI setups from breaking.

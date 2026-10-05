@@ -7,72 +7,66 @@ using Windows.UI;
 namespace Windshot.Editing;
 
 /// <summary>
-/// Keeps a region bright while the rest of the screenshot dims. The dimming is drawn once
-/// for all spotlights together (see <see cref="DrawDimming"/>), so several spotlights
-/// combine into one layer with several holes.
+/// Keeps a region bright while the rest dims. Spotlights work together: one dimming layer
+/// with a hole for every visible spotlight, applied where the topmost one sits in the stack
+/// (see <see cref="Dim"/>); separately, each would darken the others' bright areas.
 /// </summary>
 internal sealed class SpotlightAnnotation : BoxAnnotation
 {
-    private readonly Rect _imageBounds;
-
-    public SpotlightAnnotation(Vector2 start, Rect imageBounds, int weight, float unit)
+    public SpotlightAnnotation(Vector2 start, int weight, float unit)
         : base(start, Microsoft.UI.Colors.Transparent, weight, unit)
     {
-        _imageBounds = imageBounds;
     }
 
     public override bool IsAreaEffect => true;
+
+    public override bool IsEffect => true;
 
     /// <summary>How dark the area outside spotlights gets.</summary>
     public float DimOpacity => Math.Clamp(0.2f + Weight * 0.06f, 0, 0.85f);
 
     private float CornerRadius => 8 * Unit;
 
-    private Rect Region
-    {
-        get
-        {
-            var region = Shape;
-            region.Intersect(_imageBounds);
-            return region;
-        }
-    }
+    public override Rect Bounds => Shape;
 
-    public override Rect Bounds => Region.IsEmpty ? Rect.Empty : Region;
-
-    /// <summary>Nothing of its own to draw; the document draws the shared dimming layer.</summary>
+    /// <summary>Drawn by <see cref="Dim"/>, as part of the layer stack.</summary>
     public override void Draw(CanvasDrawingSession ds)
     {
     }
 
     public override bool HitTest(Vector2 point, float tolerance) =>
-        Region.Inflate(tolerance).Contains(point.ToPoint());
+        Shape.Inflate(tolerance).Contains(point.ToPoint());
 
     /// <summary>
-    /// Dims the screenshot (<paramref name="card"/>: the image plus any filled expansion)
-    /// everywhere outside the given spotlights. Transparent canvas outside the card stays
-    /// transparent rather than turning grey on export.
+    /// Everything beneath, dimmed within the card (the screenshot plus any filled expansion)
+    /// outside all the given spotlights. Transparent canvas outside the card stays transparent
+    /// rather than turning grey on export.
     /// </summary>
-    public static void DrawDimming(CanvasDrawingSession ds, Rect card, IReadOnlyList<SpotlightAnnotation> spotlights)
+    public static ICanvasImage Dim(LayerContext context, ICanvasImage below, IReadOnlyList<SpotlightAnnotation> spotlights)
     {
+        var result = context.NewList();
+        using var s = result.CreateDrawingSession();
+        s.DrawImage(below);
         if (spotlights.Count == 0)
-            return;
+            return result;
 
-        var dimmed = CanvasGeometry.CreateRectangle(ds, card);
+        // Rounded like the card when beautified, so the corners don't darken the backdrop.
+        var dimmed = context.CardShape(s) ?? CanvasGeometry.CreateRectangle(s, context.Card);
         foreach (var spot in spotlights)
         {
-            var region = spot.Region;
-            if (region.IsEmpty)
+            var region = spot.Shape;
+            if (region.Width < 1 || region.Height < 1)
                 continue;
-            using var hole = CanvasGeometry.CreateRoundedRectangle(ds, region, spot.CornerRadius, spot.CornerRadius);
+            using var hole = CanvasGeometry.CreateRoundedRectangle(s, region, spot.CornerRadius, spot.CornerRadius);
             var next = dimmed.CombineWith(hole, Matrix3x2.Identity, CanvasGeometryCombine.Exclude);
             dimmed.Dispose();
             dimmed = next;
         }
 
-        // One opacity for the whole layer: the darkest any spotlight asks for.
-        float opacity = spotlights.Max(s => s.DimOpacity);
-        ds.FillGeometry(dimmed, Color.FromArgb((byte)(255 * opacity), 0, 0, 0));
+        // One darkness for the whole layer: the darkest any spotlight asks for.
+        float opacity = spotlights.Max(spot => spot.DimOpacity);
+        s.FillGeometry(dimmed, Color.FromArgb((byte)(255 * opacity), 0, 0, 0));
         dimmed.Dispose();
+        return result;
     }
 }

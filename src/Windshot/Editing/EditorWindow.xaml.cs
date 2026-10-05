@@ -115,6 +115,7 @@ public sealed partial class EditorWindow : Window
         WeightSlider.ValueChanged += WeightSlider_ValueChanged;
         BuildSwatches();
         BuildBackdropControls();
+        InitializeLayers();
         SizeToCapture(capture);
         if (File.Exists(AppIcon.FilePath))
             AppWindow.SetIcon(AppIcon.FilePath);
@@ -138,6 +139,7 @@ public sealed partial class EditorWindow : Window
         prefs.Editor.HighlighterColor = _highlightColor.ToHex();
         prefs.Editor.Pixelate = _pixelate;
         prefs.Editor.TextBackground = _textBoxed;
+        prefs.Editor.ShowLayers = _layersOpen;
         prefs.Beautify.Preset = BackdropPresets.All[_backdropPreset].Name;
         prefs.Beautify.Padding = _backdropPadding;
         Settings.Save();
@@ -207,6 +209,8 @@ public sealed partial class EditorWindow : Window
     private void Select(Annotation? annotation)
     {
         _selected = annotation;
+        _imageLayerSelected = false;
+        SyncLayerSelection();
         if (annotation is { IsAreaEffect: false })
             ActiveColor = annotation.Color; // picking up an object's color makes it easy to match
         SyncSlider();
@@ -384,6 +388,7 @@ public sealed partial class EditorWindow : Window
     {
         _history.Commit(_document, coalesceKey);
         SyncHistoryButtons();
+        RefreshLayers();
     }
 
     private void Undo_Click(object sender, RoutedEventArgs e) => StepHistory(undo: true);
@@ -404,6 +409,7 @@ public sealed partial class EditorWindow : Window
         if (undo ? _history.Undo(_document) : _history.Redo(_document))
             Select(null); // the restored objects are copies; the old selection no longer exists
         SyncHistoryButtons();
+        RefreshLayers();
     }
 
     private void SyncHistoryButtons()
@@ -456,14 +462,13 @@ public sealed partial class EditorWindow : Window
             case VirtualKey.P when !ctrl && PixelateButton.Visibility == Visibility.Visible:
                 SetPixelate(PixelateButton.IsChecked != true);
                 break;
+            // Ctrl+] / Ctrl+[ restack the selection (Shift: to the top or bottom); plain ] and [ resize.
+            case (VirtualKey)219 when ctrl: MoveLayer(-1, allTheWay: shift); break;
+            case (VirtualKey)221 when ctrl: MoveLayer(+1, allTheWay: shift); break;
             case (VirtualKey)219: SetWeight((int)WeightSlider.Value - 1); break; // [
             case (VirtualKey)221: SetWeight((int)WeightSlider.Value + 1); break; // ]
-            case VirtualKey.Delete or VirtualKey.Back when _selected is not null:
-                _document.Annotations.Remove(_selected);
-                (_selected as IDisposable)?.Dispose();
-                Select(null);
-                Commit();
-                break;
+            case VirtualKey.L when !ctrl: SetLayersOpen(!_layersOpen); break;
+            case VirtualKey.Delete or VirtualKey.Back when _selected is not null: DeleteSelected(); break;
             case VirtualKey.Escape when _selected is not null: Select(null); break;
             default: handled = false; break;
         }
@@ -524,7 +529,7 @@ public sealed partial class EditorWindow : Window
         _document.Render(ds, skip: _editingText);
         _editingText?.Draw(ds, chromeOnly: true); // the text box draws the letters on top
 
-        if (_selected is not null && _selected != _editingText)
+        if (_selected is { Visible: true } && _selected != _editingText)
             DrawSelection(ds, _selected);
         if (_cropRect is { } crop)
             DrawCropOverlay(ds, crop);
@@ -675,7 +680,7 @@ public sealed partial class EditorWindow : Window
         {
             // Placed on press; dragging before release moves it into position.
             var step = new StepAnnotation(p, _color, weight, Unit);
-            _document.Annotations.Add(step);
+            AddLayer(step);
             Select(step);
             StartDrag(e, step, handle: -1, creating: true, p);
             return;
@@ -684,12 +689,12 @@ public sealed partial class EditorWindow : Window
         TwoPointAnnotation shape = _tool switch
         {
             Tool.Arrow => new ArrowAnnotation(p, _color, weight, Unit),
-            Tool.Blur => new BlurAnnotation(p, _document.Image, _document.ImageBounds, _pixelate, weight, Unit),
-            Tool.Spotlight => new SpotlightAnnotation(p, _document.ImageBounds, weight, Unit),
-            Tool.Highlighter => new HighlighterAnnotation(p, _document.ImageBounds, _highlightColor, weight, Unit),
+            Tool.Blur => new BlurAnnotation(p, _pixelate, weight, Unit),
+            Tool.Spotlight => new SpotlightAnnotation(p, weight, Unit),
+            Tool.Highlighter => new HighlighterAnnotation(p, _highlightColor, weight, Unit),
             _ => new RectangleAnnotation(p, _color, weight, Unit),
         };
-        _document.Annotations.Add(shape);
+        AddLayer(shape);
         Select(shape);
         StartDrag(e, shape, TwoPointAnnotation.EndHandle, creating: true, p);
     }
@@ -717,7 +722,7 @@ public sealed partial class EditorWindow : Window
             text.Position -= new Vector2(0, text.FontSize * 0.65f);
         }
 
-        _document.Annotations.Add(text);
+        AddLayer(text);
         Select(text);
         BeginTextEdit(text, isNew: true);
     }
@@ -1294,6 +1299,7 @@ public sealed partial class EditorWindow : Window
         BindIcon(TextBackgroundButton, "color_background");
         BindIcon(PinButton, "pin");
         BindIcon(CopyTextButton, "scan_text");
+        BindIcon(LayersButton, "layer");
         BeautifyButton.Content = Shell.FluentIcons.Create("sparkle", filled: false);
     }
 

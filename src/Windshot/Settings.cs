@@ -73,6 +73,9 @@ internal sealed class Settings
 
         /// <summary>Close the editor once its image has been copied or saved.</summary>
         public bool CloseAfterSaveOrCopy { get; set; } = true;
+
+        /// <summary>Show the layers panel; remembered from the last editor.</summary>
+        public bool ShowLayers { get; set; }
     }
 
     public sealed class BeautifySettings

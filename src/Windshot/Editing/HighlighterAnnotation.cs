@@ -7,24 +7,23 @@ using Windows.UI;
 namespace Windshot.Editing;
 
 /// <summary>
-/// A straight, marker-style stroke. It blends with "darken" (per-channel minimum), so the
-/// text underneath stays fully black instead of being tinted, the way real highlighter ink
-/// behaves. It marks the screenshot only: it's clipped to the image and never grows the canvas.
+/// A straight, marker-style stroke. It blends with "darken" (per-channel minimum) into
+/// whatever is beneath it in the layer stack, so text underneath stays fully black instead of
+/// being tinted, the way real highlighter ink behaves. It never grows the canvas.
 /// </summary>
 internal sealed class HighlighterAnnotation : TwoPointAnnotation
 {
     private const float SnapDegrees = 5;
     private static readonly float SnapSlope = MathF.Tan(SnapDegrees * MathF.PI / 180);
 
-    private readonly Rect _imageBounds;
-
-    public HighlighterAnnotation(Vector2 start, Rect imageBounds, Color color, int weight, float unit)
+    public HighlighterAnnotation(Vector2 start, Color color, int weight, float unit)
         : base(start, color, weight, unit)
     {
-        _imageBounds = imageBounds;
     }
 
     public override bool ExtendsCanvas => false;
+
+    public override bool IsEffect => true;
 
     public float Thickness => (8 + Weight * 3) * Unit;
 
@@ -58,22 +57,25 @@ internal sealed class HighlighterAnnotation : TwoPointAnnotation
         {
             var points = Outline();
             float minX = points.Min(p => p.X), minY = points.Min(p => p.Y);
-            var bounds = new Rect(minX, minY, points.Max(p => p.X) - minX, points.Max(p => p.Y) - minY);
-            bounds.Intersect(_imageBounds);
-            return bounds;
+            return new Rect(minX, minY, points.Max(p => p.X) - minX, points.Max(p => p.Y) - minY);
         }
     }
 
+    /// <summary>Drawn by <see cref="ApplyTo"/>, as part of the layer stack.</summary>
     public override void Draw(CanvasDrawingSession ds)
     {
-        using var stroke = CanvasGeometry.CreatePolygon(ds, Outline());
-        using var image = CanvasGeometry.CreateRectangle(ds, _imageBounds);
-        using var clipped = stroke.CombineWith(image, Matrix3x2.Identity, CanvasGeometryCombine.Intersect);
+    }
 
-        var blend = ds.Blend;
-        ds.Blend = CanvasBlend.Min;
-        ds.FillGeometry(clipped, Ink);
-        ds.Blend = blend;
+    public override ICanvasImage ApplyTo(LayerContext context, ICanvasImage below)
+    {
+        var result = context.NewList();
+        using var s = result.CreateDrawingSession();
+        s.DrawImage(below);
+        // Over transparent canvas the minimum is transparent, so ink only lands on what's there.
+        using var stroke = CanvasGeometry.CreatePolygon(s, Outline());
+        s.Blend = CanvasBlend.Min;
+        s.FillGeometry(stroke, Ink);
+        return result;
     }
 
     public override bool HitTest(Vector2 point, float tolerance)

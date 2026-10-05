@@ -8,7 +8,7 @@ internal sealed class History
 {
     private const int MaxStates = 200;
 
-    private sealed record State(Annotation[] Annotations, Windows.Foundation.Rect? Crop);
+    private sealed record State(Annotation[] Annotations, Windows.Foundation.Rect? Crop, bool ImageVisible, float ImageOpacity);
 
     private readonly List<State> _states = new();
     private int _index;
@@ -63,9 +63,11 @@ internal sealed class History
         // Clone again so the stored state stays untouched by later edits.
         document.Annotations.AddRange(_states[index].Annotations.Select(a => a.Clone()));
         document.CropOverride = _states[index].Crop;
+        document.ImageVisible = _states[index].ImageVisible;
+        document.ImageOpacity = _states[index].ImageOpacity;
         return true;
     }
 
     private static State Snapshot(Document document) =>
-        new(document.Annotations.Select(a => a.Clone()).ToArray(), document.CropOverride);
+        new(document.Annotations.Select(a => a.Clone()).ToArray(), document.CropOverride, document.ImageVisible, document.ImageOpacity);
 }

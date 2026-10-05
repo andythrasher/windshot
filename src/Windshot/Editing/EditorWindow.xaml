@@ -114,12 +114,19 @@
             <AppBarSeparator />
             <AppBarButton x:Name="PinButton" Label="Pin" Click="Pin_Click" ToolTipService.ToolTip="Pin to screen (Ctrl+P)" />
             <AppBarButton x:Name="CopyTextButton" Label="Copy text" Click="CopyText_Click" ToolTipService.ToolTip="Copy text (Ctrl+Shift+C)" />
+            <AppBarSeparator />
+            <AppBarToggleButton x:Name="LayersButton" Label="Layers" Click="LayersButton_Click" ToolTipService.ToolTip="Layers (L)" />
         </CommandBar>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
 
         <!-- Transparent background makes the whole area hit-testable, not just drawn pixels. -->
         <local:CursorHost
             x:Name="CanvasHost"
-            Grid.Row="1"
             Background="Transparent"
             PointerPressed="Canvas_PointerPressed"
             PointerMoved="Canvas_PointerMoved"
@@ -144,5 +151,63 @@
                 Click="ZoomButton_Click"
                 ToolTipService.ToolTip="Zoom: scroll, Ctrl+= / Ctrl+-, Ctrl+0 to fit, Ctrl+1 for actual pixels. Space+drag or middle-drag to pan. Click to switch between fit and 100%." />
         </local:CursorHost>
+
+            <!-- Layers, topmost first; the screenshot is pinned at the bottom. Rows are built in code. -->
+            <Border
+                x:Name="LayersPanel"
+                Grid.Column="1"
+                Width="272"
+                Visibility="Collapsed"
+                Background="{ThemeResource LayerFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1,1,0,0"
+                CornerRadius="8,0,0,0">
+                <Grid RowSpacing="4" Padding="8,12,8,12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Margin="8,0,0,4" Text="Layers" Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                    <ListView
+                        x:Name="LayerList"
+                        Grid.Row="1"
+                        SelectionMode="Single"
+                        CanDragItems="True"
+                        CanReorderItems="True"
+                        AllowDrop="True" />
+                    <!-- The screenshot: always the bottom layer, so it's not in the reorderable list. -->
+                    <Grid
+                        x:Name="ImageLayerRow"
+                        Grid.Row="2"
+                        Margin="4,0,4,0"
+                        Padding="12,0,4,0"
+                        Height="40"
+                        CornerRadius="4"
+                        ColumnSpacing="10"
+                        Background="Transparent">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ContentPresenter x:Name="ImageLayerIcon" VerticalAlignment="Center" />
+                        <TextBlock x:Name="ImageLayerName" Grid.Column="1" Text="Screenshot" VerticalAlignment="Center" />
+                        <Button x:Name="ImageLayerEye" Grid.Column="2" Width="32" Height="32" Padding="0" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Show or hide" />
+                    </Grid>
+                    <Grid Grid.Row="3" Margin="8,8,4,0" ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Opacity" VerticalAlignment="Center" />
+                        <Slider x:Name="LayerOpacity" Grid.Column="1" Minimum="0" Maximum="100" StepFrequency="1" VerticalAlignment="Center" IsEnabled="False" />
+                        <Button x:Name="DeleteLayerButton" Grid.Column="2" Width="32" Height="32" Padding="0" Background="Transparent" BorderThickness="0" IsEnabled="False" ToolTipService.ToolTip="Delete layer (Delete)" />
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
     </Grid>
 </Window>

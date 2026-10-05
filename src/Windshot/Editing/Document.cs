@@ -48,6 +48,11 @@ internal sealed class Document : IDisposable
     /// <summary>Optional "beautify" style. When set, it's part of what you see and export.</summary>
     public Backdrop? Backdrop { get; set; }
 
+    /// <summary>The screenshot is the bottom layer; hiding it leaves just the annotations, on transparency.</summary>
+    public bool ImageVisible { get; set; } = true;
+
+    public float ImageOpacity { get; set; } = 1;
+
     private float Unit => (float)SourceScale;
 
     private float CornerRadius => Backdrop is null ? 0 : Backdrop.CornerRadius * Unit;
@@ -67,7 +72,7 @@ internal sealed class Document : IDisposable
 
             var image = ImageBounds;
             var bounds = image;
-            foreach (var annotation in Annotations.Where(a => a.ExtendsCanvas))
+            foreach (var annotation in Annotations.Where(a => a.ExtendsCanvas && a.Visible))
             {
                 var a = annotation.Bounds;
                 if (!image.ContainsRect(a))
@@ -88,7 +93,7 @@ internal sealed class Document : IDisposable
     {
         var content = ContentBounds;
         var image = ImageBounds;
-        var overhanging = Annotations.Where(a => a.ExtendsCanvas).Select(a => a.Bounds).Where(b => !b.IsEmpty).ToList();
+        var overhanging = Annotations.Where(a => a.ExtendsCanvas && a.Visible).Select(a => a.Bounds).Where(b => !b.IsEmpty).ToList();
         var fills = new List<(Rect, Windows.UI.Color)>();
         bool allFilled = true;
 
@@ -127,14 +132,17 @@ internal sealed class Document : IDisposable
     }
 
     /// <summary>
-    /// Paints in layers: the backdrop if any; then the card (expansion fill, image, and what
-    /// marks the image itself: blurs, highlights, spotlight dimming), clipped to rounded
-    /// corners when beautified; then every other annotation on top, unclipped, so arrows and
-    /// text stay crisp and can reach out onto the backdrop.
+    /// Paints the backdrop if any, then the layer stack from the bottom up: the card (the
+    /// screenshot with any expansion fill, rounded when beautified), then each visible
+    /// annotation in order. Shapes and text draw over what's beneath them, unclipped, so they
+    /// can reach out onto the backdrop; effects (blur, highlight, spotlight) take everything
+    /// beneath them as their input, like adjustment layers.
     /// </summary>
     /// <param name="skip">An annotation the editor is showing some other way, e.g. text being typed.</param>
     public void Render(CanvasDrawingSession ds, Annotation? skip = null)
     {
+        NumberSteps();
+
         // The card (what beautify rounds and shadows) covers the expansion only when every
         // added side got a fill; otherwise it's just the image, and partial fills sit outside it.
         var fills = ExpansionFills(out bool complete);
@@ -146,36 +154,92 @@ internal sealed class Document : IDisposable
         if (Backdrop is not null)
             DrawBackdrop(ds, Backdrop, card);
 
+        using var context = new LayerContext(ds, card, CornerRadius);
+        var scene = Compose(context, fills, fillsInCard, skip);
         // Everything past the crop is hidden, on screen as in the export (which would only
         // trim it at the canvas edge, leaving it on the beautify backdrop).
-        using var cropped = CropOverride is Rect cropRect ? ds.CreateLayer(1, cropRect) : null;
-        if (!fillsInCard)
-            DrawFills(ds, fills);
-
-        using (var rounded = CornerRadius > 0 ? CanvasGeometry.CreateRoundedRectangle(ds, card, CornerRadius, CornerRadius) : null)
-        using (rounded is null ? null : ds.CreateLayer(1, rounded))
-        {
-            if (fillsInCard)
-                DrawFills(ds, fills);
-            ds.DrawImage(Image, ImageBounds, ImageBounds, 1, ImageInterpolation);
-
-            foreach (var blur in Annotations.OfType<BlurAnnotation>())
-                blur.Draw(ds);
-            foreach (var highlight in Annotations.OfType<HighlighterAnnotation>())
-                highlight.Draw(ds);
-            SpotlightAnnotation.DrawDimming(ds, card, Annotations.OfType<SpotlightAnnotation>().ToList());
-        }
-
-        int step = 0;
-        foreach (var annotation in Annotations.Where(a => a is { IsAreaEffect: false } and not HighlighterAnnotation))
-        {
-            if (annotation is StepAnnotation marker)
-                marker.Number = ++step;
-            if (annotation != skip)
-                annotation.Draw(ds);
-        }
+        using (CropOverride is Rect cropRect ? ds.CreateLayer(1, cropRect) : null)
+            ds.DrawImage(scene);
     }
 
+    /// <summary>The layer stack as one image, built bottom-up from command lists and effects.</summary>
+    private ICanvasImage Compose(LayerContext context, List<(Rect Band, Windows.UI.Color Color)> fills, bool fillsInCard, Annotation? skip)
+    {
+        var bottom = context.NewList();
+        using (var s = bottom.CreateDrawingSession())
+        {
+            if (!fillsInCard)
+                DrawFills(s, fills);
+            using var rounded = context.CardShape(s);
+            using (rounded is null ? null : s.CreateLayer(1, rounded))
+            {
+                if (fillsInCard)
+                    DrawFills(s, fills);
+                if (ImageVisible)
+                    s.DrawImage(Image, ImageBounds, ImageBounds, ImageOpacity, ImageInterpolation);
+            }
+        }
+
+        var visible = Annotations.Where(a => a.Visible && a != skip).ToList();
+        var spotlights = visible.OfType<SpotlightAnnotation>().ToList();
+        ICanvasImage below = bottom;
+
+        // Consecutive shapes and text share one command list; an effect starts a new stage.
+        CanvasCommandList? stage = null;
+        CanvasDrawingSession? session = null;
+        void EndStage()
+        {
+            if (session is null)
+                return;
+            session.Dispose();
+            session = null;
+            below = stage!;
+        }
+
+        foreach (var annotation in visible)
+        {
+            if (annotation.IsEffect)
+            {
+                EndStage();
+                // Spotlights act together, at the topmost one (see SpotlightAnnotation).
+                var applied = annotation switch
+                {
+                    SpotlightAnnotation spot => spot == spotlights[^1] ? SpotlightAnnotation.Dim(context, below, spotlights) : below,
+                    _ => annotation.ApplyTo(context, below),
+                };
+                if (applied != below && annotation.Opacity < 1)
+                    applied = context.Blend(below, applied, annotation.Opacity);
+                below = applied;
+                continue;
+            }
+
+            if (session is null)
+            {
+                stage = context.NewList();
+                session = stage.CreateDrawingSession();
+                session.DrawImage(below);
+            }
+            if (annotation.Opacity < 1)
+            {
+                using (session.CreateLayer(annotation.Opacity))
+                    annotation.Draw(session);
+            }
+            else
+            {
+                annotation.Draw(session);
+            }
+        }
+        EndStage();
+        return below;
+    }
+
+    /// <summary>Steps count 1, 2, 3… in the order they were placed, whatever their stacking; hidden ones are skipped.</summary>
+    internal void NumberSteps()
+    {
+        int number = 0;
+        foreach (var step in Annotations.OfType<StepAnnotation>().Where(s => s.Visible).OrderBy(s => s.Created))
+            step.Number = ++number;
+    }
     private static void DrawFills(CanvasDrawingSession ds, List<(Rect Band, Windows.UI.Color Color)> fills)
     {
         // Bands share edges with the image; antialiasing would leave hairline seams.
@@ -218,11 +282,12 @@ internal sealed class Document : IDisposable
     public Annotation? HitTest(Vector2 point, float tolerance, bool includeAreaEffects)
     {
         // Topmost first: regular annotations paint above area effects.
-        // Nothing outside the crop can be grabbed: it isn't shown.
+        // Nothing outside the crop can be grabbed, nor anything hidden: they aren't shown.
         if (CropOverride is Rect crop && !crop.Contains(point.ToPoint()))
             return null;
-        var ordered = Annotations.Where(a => !a.IsAreaEffect).Reverse()
-            .Concat(includeAreaEffects ? Annotations.Where(a => a.IsAreaEffect).Reverse() : []);
+        var shown = Annotations.Where(a => a.Visible).ToList();
+        var ordered = shown.Where(a => !a.IsAreaEffect).AsEnumerable().Reverse()
+            .Concat(includeAreaEffects ? shown.Where(a => a.IsAreaEffect).AsEnumerable().Reverse() : []);
         return ordered.FirstOrDefault(a => a.HitTest(point, tolerance));
     }
 
