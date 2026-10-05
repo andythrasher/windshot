@@ -96,20 +96,11 @@ header.site nav a:hover { color: var(--text); }
 
 .cta { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; }
 
-.button {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 22px;
-  border-radius: 8px;
-  background: linear-gradient(120deg, var(--ocean), var(--lavender));
-  color: #fff;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.button:hover { filter: brightness(1.08); }
-.button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+/* Microsoft's official Store badge, unaltered. */
+.store-badge { display: inline-block; border-radius: 6px; line-height: 0; }
+.store-badge img { width: 200px; height: auto; }
+.store-badge:hover img { filter: brightness(1.15); }
+.store-badge:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
 .note { color: var(--muted); font-size: 15px; }
 
