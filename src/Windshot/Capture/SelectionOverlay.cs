@@ -29,7 +29,10 @@ internal sealed class SelectionOverlay : Form
     private readonly string? _hint;
     private readonly Font? _hintFont;
     private Point? _dragStart;
+    /// <summary>The selection in desktop pixels; it can span monitors, and this one shows its part.</summary>
     private Rectangle _selection;
+    /// <summary>Whether this monitor shows the selection's size label (only one of them does).</summary>
+    private bool _showsSelectionLabel = true;
     /// <summary>The window under the cursor, in desktop coordinates; what a click captures.</summary>
     private Rectangle? _hover;
     /// <summary>The window behind <see cref="_hover"/>, unless that's a whole monitor.</summary>
@@ -79,8 +82,31 @@ internal sealed class SelectionOverlay : Form
     public event Action<SelectionOverlay, Rectangle, WindowRegion?>? Selected;
     public event Action? Cancelled;
 
+    /// <summary>
+    /// A drag that started here changed the selection (desktop pixels), which can reach into
+    /// other monitors. Without a handler, only this monitor shows it.
+    /// </summary>
+    public event Action<Rectangle>? SelectionChanged;
+
+    /// <summary>The cursor moved during a drag that started here; it may be over another monitor.</summary>
+    public event Action<Point>? DragCursorMoved;
+
     /// <summary>Device pixels per DIP on this monitor.</summary>
     public double MonitorScale { get; }
+
+    public Rectangle MonitorBounds => _monitorBounds;
+
+    /// <summary>Shows this monitor's part of a selection, with its size label if <paramref name="label"/>.</summary>
+    public void ShowSelection(Rectangle desktop, bool label)
+    {
+        _selection = desktop;
+        _showsSelectionLabel = label;
+        RefreshLit();
+    }
+
+    /// <summary>Shows the magnifier at a desktop point while it's over this monitor, else hides it.</summary>
+    public void ShowCursor(Point desktop) =>
+        UpdateCursorAids(_monitorBounds.Contains(desktop) ? new Point(desktop.X - _monitorBounds.X, desktop.Y - _monitorBounds.Y) : null);
 
     protected override CreateParams CreateParams
     {
@@ -242,8 +268,11 @@ internal sealed class SelectionOverlay : Form
         UpdateCursorAids(null); // the cursor moved to another monitor's overlay
     }
 
-    /// <summary>An area shown at full brightness, outlined, with its size (which may be larger than the visible part).</summary>
-    private readonly record struct Lit(Rectangle Area, Size Size, Color Border, int Thickness);
+    /// <summary>
+    /// An area shown at full brightness, outlined, with its size (which may be larger than the
+    /// visible part) in a label when <paramref name="Label"/>.
+    /// </summary>
+    private readonly record struct Lit(Rectangle Area, Size Size, Color Border, int Thickness, bool Label = true);
 
     /// <summary>What's lit right now: the selection while dragging, else the window under the cursor.</summary>
     private Lit? CurrentLit()
@@ -251,7 +280,12 @@ internal sealed class SelectionOverlay : Form
         // Until the mouse has clearly moved, a press is still a click on the hovered window.
         bool dragging = _selection.Width >= MinSelection || _selection.Height >= MinSelection;
         if (dragging)
-            return _selection.Width > 0 && _selection.Height > 0 ? new Lit(_selection, _selection.Size, Color.White, 1) : null;
+        {
+            var visible = _selection;
+            visible.Offset(-_monitorBounds.X, -_monitorBounds.Y);
+            visible.Intersect(ClientRectangle);
+            return visible.Width > 0 && visible.Height > 0 ? new Lit(visible, _selection.Size, Color.White, 1, _showsSelectionLabel) : null;
+        }
         if (!_rulerOn && HoverClientRect() is Rectangle window)
             return new Lit(window, _hover!.Value.Size, WindowHighlight, (int)Math.Ceiling(2 * MonitorScale));
         return null;
@@ -262,7 +296,7 @@ internal sealed class SelectionOverlay : Form
     /// through here so they can't disagree; when they did, stale outlines and labels stayed
     /// on screen (e.g. a label wider than a narrow selection).
     /// </summary>
-    private Rectangle LitBounds(Lit lit) => Rectangle.Union(lit.Area, LabelBounds(lit, out _));
+    private Rectangle LitBounds(Lit lit) => lit.Label ? Rectangle.Union(lit.Area, LabelBounds(lit, out _)) : lit.Area;
 
     private Rectangle LabelBounds(Lit lit, out string label)
     {
@@ -300,6 +334,8 @@ internal sealed class SelectionOverlay : Form
         using (var pen = new Pen(lit.Border, lit.Thickness) { Alignment = PenAlignment.Inset })
             g.DrawRectangle(pen, area.X, area.Y, area.Width - 1, area.Height - 1);
 
+        if (!lit.Label)
+            return;
         var labelRect = LabelBounds(lit, out string label);
         using (var bg = new SolidBrush(Color.FromArgb(200, 32, 32, 32)))
             g.FillRectangle(bg, labelRect);
@@ -382,17 +418,24 @@ internal sealed class SelectionOverlay : Form
 
     protected override void OnMouseMove(MouseEventArgs e)
     {
-        UpdateCursorAids(e.Location);
         if (_dragStart is not Point start)
         {
+            UpdateCursorAids(e.Location);
             UpdateHover(e.Location);
             return;
         }
 
+        // This window has the mouse captured for the whole drag, so the cursor can be over
+        // another monitor; the selection follows it there.
         var rect = Rectangle.FromLTRB(
             Math.Min(start.X, e.X), Math.Min(start.Y, e.Y),
             Math.Max(start.X, e.X), Math.Max(start.Y, e.Y));
-        SetSelection(Rectangle.Intersect(rect, ClientRectangle));
+        rect.Offset(_monitorBounds.Location);
+        SetSelection(Rectangle.Intersect(rect, _virtualBounds));
+        if (DragCursorMoved is { } moved)
+            moved(ToDesktop(e.Location));
+        else
+            UpdateCursorAids(ClientRectangle.Contains(e.Location) ? e.Location : null);
     }
 
     protected override void OnMouseUp(MouseEventArgs e)
@@ -403,9 +446,7 @@ internal sealed class SelectionOverlay : Form
         _dragStart = null;
         if (_selection.Width >= MinSelection && _selection.Height >= MinSelection)
         {
-            var desktopRect = _selection;
-            desktopRect.Offset(_monitorBounds.Location);
-            Selected?.Invoke(this, desktopRect, null);
+            Selected?.Invoke(this, _selection, null);
         }
         else if (_rulerOn)
         {
@@ -453,10 +494,12 @@ internal sealed class SelectionOverlay : Form
     protected override bool IsInputKey(Keys keyData) =>
         keyData is Keys.Left or Keys.Right or Keys.Up or Keys.Down || base.IsInputKey(keyData);
 
-    private void SetSelection(Rectangle rect)
+    private void SetSelection(Rectangle desktop)
     {
-        _selection = rect;
-        RefreshLit();
+        if (SelectionChanged is { } changed)
+            changed(desktop);
+        else
+            ShowSelection(desktop, label: true);
     }
 
     protected override void Dispose(bool disposing)

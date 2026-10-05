@@ -40,7 +40,14 @@ internal static class CaptureSession
         // Taken right after the snapshot, so the clickable windows match the frozen picture.
         var windows = WindowFinder.VisibleWindows();
         Log.Write($"Snapshot {snapshot.VirtualBounds} and {windows.Count} windows in {stopwatch.ElapsedMilliseconds} ms");
-        _overlays = new List<SelectionOverlay>();
+        var overlays = _overlays = new List<SelectionOverlay>();
+
+        // The monitor with most of an area: its scale is the capture's, and the editor opens there.
+        SelectionOverlay MostOf(Rectangle area) => overlays.MaxBy(o =>
+        {
+            var part = Rectangle.Intersect(o.MonitorBounds, area);
+            return (long)part.Width * part.Height;
+        })!;
 
         void End()
         {
@@ -55,16 +62,31 @@ internal static class CaptureSession
             snapshot.Dispose();
         }
 
-        foreach (var screen in Screen.AllScreens)
+        foreach (var monitor in Monitors.All())
         {
-            var overlay = new SelectionOverlay(snapshot, screen.Bounds, windows, hint);
-            overlay.Selected += (source, desktopRect, window) =>
+            var overlay = new SelectionOverlay(snapshot, monitor.Bounds, windows, hint);
+            // A drag can cross monitors: each shows its part, and the one with the selection's
+            // bottom-right corner (where the label sits) shows the size.
+            overlay.SelectionChanged += selection =>
             {
-                Log.Write($"Selected {desktopRect} at scale {source.MonitorScale}" + (window is { } w ? $", a window with {w.Corners} corners" : ""));
+                var corner = new Point(selection.Right - 1, selection.Bottom - 1);
+                var labelled = overlays.FirstOrDefault(o => o.MonitorBounds.Contains(corner)) ?? MostOf(selection);
+                foreach (var o in overlays)
+                    o.ShowSelection(selection, o == labelled);
+            };
+            overlay.DragCursorMoved += cursor =>
+            {
+                foreach (var o in overlays)
+                    o.ShowCursor(cursor);
+            };
+            overlay.Selected += (_, desktopRect, window) =>
+            {
+                double scale = MostOf(desktopRect).MonitorScale;
+                Log.Write($"Selected {desktopRect} at scale {scale}" + (window is { } w ? $", a window with {w.Corners} corners" : ""));
                 Action then;
                 try
                 {
-                    then = prepare(snapshot, desktopRect, source.MonitorScale, window);
+                    then = prepare(snapshot, desktopRect, scale, window);
                 }
                 finally
                 {

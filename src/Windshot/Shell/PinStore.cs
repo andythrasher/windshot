@@ -156,13 +156,13 @@ internal static class PinStore
     private static Point OnScreen(Rectangle bounds)
     {
         const int MinVisible = 48;
-        foreach (var screen in Screen.AllScreens)
+        foreach (var monitor in Monitors.All())
         {
-            var visible = Rectangle.Intersect(bounds, screen.WorkingArea);
+            var visible = Rectangle.Intersect(bounds, monitor.WorkingArea);
             if (visible.Width >= Math.Min(MinVisible, bounds.Width) && visible.Height >= Math.Min(MinVisible, bounds.Height))
                 return bounds.Location;
         }
-        var main = Screen.PrimaryScreen?.WorkingArea ?? new Rectangle(0, 0, 800, 600);
+        var main = Monitors.Primary?.WorkingArea ?? new Rectangle(0, 0, 800, 600);
         return new Point(main.X + MinVisible, main.Y + MinVisible);
     }
 }

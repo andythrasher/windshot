@@ -147,8 +147,14 @@ public sealed partial class EditorWindow : Window
 
     private void SizeToCapture(CapturedImage capture)
     {
-        // Aim to show the capture at 1:1 physical pixels, capped to most of the work area.
-        var workArea = DisplayArea.GetFromPoint(new PointInt32(0, 0), DisplayAreaFallback.Primary).WorkArea;
+        // Open on the monitor the capture came from (most of it, if it spans monitors), showing
+        // it at 1:1 physical pixels, capped to most of that monitor's work area.
+        var source = capture.DesktopBounds;
+        var workArea = DisplayArea.GetFromRect(
+            new RectInt32(source.X, source.Y, source.Width, source.Height), DisplayAreaFallback.Primary).WorkArea;
+        // Move onto that monitor before sizing: crossing to a monitor with a different scale
+        // rescales the window, which would undo a size set first.
+        AppWindow.Move(new PointInt32(workArea.X, workArea.Y));
         int chromeWidth = (int)(2 * ViewPadding * capture.Scale + 120);
         int chromeHeight = (int)((2 * ViewPadding + 90) * capture.Scale);
         // The minimum keeps the whole toolbar visible.
