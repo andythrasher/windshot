@@ -1541,17 +1541,36 @@ public sealed partial class EditorWindow : Window
 
     private readonly TextBlock _beautifyLabel = new() { Text = "Beautify", FontSize = 14, Visibility = Visibility.Collapsed, VerticalAlignment = VerticalAlignment.Center };
 
+    // The icon is swapped only when it changes: PointerEntered bubbles up from the icon itself,
+    // so swapping on every one swaps the icon out from under the pointer again and again, and a
+    // click pressed on an icon that's gone by the release doesn't count.
     private void BindIcon(AppBarButton button, string icon)
     {
-        button.Icon = Shell.FluentIcons.Create(icon, filled: false);
-        button.PointerEntered += (_, _) => button.Icon = Shell.FluentIcons.Create(icon, filled: button.IsEnabled);
-        button.PointerExited += (_, _) => button.Icon = Shell.FluentIcons.Create(icon, filled: false);
+        bool? shown = null;
+        void Show(bool filled)
+        {
+            if (shown == filled)
+                return;
+            shown = filled;
+            button.Icon = Shell.FluentIcons.Create(icon, filled);
+        }
+        button.PointerEntered += (_, _) => Show(button.IsEnabled);
+        button.PointerExited += (_, _) => Show(false);
+        Show(false);
     }
 
     private void BindIcon(AppBarToggleButton button, string icon)
     {
         bool hovered = false;
-        void Refresh() => button.Icon = Shell.FluentIcons.Create(icon, filled: hovered || button.IsChecked == true);
+        bool? shown = null;
+        void Refresh()
+        {
+            bool filled = hovered || button.IsChecked == true;
+            if (shown == filled)
+                return;
+            shown = filled;
+            button.Icon = Shell.FluentIcons.Create(icon, filled);
+        }
         button.PointerEntered += (_, _) => { hovered = true; Refresh(); };
         button.PointerExited += (_, _) => { hovered = false; Refresh(); };
         button.Checked += (_, _) => Refresh();
