@@ -125,31 +125,6 @@ internal abstract class TwoPointAnnotation : Annotation
     }
 }
 
-internal sealed class RectangleAnnotation : BoxAnnotation
-{
-    public RectangleAnnotation(Vector2 start, Color color, int weight, float unit)
-        : base(start, color, weight, unit)
-    {
-    }
-
-    public float Thickness => (1 + Weight) * Unit;
-
-    public override Rect Bounds => Shape.Inflate(Thickness / 2);
-
-    public override void Draw(CanvasDrawingSession ds) =>
-        ds.DrawRoundedRectangle(Shape, Thickness / 2, Thickness / 2, Color, Thickness);
-
-    public override bool HitTest(Vector2 point, float tolerance)
-    {
-        // Only the stroke is grabbable, so you can still click things inside the rectangle.
-        float reach = Thickness / 2 + tolerance;
-        var outer = Shape.Inflate(reach);
-        var inner = Shape.Inflate(-reach);
-        var p = point.ToPoint();
-        return outer.Contains(p) && (inner.IsEmpty || !inner.Contains(p));
-    }
-}
-
 /// <summary>A two-point annotation that is an axis-aligned box, resizable from any corner.</summary>
 internal abstract class BoxAnnotation : TwoPointAnnotation
 {

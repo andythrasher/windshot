@@ -27,6 +27,10 @@ public sealed partial class EditorWindow
         Show(FontContainer, subject == Tool.Text);
         Show(TextBackgroundButton, subject == Tool.Text);
         Show(PixelateButton, subject == Tool.Blur);
+        foreach (var button in ShapeButtons)
+            Show(button, subject == Tool.Rectangle);
+        Show(ShapeSeparator, subject == Tool.Rectangle);
+        Show(FillButton, subject == Tool.Rectangle);
 
         OptionsHint.Text = subject == Tool.Crop
             ? "Drag the edges or draw a new area. Enter applies, Esc cancels."

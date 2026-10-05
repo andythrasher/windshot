@@ -13,9 +13,30 @@ internal static partial class FluentIcons
     /// <param name="filled">The filled style, used for the active tool and on hover.</param>
     public static PathIcon Create(string name, bool filled)
     {
-        var (regular, solid) = Paths[name];
+        var (regular, solid) = Paths.TryGetValue(name, out var paths) ? paths : Drawn[name];
         // A geometry can only belong to one element, so each icon gets a freshly parsed one.
         var data = (Geometry)XamlBindingHelper.ConvertValue(typeof(Geometry), filled ? solid : regular);
         return new PathIcon { Data = data };
     }
+
+    /// <summary>
+    /// Shape icons drawn for Windshot on the same 20x20 grid, with the same 1-unit lines as
+    /// the Fluent icons. Outlines are rings: the default even-odd fill leaves their middles empty.
+    /// </summary>
+    private static readonly Dictionary<string, (string Regular, string Filled)> Drawn = new()
+    {
+        ["shape_ellipse"] = (
+            "M2,10 A8,6 0 1 1 18,10 A8,6 0 1 1 2,10 Z M3,10 A7,5 0 1 0 17,10 A7,5 0 1 0 3,10 Z",
+            "M2,10 A8,6 0 1 1 18,10 A8,6 0 1 1 2,10 Z"),
+        ["shape_triangle"] = (
+            "M10,3 L18,17 L2,17 Z M10,5.02 L3.72,16 L16.28,16 Z",
+            "M10,3 L18,17 L2,17 Z"),
+        ["shape_polygon"] = (
+            "M10,2.5 L17.5,8 L15,17.5 L5,17.5 L2.5,8 Z M10,3.74 L3.66,8.39 L5.77,16.5 L14.23,16.5 L16.34,8.39 Z",
+            "M10,2.5 L17.5,8 L15,17.5 L5,17.5 L2.5,8 Z"),
+        // A shape with its inside filled in.
+        ["shape_fill"] = (
+            "M3,4.5 H17 V15.5 H3 Z M4,5.5 V14.5 H16 V5.5 Z M6,7.5 H14 V12.5 H6 Z",
+            "M3,4.5 H17 V15.5 H3 Z"),
+    };
 }

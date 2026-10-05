@@ -108,6 +108,8 @@ public sealed partial class EditorWindow : Window
         _highlightColor = Themes.InSet(ColorExtensions.TryParseHex(prefs.Editor.HighlighterColor, out var highlight) ? highlight : _palette[2].Color, _palette);
         _pixelate = prefs.Editor.Pixelate;
         _highlightBlend = prefs.Editor.HighlighterBlend;
+        _shapeKind = prefs.Editor.Shape;
+        _fillShapes = prefs.Editor.FillShapes;
         _textBoxed = prefs.Editor.TextBackground;
         _font = string.IsNullOrWhiteSpace(prefs.Editor.Font) ? TextAnnotation.DefaultFontFamily : prefs.Editor.Font;
         _beautify = prefs.Beautify.OnByDefault;
@@ -121,6 +123,7 @@ public sealed partial class EditorWindow : Window
         InitializeColorSets();
         InitializeFonts();
         InitializeBlend();
+        InitializeShapes();
         InitializeMoreColors();
         BuildSwatches();
         BuildBackdropControls();
@@ -148,6 +151,8 @@ public sealed partial class EditorWindow : Window
         prefs.Editor.HighlighterColor = _highlightColor.ToHex();
         prefs.Editor.Pixelate = _pixelate;
         prefs.Editor.HighlighterBlend = _highlightBlend;
+        prefs.Editor.Shape = _shapeKind;
+        prefs.Editor.FillShapes = _fillShapes;
         prefs.Editor.TextBackground = _textBoxed;
         prefs.Editor.Font = _font;
         prefs.Editor.ShowLayers = _layersOpen;
@@ -211,6 +216,7 @@ public sealed partial class EditorWindow : Window
     private void SetTool(Tool tool)
     {
         CommitTextEdit();
+        FinishPolygon();
         // Leaving the crop tool applies the crop; entering it shows the whole canvas to crop from.
         if (_tool == Tool.Crop && tool != Tool.Crop)
             ApplyCrop();
@@ -235,6 +241,7 @@ public sealed partial class EditorWindow : Window
             SyncBlend();
             SyncTextBackground();
             SyncFont();
+            SyncShapes();
             SyncColor();
         }
         SyncOptions();
@@ -268,6 +275,7 @@ public sealed partial class EditorWindow : Window
         SyncBlend();
         SyncTextBackground();
         SyncFont();
+        SyncShapes();
         SyncOptions();
         Canvas.Invalidate();
     }
@@ -493,6 +501,12 @@ public sealed partial class EditorWindow : Window
     {
         if (_drag is not null)
             return;
+        if (_polygonDraft is not null && undo)
+        {
+            UndoPolygonCorner();
+            return;
+        }
+        FinishPolygon();
         if (_tool == Tool.Crop)
         {
             // While cropping, undo just drops the crop being adjusted.
@@ -554,6 +568,9 @@ public sealed partial class EditorWindow : Window
             case VirtualKey.N when !ctrl: SetTool(Tool.Step); break;
             case VirtualKey.S when !ctrl: SetTool(Tool.Spotlight); break;
             case VirtualKey.H when !ctrl: SetTool(Tool.Highlighter); break;
+            case VirtualKey.F when !ctrl && FillButton.Visibility == Visibility.Visible:
+                SetFill(FillButton.IsChecked != true);
+                break;
             case VirtualKey.P when !ctrl && PixelateButton.Visibility == Visibility.Visible:
                 SetPixelate(PixelateButton.IsChecked != true);
                 break;
@@ -635,6 +652,7 @@ public sealed partial class EditorWindow : Window
             using var dashed = new CanvasStrokeStyle { DashStyle = CanvasDashStyle.Dash };
             ds.DrawRectangle(new Windows.Foundation.Rect(_textDrag.Start.ToPoint(), _textDrag.End.ToPoint()), AccentColor, 1.5f * px, dashed);
         }
+        DrawPolygonDraft(ds);
     }
 
     private void DrawSelection(CanvasDrawingSession ds, Annotation annotation)
@@ -728,6 +746,12 @@ public sealed partial class EditorWindow : Window
         var p = ToDocument(point.Position.ToVector2());
         float tolerance = HitTolerance / _view.M11;
 
+        if (_polygonDraft is not null)
+        {
+            PolygonPressed(p);
+            return;
+        }
+
         if (_tool == Tool.Crop)
         {
             CropPressed(e, p);
@@ -759,6 +783,12 @@ public sealed partial class EditorWindow : Window
             return;
         }
 
+        if (_tool == Tool.Rectangle && _shapeKind == ShapeKind.Polygon)
+        {
+            StartPolygon(p);
+            return;
+        }
+
         int weight = _toolWeights[_tool];
         if (_tool == Tool.Text)
         {
@@ -785,7 +815,7 @@ public sealed partial class EditorWindow : Window
             Tool.Blur => new BlurAnnotation(p, _pixelate, weight, Unit),
             Tool.Spotlight => new SpotlightAnnotation(p, weight, Unit),
             Tool.Highlighter => new HighlighterAnnotation(p, _highlightColor, weight, Unit) { Blend = _highlightBlend },
-            _ => new RectangleAnnotation(p, _color, weight, Unit),
+            _ => new ShapeAnnotation(p, _shapeKind, _color, weight, Unit) { Filled = _fillShapes },
         };
         AddLayer(shape);
         Select(shape);
@@ -853,6 +883,12 @@ public sealed partial class EditorWindow : Window
         }
 
         var p = ToDocument(e.GetCurrentPoint(Canvas).Position.ToVector2());
+
+        if (_polygonDraft is not null)
+        {
+            _polygonCursor = p;
+            Canvas.Invalidate();
+        }
 
         if (_cropDrag is not null && e.Pointer.PointerId == _cropDrag.PointerId)
         {
@@ -939,6 +975,12 @@ public sealed partial class EditorWindow : Window
 
     private void Canvas_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
     {
+        if (_polygonDraft is not null)
+        {
+            FinishPolygon();
+            e.Handled = true;
+            return;
+        }
         var p = ToDocument(e.GetPosition(Canvas).ToVector2());
         if (_document.HitTest(p, HitTolerance / _view.M11, includeAreaEffects: false) is TextAnnotation text)
         {
@@ -1045,6 +1087,13 @@ public sealed partial class EditorWindow : Window
     {
         if (_editingText is not null || e.OriginalSource is TextBox)
             return;
+        if (_polygonDraft is not null && e.Key is VirtualKey.Enter or VirtualKey.Escape)
+        {
+            // Either finishes the polygon being clicked out.
+            FinishPolygon();
+            e.Handled = true;
+            return;
+        }
         if (_tool == Tool.Crop && e.Key is VirtualKey.Enter or VirtualKey.Escape)
         {
             // Enter applies the crop (by leaving the tool); Esc puts it back as it was.

@@ -198,7 +198,7 @@ public sealed partial class EditorWindow
         row.Children.Clear();
 
         var icon = new Grid { Width = 22, Height = 22, VerticalAlignment = VerticalAlignment.Center };
-        icon.Children.Add(Shell.FluentIcons.Create(ToolIcons[ToolFor(annotation).ToString()], filled: false));
+        icon.Children.Add(Shell.FluentIcons.Create(LayerIcon(annotation), filled: false));
         if (!annotation.IsEffect || annotation is HighlighterAnnotation)
         {
             icon.Children.Add(new Ellipse
@@ -256,7 +256,17 @@ public sealed partial class EditorWindow
         StepAnnotation step => $"Step {step.Number}",
         SpotlightAnnotation => "Spotlight",
         HighlighterAnnotation => "Highlight",
-        _ => "Rectangle",
+        ShapeAnnotation shape => shape.Kind.ToString(),
+        PolygonAnnotation => "Polygon",
+        _ => "Shape",
+    };
+
+    /// <summary>A layer's icon: its tool's, or for shapes, its own shape.</summary>
+    private static string LayerIcon(Annotation annotation) => annotation switch
+    {
+        ShapeAnnotation shape => ShapeIcon(shape.Kind),
+        PolygonAnnotation => ShapeIcon(ShapeKind.Polygon),
+        _ => ToolIcons[ToolFor(annotation).ToString()],
     };
 
     /// <summary>Swaps a row's name for a text box. Enter or clicking away keeps it, Esc cancels, and an empty name goes back to the default.</summary>

@@ -25,7 +25,7 @@ internal sealed class Settings
         ReadCommentHandling = JsonCommentHandling.Skip,
         AllowTrailingCommas = true,
         PropertyNameCaseInsensitive = true,
-        Converters = { new JsonStringEnumConverter<Tool>(), new JsonStringEnumConverter<HighlightBlend>() },
+        Converters = { new JsonStringEnumConverter<Tool>(), new JsonStringEnumConverter<HighlightBlend>(), new JsonStringEnumConverter<ShapeKind>() },
     });
 
     public HotkeySettings Hotkeys { get; set; } = new();
@@ -88,6 +88,12 @@ internal sealed class Settings
 
         /// <summary>How highlights mix with what's under them: Multiply, Darken, Overlay or Screen.</summary>
         public HighlightBlend HighlighterBlend { get; set; } = HighlightBlend.Multiply;
+
+        /// <summary>The shape tool's shape: Rectangle, Ellipse, Triangle or Polygon.</summary>
+        public ShapeKind Shape { get; set; } = ShapeKind.Rectangle;
+
+        /// <summary>Fill new shapes with their color.</summary>
+        public bool FillShapes { get; set; }
         public bool TextBackground { get; set; }
 
         /// <summary>The font new text uses, by family name, e.g. "Segoe UI Variable Display" or "Consolas".</summary>
