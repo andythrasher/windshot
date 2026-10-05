@@ -83,11 +83,14 @@ Windshot lives in the notification area and starts in a blink. It can start with
 
 1.1:
 • New shapes: ellipses, triangles and polygons, outlined or filled. Fill a shape to cover something up.
+• Rotate any annotation with the handle above it.
+• Hold Shift for squares and circles, arrows at 45° angles, and straight moves.
 • Highlighter blend modes; the default now works like real highlighter ink, so text stays dark.
 • A brighter golden yellow.
 • An options bar under the toolbar with the settings for what you're drawing or have selected.
 • With the text tool, a click moves text and a double-click edits it.
 • Supporter extras: more editor themes, color sets, a color wheel, fonts and stickers, with a one-time purchase.
+• Fixed: toolbar buttons sometimes missing a click.
 
 1.0.1:
 • Works with monitors you connect or disconnect while Windshot is running.
