@@ -106,7 +106,8 @@
                     </StackPanel>
                     <DropDownButton.Flyout>
                         <!-- Free to extend past the window's bottom: confined to the window, it
-                             would slide up over the toolbar once the color wheel is open. -->
+                             would slide up over the toolbar once the color wheel is open, and
+                             open behind the "…" menu, which is a window of its own. -->
                         <Flyout x:Name="ColorFlyout" Placement="Bottom" ShouldConstrainToRootBounds="False">
                             <StackPanel x:Name="ColorFlyoutContent" Spacing="12">
                                 <!-- Switching sets recolors what's drawn to the new set's matching colors. -->
@@ -144,7 +145,8 @@
                     IsCheckedChanged="BeautifyButton_IsCheckedChanged"
                     ToolTipService.ToolTip="Beautify: gradient backdrop, rounded corners and shadow">
                     <ToggleSplitButton.Flyout>
-                        <Flyout Placement="Bottom">
+                        <!-- Unconfined like the color menu, so it opens above the "…" menu too. -->
+                        <Flyout Placement="Bottom" ShouldConstrainToRootBounds="False">
                             <StackPanel x:Name="BeautifyFlyoutContent" Width="236" Spacing="8">
                                 <TextBlock Text="Backdrop" Style="{ThemeResource BodyStrongTextBlockStyle}" />
                                 <VariableSizedWrapGrid x:Name="BackdropSwatches" Orientation="Horizontal" MaximumRowsOrColumns="4" />
