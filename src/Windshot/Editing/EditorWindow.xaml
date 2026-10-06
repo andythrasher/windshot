@@ -27,12 +27,12 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <Grid.Resources>
-                <!-- Compact, Snipping Tool-sized buttons; the defaults leave room for labels. -->
+                <!-- Icon-only buttons, no wider than their highlight; the defaults leave room for labels. -->
                 <Style TargetType="AppBarButton" BasedOn="{StaticResource DefaultAppBarButtonStyle}">
-                    <Setter Property="Width" Value="44" />
+                    <Setter Property="Width" Value="36" />
                 </Style>
                 <Style TargetType="AppBarToggleButton" BasedOn="{StaticResource DefaultAppBarToggleButtonStyle}">
-                    <Setter Property="Width" Value="44" />
+                    <Setter Property="Width" Value="36" />
                 </Style>
             </Grid.Resources>
         <CommandBar
@@ -102,11 +102,11 @@
             IsDynamicOverflowEnabled="True"
             DynamicOverflowItemsChanging="Toolbar_DynamicOverflowItemsChanging">
             <!-- The shape tool's shapes, icon-only like the tools; icons are assigned in code. -->
-            <AppBarToggleButton x:Name="ShapeRectangleButton" Width="44" LabelPosition="Collapsed" Label="Rectangle" Click="ShapeButton_Click" Tag="Rectangle" ToolTipService.ToolTip="Rectangle (Shift: square)" />
-            <AppBarToggleButton x:Name="ShapeEllipseButton" Width="44" LabelPosition="Collapsed" Label="Ellipse" Click="ShapeButton_Click" Tag="Ellipse" ToolTipService.ToolTip="Ellipse (Shift: circle)" />
-            <AppBarToggleButton x:Name="ShapeTriangleButton" Width="44" LabelPosition="Collapsed" Label="Triangle" Click="ShapeButton_Click" Tag="Triangle" ToolTipService.ToolTip="Triangle (Shift: equal sides)" />
-            <AppBarToggleButton x:Name="ShapePolygonButton" Width="44" LabelPosition="Collapsed" Label="Polygon" Click="ShapeButton_Click" Tag="Polygon" ToolTipService.ToolTip="Polygon: click each corner; click the first corner, double-click or press Enter to finish. Shift keeps sides at 45° steps." />
-            <AppBarToggleButton x:Name="ShapeStickerButton" Width="44" LabelPosition="Collapsed" Label="Sticker" Click="ShapeButton_Click" Tag="Sticker" ToolTipService.ToolTip="Stickers: pick one, then click to place it or drag to size it">
+            <AppBarToggleButton x:Name="ShapeRectangleButton" Width="36" LabelPosition="Collapsed" Label="Rectangle" Click="ShapeButton_Click" Tag="Rectangle" ToolTipService.ToolTip="Rectangle (Shift: square)" />
+            <AppBarToggleButton x:Name="ShapeEllipseButton" Width="36" LabelPosition="Collapsed" Label="Ellipse" Click="ShapeButton_Click" Tag="Ellipse" ToolTipService.ToolTip="Ellipse (Shift: circle)" />
+            <AppBarToggleButton x:Name="ShapeTriangleButton" Width="36" LabelPosition="Collapsed" Label="Triangle" Click="ShapeButton_Click" Tag="Triangle" ToolTipService.ToolTip="Triangle (Shift: equal sides)" />
+            <AppBarToggleButton x:Name="ShapePolygonButton" Width="36" LabelPosition="Collapsed" Label="Polygon" Click="ShapeButton_Click" Tag="Polygon" ToolTipService.ToolTip="Polygon: click each corner; click the first corner, double-click or press Enter to finish. Shift keeps sides at 45° steps." />
+            <AppBarToggleButton x:Name="ShapeStickerButton" Width="36" LabelPosition="Collapsed" Label="Sticker" Click="ShapeButton_Click" Tag="Sticker" ToolTipService.ToolTip="Stickers: pick one, then click to place it or drag to size it">
                 <FlyoutBase.AttachedFlyout>
                     <Flyout x:Name="StickerFlyout" Placement="Bottom" ShouldConstrainToRootBounds="False">
                         <VariableSizedWrapGrid x:Name="StickerGrid" Orientation="Horizontal" MaximumRowsOrColumns="6" />
@@ -269,14 +269,19 @@
                         SelectionMode="Extended"
                         CanDragItems="True"
                         CanReorderItems="True"
-                        AllowDrop="True" />
+                        AllowDrop="True">
+                        <ListView.Resources>
+                            <!-- Rows as compact as the toolbar. -->
+                            <x:Double x:Key="ListViewItemMinHeight">32</x:Double>
+                        </ListView.Resources>
+                    </ListView>
                     <!-- The screenshot: always the bottom layer, so it's not in the reorderable list. -->
                     <Grid
                         x:Name="ImageLayerRow"
                         Grid.Row="2"
                         Margin="4,0,4,0"
                         Padding="12,0,4,0"
-                        Height="40"
+                        Height="32"
                         CornerRadius="4"
                         ColumnSpacing="10"
                         Background="Transparent">
@@ -287,7 +292,7 @@
                         </Grid.ColumnDefinitions>
                         <ContentPresenter x:Name="ImageLayerIcon" VerticalAlignment="Center" />
                         <TextBlock x:Name="ImageLayerName" Grid.Column="1" Text="Screenshot" VerticalAlignment="Center" />
-                        <Button x:Name="ImageLayerEye" Grid.Column="2" Width="32" Height="32" Padding="0" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Show or hide" />
+                        <Button x:Name="ImageLayerEye" Grid.Column="2" Width="28" Height="28" Padding="0" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Show or hide" />
                     </Grid>
                     <Grid Grid.Row="3" Margin="8,8,4,0" ColumnSpacing="8">
                         <Grid.ColumnDefinitions>
@@ -297,7 +302,7 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="Opacity" VerticalAlignment="Center" />
                         <Slider x:Name="LayerOpacity" Grid.Column="1" Minimum="0" Maximum="100" StepFrequency="1" VerticalAlignment="Center" IsEnabled="False" />
-                        <Button x:Name="DeleteLayerButton" Grid.Column="2" Width="32" Height="32" Padding="0" Background="Transparent" BorderThickness="0" IsEnabled="False" ToolTipService.ToolTip="Delete (Delete)" />
+                        <Button x:Name="DeleteLayerButton" Grid.Column="2" Width="28" Height="28" Padding="0" Background="Transparent" BorderThickness="0" IsEnabled="False" ToolTipService.ToolTip="Delete (Delete)" />
                     </Grid>
                 </Grid>
             </Border>

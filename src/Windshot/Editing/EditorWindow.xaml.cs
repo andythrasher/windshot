@@ -105,6 +105,9 @@ public sealed partial class EditorWindow : Window
         public float Turned { get; set; }
     }
 
+    /// <summary>An icon-only toolbar button's width, in DIPs: no wider than its highlight, plus a little gap.</summary>
+    private const double IconButtonWidth = 36;
+
     private const int MoveWhole = -1;
     private const int RotateHandle = -2;
     /// <summary>How far above the top edge the rotate handle sits, in DIPs.</summary>
@@ -206,7 +209,7 @@ public sealed partial class EditorWindow : Window
         // rescales the window, which would undo a size set first.
         AppWindow.Move(new PointInt32(workArea.X, workArea.Y));
         int chromeWidth = (int)(2 * ViewPadding * capture.Scale + 120);
-        int chromeHeight = (int)((2 * ViewPadding + 138) * capture.Scale);
+        int chromeHeight = (int)((2 * ViewPadding + 122) * capture.Scale);
         // The minimum keeps the whole toolbar visible.
         int width = Math.Clamp(capture.Width + chromeWidth, (int)(1060 * capture.Scale), (int)(workArea.Width * 0.85));
         int height = Math.Clamp(capture.Height + chromeHeight, (int)(360 * capture.Scale), (int)(workArea.Height * 0.85));
@@ -1700,8 +1703,9 @@ public sealed partial class EditorWindow : Window
     }
 
     /// <summary>
-    /// The compact 44px button width (from the toolbar's style) would clip labels in the "…"
-    /// menu, so buttons there size to the menu instead, and get it back when they return.
+    /// The compact button width (from the toolbar's style, or set on the shape buttons) would
+    /// clip labels in the "…" menu, so buttons there size to the menu instead, and get it back
+    /// when they return.
     /// </summary>
     private void Toolbar_DynamicOverflowItemsChanging(CommandBar sender, DynamicOverflowItemsChangingEventArgs args)
     {
@@ -1715,6 +1719,8 @@ public sealed partial class EditorWindow : Window
                 {
                     if (inMenu)
                         element.Width = double.NaN;
+                    else if (element is AppBarToggleButton toggle && ShapeButtons.Contains(toggle))
+                        element.Width = IconButtonWidth; // set on the button itself, not by a style
                     else
                         element.ClearValue(FrameworkElement.WidthProperty);
                 }

@@ -8,6 +8,19 @@
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
             </ResourceDictionary.MergedDictionaries>
+
+            <!-- The editor's toolbars, sized for a mouse rather than the touch-sized defaults:
+                 40 high (not 48), with a 32x32 highlight around 16px icons, as in Microsoft's
+                 own compact media controls; labeled buttons (Fill, Pixelate) are trimmed to
+                 match. These live here because the buttons' visual states only look resources
+                 up on the control itself or the app, not in the window. -->
+            <x:Double x:Key="AppBarThemeCompactHeight">40</x:Double>
+            <Thickness x:Key="AppBarButtonInnerBorderMargin">2,4,2,4</Thickness>
+            <Thickness x:Key="AppBarButtonContentViewboxCollapsedMargin">0,12</Thickness>
+            <Thickness x:Key="AppBarButtonContentViewboxMargin">10,12,0,12</Thickness>
+            <Thickness x:Key="AppBarButtonTextLabelOnRightMargin">8,12,10,8</Thickness>
+            <Thickness x:Key="AppBarToggleButtonTextLabelOnRightMargin">8,12,10,8</Thickness>
+            <Thickness x:Key="AppBarSeparatorMargin">2,10,2,10</Thickness>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

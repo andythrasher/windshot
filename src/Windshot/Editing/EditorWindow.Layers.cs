@@ -241,7 +241,7 @@ public sealed partial class EditorWindow
             LayerList.Items.Clear();
             foreach (var annotation in order)
             {
-                var row = new Grid { Tag = annotation, Height = 40, ColumnSpacing = 10, Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent) };
+                var row = new Grid { Tag = annotation, Height = 32, ColumnSpacing = 10, Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent) };
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -298,8 +298,8 @@ public sealed partial class EditorWindow
 
         var eye = new Button
         {
-            Width = 32,
-            Height = 32,
+            Width = 28,
+            Height = 28,
             Padding = new Thickness(0),
             Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
             BorderThickness = new Thickness(0),
