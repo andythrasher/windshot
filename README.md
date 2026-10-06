@@ -73,8 +73,10 @@ straight across or up and down.
 **Crop** shows the whole canvas with the crop marked: drag its edges or corners, drag inside to
 move it, or drag out a new area; Enter (or another tool) applies it and Esc cancels. Nothing is
 thrown away, so picking Crop again lets you loosen it, and undo covers it. **Ctrl+Z** /
-**Ctrl+Y** undo and redo, **Delete** removes, **Ctrl+C** copies, **Ctrl+S** saves. Copying or
-saving closes the editor (turn that off with `CloseAfterSaveOrCopy` in the settings).
+**Ctrl+Y** undo and redo, **Delete** removes, **Ctrl+C** copies, **Ctrl+S** saves straight to
+*Pictures\Screenshots* (Settings can change the folder, or turn that off to be asked each time),
+and **Ctrl+Shift+S** asks where to save. Copying or saving closes the editor (turn that off in
+Settings).
 
 **Ctrl+Shift+4** starts a **scrolling capture**: select the scrolling area (or click a window),
 then scroll it yourself, with the wheel, keyboard or scrollbar. Windshot grabs frames as it moves

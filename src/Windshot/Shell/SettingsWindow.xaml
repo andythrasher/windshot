@@ -157,6 +157,39 @@
                     </Grid>
                 </Border>
 
+                <TextBlock Text="Saving" Style="{StaticResource Section}" />
+                <Border Style="{StaticResource Card}">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Save without asking" />
+                            <TextBlock Style="{StaticResource Description}" Text="Save (Ctrl+S) puts the image straight in the folder below. Ctrl+Shift+S always asks where." />
+                        </StackPanel>
+                        <ToggleSwitch x:Name="SaveWithoutAsking" Grid.Column="1" MinWidth="0" OnContent="" OffContent="" />
+                    </Grid>
+                </Border>
+                <Border Style="{StaticResource Card}">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Save folder" />
+                            <TextBlock x:Name="SaveFolderPath" Style="{StaticResource Description}" IsTextSelectionEnabled="True" />
+                            <TextBlock x:Name="SaveFolderProblem" Style="{StaticResource Problem}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                            <Button x:Name="ChangeSaveFolder" Content="Change…" />
+                            <Button x:Name="OpenSaveFolder" ToolTipService.ToolTip="Open the folder" />
+                            <Button x:Name="ResetSaveFolder" ToolTipService.ToolTip="Back to Pictures\Screenshots" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
                 <TextBlock Text="Appearance" Style="{StaticResource Section}" />
                 <Border Style="{StaticResource Card}">
                     <Grid ColumnSpacing="16">

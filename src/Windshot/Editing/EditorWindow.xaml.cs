@@ -609,6 +609,7 @@ public sealed partial class EditorWindow : Window
             case VirtualKey.C when ctrl && shift: CopyText_Click(this, new RoutedEventArgs()); break;
             case VirtualKey.P when ctrl: Pin_Click(this, new RoutedEventArgs()); break;
             case VirtualKey.C when ctrl: Copy_Click(this, new RoutedEventArgs()); break;
+            case VirtualKey.S when ctrl && shift: Save(ask: true); break;
             case VirtualKey.S when ctrl: Save_Click(this, new RoutedEventArgs()); break;
             case VirtualKey.C when !ctrl && !shift: SetTool(Tool.Crop); break;
             case VirtualKey.V when !ctrl: SetTool(Tool.Select); break;
@@ -1683,6 +1684,9 @@ public sealed partial class EditorWindow : Window
     private void InitializeIcons()
     {
         BindIcon(SaveButton, "save");
+        ToolTipService.SetToolTip(SaveButton, Settings.Current.Saving.SaveWithoutAsking
+            ? $"Save to {Path.GetFileName(Settings.Current.Saving.EffectiveFolder.TrimEnd(Path.DirectorySeparatorChar))} (Ctrl+S). Ctrl+Shift+S to save as."
+            : "Save (Ctrl+S)");
         BindIcon(CopyButton, "copy");
         BindIcon(UndoButton, "arrow_undo");
         BindIcon(RedoButton, "arrow_redo");
@@ -1787,7 +1791,56 @@ public sealed partial class EditorWindow : Window
         Canvas.Invalidate();
     }
 
-    private async void Save_Click(object sender, RoutedEventArgs e)
+    private void Save_Click(object sender, RoutedEventArgs e) => Save(ask: !Settings.Current.Saving.SaveWithoutAsking);
+
+    private void Save(bool ask)
+    {
+        if (ask)
+            SaveAs();
+        else
+            SaveToFolder();
+    }
+
+    /// <summary>Saves straight to the folder from settings (Pictures\Screenshots unless changed), under a new name.</summary>
+    private async void SaveToFolder()
+    {
+        string folder = Settings.Current.Saving.EffectiveFolder;
+        try
+        {
+            FinishEditing();
+            Directory.CreateDirectory(folder);
+            string path = UniquePath(folder, $"Windshot {DateTime.Now:yyyy-MM-dd HHmmss}");
+            using var png = await _document.EncodePngAsync();
+            using (var input = png.AsStreamForRead())
+            using (var output = new FileStream(path, FileMode.CreateNew, FileAccess.Write))
+                await input.CopyToAsync(output);
+            Log.Write($"Saved {path}");
+            string message = $"Saved to {Path.GetFileName(folder.TrimEnd(Path.DirectorySeparatorChar))}";
+            // No dialog was shown, so say so even when the editor stays open.
+            if (Settings.Current.Editor.CloseAfterSaveOrCopy)
+                CloseAfterExport(message);
+            else
+                ShowMessage(message);
+        }
+        catch (Exception ex)
+        {
+            // E.g. the folder is on a drive that's gone, read-only, or full.
+            Log.Write($"Save to {folder} failed: {ex}");
+            ShowMessage($"Couldn't save to {folder}. Pick another folder in Settings, or use Save as (Ctrl+Shift+S).");
+        }
+    }
+
+    /// <summary><paramref name="name"/>.png in the folder, or with " 2", " 3"… added if that's taken (two saves in one second).</summary>
+    private static string UniquePath(string folder, string name)
+    {
+        string path = Path.Combine(folder, name + ".png");
+        for (int n = 2; File.Exists(path); n++)
+            path = Path.Combine(folder, $"{name} {n}.png");
+        return path;
+    }
+
+    /// <summary>Asks where to save.</summary>
+    private async void SaveAs()
     {
         Windows.Storage.StorageFile? file = null;
         try

@@ -39,6 +39,24 @@ internal sealed class Settings
     }
     public BeautifySettings Beautify { get; set; } = new();
     public ClipboardSettings Clipboard { get; set; } = new();
+    public SavingSettings Saving { get; set; } = new();
+
+    public sealed class SavingSettings
+    {
+        /// <summary>Save (Ctrl+S) saves straight to <see cref="Folder"/>; off, it asks where every time. Ctrl+Shift+S always asks.</summary>
+        public bool SaveWithoutAsking { get; set; } = true;
+
+        /// <summary>Where Save puts images. Empty means Pictures\Screenshots, wherever Pictures is.</summary>
+        public string Folder { get; set; } = "";
+
+        public static string DefaultFolder =>
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "Screenshots");
+
+        /// <summary>The folder actually used: the chosen one (environment variables expanded), or the default.</summary>
+        [JsonIgnore]
+        public string EffectiveFolder =>
+            string.IsNullOrWhiteSpace(Folder) ? DefaultFolder : Environment.ExpandEnvironmentVariables(Folder.Trim());
+    }
     public AppearanceSettings Appearance { get; set; } = new();
 
     public sealed class AppearanceSettings
@@ -197,6 +215,8 @@ internal sealed class Settings
         Beautify ??= new BeautifySettings();
         Clipboard ??= new ClipboardSettings();
         Appearance ??= new AppearanceSettings();
+        Saving ??= new SavingSettings();
+        Saving.Folder ??= "";
 
         var sizes = Editor.Sizes ?? [];
         Editor.Sizes = new EditorSettings().Sizes;

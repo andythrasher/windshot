@@ -106,6 +106,24 @@ public sealed partial class SettingsWindow : Window
                 Save(s => s.Beautify.Preset = BackdropPresets.All[BeautifyPreset.SelectedIndex].Name);
         };
         BeautifyPadding.ValueChanged += (_, e) => Save(s => s.Beautify.Padding = e.NewValue);
+        SaveWithoutAsking.Toggled += (_, _) => Save(s => s.Saving.SaveWithoutAsking = SaveWithoutAsking.IsOn);
+        OpenSaveFolder.Content = FluentIcons.Create("folder_open", filled: false);
+        ResetSaveFolder.Content = FluentIcons.Create("arrow_reset", filled: false);
+        ChangeSaveFolder.Click += async (_, _) => await PickSaveFolderAsync();
+        ResetSaveFolder.Click += (_, _) => SetSaveFolder("");
+        OpenSaveFolder.Click += (_, _) =>
+        {
+            string folder = Settings.Current.Saving.EffectiveFolder;
+            try
+            {
+                Directory.CreateDirectory(folder); // the default doesn't exist until the first save
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(folder) { UseShellExecute = true });
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+            {
+                ShowSaveFolderProblem($"Couldn't open {folder}: {ex.Message}");
+            }
+        };
         OpenFile.Click += (_, _) => App.OpenSettingsFile();
         SupporterButton.Click += async (_, _) =>
         {
@@ -174,6 +192,8 @@ public sealed partial class SettingsWindow : Window
         BeautifyPreset.SelectedIndex = Math.Max(0, Array.FindIndex(BackdropPresets.All,
             p => p.Name.Equals(s.Beautify.Preset, StringComparison.OrdinalIgnoreCase)));
         BeautifyPadding.Value = Math.Clamp(s.Beautify.Padding, 16, 160);
+        SaveWithoutAsking.IsOn = s.Saving.SaveWithoutAsking;
+        ShowSaveFolder();
         WindowTheme.SelectedIndex = Array.IndexOf(Themes.All, Themes.Find(s.Appearance.Window));
         ColorSet.SelectedIndex = Array.IndexOf(Themes.All, Themes.Find(s.Appearance.Colors));
         ShowSupporter();
@@ -207,6 +227,58 @@ public sealed partial class SettingsWindow : Window
             note.Text = text;
             note.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         }
+    }
+
+    // ---- Save folder -------------------------------------------------------------------
+
+    private void ShowSaveFolder()
+    {
+        var saving = Settings.Current.Saving;
+        SaveFolderPath.Text = saving.EffectiveFolder;
+        ResetSaveFolder.Visibility = string.IsNullOrWhiteSpace(saving.Folder) ? Visibility.Collapsed : Visibility.Visible;
+        SaveFolderProblem.Visibility = Visibility.Collapsed;
+    }
+
+    private void ShowSaveFolderProblem(string text)
+    {
+        SaveFolderProblem.Text = text;
+        SaveFolderProblem.Visibility = Visibility.Visible;
+    }
+
+    private async Task PickSaveFolderAsync()
+    {
+        var picker = new Windows.Storage.Pickers.FolderPicker { SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.PicturesLibrary };
+        picker.FileTypeFilter.Add("*");
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
+        Windows.Storage.StorageFolder? picked;
+        try
+        {
+            picked = await picker.PickSingleFolderAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Folder picker failed: {ex.Message}");
+            ShowSaveFolderProblem("Couldn't show the folder picker. You can type a folder into the settings file instead.");
+            return;
+        }
+        if (picked is null)
+            return;
+        // Libraries and other virtual folders have no path to save into.
+        if (string.IsNullOrEmpty(picked.Path))
+        {
+            ShowSaveFolderProblem($"{picked.DisplayName} isn't a folder on disk. Pick a folder inside it.");
+            return;
+        }
+        // Picking the default folder itself goes back to following Pictures (e.g. if it moves to OneDrive).
+        SetSaveFolder(string.Equals(Path.TrimEndingDirectorySeparator(picked.Path), Settings.SavingSettings.DefaultFolder, StringComparison.OrdinalIgnoreCase) ? "" : picked.Path);
+    }
+
+    private void SetSaveFolder(string folder)
+    {
+        Settings.Current.Saving.Folder = folder;
+        Settings.Save();
+        Log.Write($"Save folder set to {Settings.Current.Saving.EffectiveFolder}");
+        ShowSaveFolder();
     }
 
     /// <summary>Shows a theme's colors beside its picker.</summary>
