@@ -58,6 +58,7 @@
             <AppBarToggleButton Label="Highlighter" Click="ToolButton_Click" Tag="Highlighter" ToolTipService.ToolTip="Highlighter (H)" />
             <AppBarToggleButton Label="Spotlight" Click="ToolButton_Click" Tag="Spotlight" ToolTipService.ToolTip="Spotlight (S)" />
             <AppBarToggleButton Label="Crop" Click="ToolButton_Click" Tag="Crop" ToolTipService.ToolTip="Crop (C). Drag the edges or draw a new area; Enter applies, Esc cancels." />
+            <AppBarButton x:Name="InsertImageButton" Label="Insert image" Click="InsertImage_Click" ToolTipService.ToolTip="Insert an image (PNG, JPEG or WebP). You can also paste one (Ctrl+V) or drop one here." />
             <AppBarSeparator />
             <AppBarElementContainer x:Name="BeautifyContainer" VerticalContentAlignment="Center">
                 <!-- Toggle on the left part; the arrow opens backdrop presets and padding. -->
@@ -175,6 +176,34 @@
                     </DropDownButton.Flyout>
                 </DropDownButton>
             </AppBarElementContainer>
+            <!-- Outline, shadow and corner rounding (see LayerStyle). -->
+            <AppBarElementContainer x:Name="StyleContainer" VerticalContentAlignment="Center">
+                <DropDownButton
+                    x:Name="StyleButton"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    Margin="4,0"
+                    ToolTipService.ToolTip="Style: an outline, a shadow and rounder corners, to make it stand out">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <ContentPresenter x:Name="StyleIcon" VerticalAlignment="Center" />
+                        <TextBlock Text="Style" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <DropDownButton.Flyout>
+                        <!-- Unconfined like the color menu, so it opens above the "…" menu too. -->
+                        <Flyout x:Name="StyleFlyout" Placement="Bottom" ShouldConstrainToRootBounds="False">
+                            <StackPanel x:Name="StyleFlyoutContent" Width="248" Spacing="8">
+                                <Slider x:Name="OutlineSlider" Header="Outline" Minimum="0" Maximum="10" StepFrequency="1" />
+                                <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,-6,0,0">
+                                    <RadioButton x:Name="LightOutline" Content="White" GroupName="OutlineColor" MinWidth="0" />
+                                    <RadioButton x:Name="DarkOutline" Content="Black" GroupName="OutlineColor" MinWidth="0" />
+                                </StackPanel>
+                                <Slider x:Name="ShadowSlider" Header="Shadow" Minimum="0" Maximum="10" StepFrequency="1" />
+                                <Slider x:Name="CornersSlider" Header="Rounded corners" Minimum="0" Maximum="10" StepFrequency="1" />
+                            </StackPanel>
+                        </Flyout>
+                    </DropDownButton.Flyout>
+                </DropDownButton>
+            </AppBarElementContainer>
             <AppBarElementContainer x:Name="BlendContainer" Visibility="Collapsed" VerticalContentAlignment="Center" ToolTipService.ToolTip="How the highlight mixes with what's under it">
                 <StackPanel Orientation="Horizontal" Spacing="8" Margin="12,0,4,0">
                     <TextBlock Text="Blend" VerticalAlignment="Center" />
@@ -225,7 +254,10 @@
             PointerMoved="Canvas_PointerMoved"
             PointerReleased="Canvas_PointerReleased"
             PointerWheelChanged="Canvas_PointerWheelChanged"
-            DoubleTapped="Canvas_DoubleTapped">
+            DoubleTapped="Canvas_DoubleTapped"
+            AllowDrop="True"
+            DragOver="Canvas_DragOver"
+            Drop="Canvas_Drop">
             <canvas:CanvasControl
                 x:Name="Canvas"
                 ClearColor="Transparent"

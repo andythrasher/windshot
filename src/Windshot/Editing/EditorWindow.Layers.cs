@@ -135,6 +135,9 @@ public sealed partial class EditorWindow
     /// </summary>
     private void AddLayer(Annotation annotation)
     {
+        // New layers come in with their tool's style (see the Style menu).
+        if (annotation.CanStyle && annotation.Style == LayerStyle.None)
+            annotation.Style = ToolStyle(ToolFor(annotation));
         var list = _document.Annotations;
         if (!annotation.IsEffect)
         {
@@ -268,7 +271,7 @@ public sealed partial class EditorWindow
 
         var icon = new Grid { Width = 22, Height = 22, VerticalAlignment = VerticalAlignment.Center };
         icon.Children.Add(Shell.FluentIcons.Create(LayerIcon(annotation), filled: false));
-        if (!annotation.IsEffect || annotation is HighlighterAnnotation)
+        if (annotation.HasColor)
         {
             icon.Children.Add(new Ellipse
             {
@@ -328,6 +331,7 @@ public sealed partial class EditorWindow
         ShapeAnnotation { Kind: ShapeKind.Sticker } sticker => Stickers.NameOf(sticker.StickerIcon),
         ShapeAnnotation shape => shape.Kind.ToString(),
         PolygonAnnotation => "Polygon",
+        ImageAnnotation image => image.Title ?? "Image",
         _ => "Shape",
     };
 

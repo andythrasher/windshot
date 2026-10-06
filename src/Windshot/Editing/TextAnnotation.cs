@@ -117,6 +117,9 @@ internal sealed class TextAnnotation : Annotation, IDisposable
 
     public override Rect Frame => Boxed ? BoxBounds : TextBounds.Inflate(OutlineWidth);
 
+    /// <summary>Only the background box has corners to round.</summary>
+    public override bool HasCorners => Boxed;
+
     protected override void DrawUnrotated(CanvasDrawingSession ds) => Draw(ds, chromeOnly: false);
 
     /// <summary>
@@ -129,7 +132,8 @@ internal sealed class TextAnnotation : Annotation, IDisposable
     {
         if (Boxed)
         {
-            float radius = FontSize * 0.25f;
+            var box = BoxBounds;
+            float radius = Math.Min(FontSize * 0.25f + Style.CornerRadius(Unit), (float)Math.Min(box.Width, box.Height) / 2);
             ds.FillRoundedRectangle(BoxBounds, radius, radius, Color);
             if (!chromeOnly && Text.Length > 0)
                 ds.DrawTextLayout(Layout, Position, TextColor);

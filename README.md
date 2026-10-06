@@ -66,6 +66,11 @@ one is deleted), **S** spotlight (dims everything else), **H** highlighter (keep
 default), **C** crop, **V** select. **[** and **]** (or the
 Size slider) and **1–8** (colors) change the selected object, or the next one drawn. Drag
 handles to reshape arrows and rectangles, or a text box's corners to scale its text; double-click text to edit it.
+**Style** on the options bar gives arrows, shapes, text, steps and images an outline (white or
+black), a soft shadow, and rounder corners (rectangles, images and text backgrounds); each tool
+remembers its style. **Insert image** on the toolbar adds a PNG, JPEG or WebP picture as a layer
+(or paste one with Ctrl+V, or drop image files on the editor): it comes in at its own size, or
+shrunk to fit the screenshot, and its corners keep its proportions unless Shift is held.
 Drag the round handle above a selected object to rotate it (double-click that handle to straighten it).
 Hold **Shift** while dragging for squares, circles and even triangles (an existing shape keeps its
 proportions), arrows, highlights and polygon sides at 45° steps, rotation in 15° steps, and moves

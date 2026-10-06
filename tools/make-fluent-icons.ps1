@@ -14,7 +14,7 @@ $icons = @(
     'save', 'copy', 'arrow_undo', 'arrow_redo',
     'cursor', 'arrow_up_right', 'rectangle_landscape', 'text_t', 'blur',
     'number_circle_1', 'highlight', 'flashlight',
-    'crop', 'arrow_reset', 'layer', 'eye', 'eye_off', 'image', 'delete', 'grid_dots', 'color_background', 'sparkle', 'pin', 'scan_text', 'folder_open',
+    'crop', 'arrow_reset', 'layer', 'eye', 'eye_off', 'image', 'delete', 'grid_dots', 'color_background', 'sparkle', 'pin', 'scan_text', 'folder_open', 'image_add', 'square_shadow',
     # Shapes tool
     'shapes', 'oval', 'triangle', 'pentagon', 'paint_bucket', 'sticker',
     # Stickers (Editing/Stickers.cs)

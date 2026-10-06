@@ -111,6 +111,7 @@ public sealed partial class EditorWindow
             Commit();
         }
         SyncShapes();
+        SyncLayerStyle(); // only rectangles have corners to round
         Canvas.Invalidate();
     }
 

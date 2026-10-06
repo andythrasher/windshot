@@ -222,11 +222,11 @@ internal sealed class Document : IDisposable
             if (annotation.Opacity < 1)
             {
                 using (session.CreateLayer(annotation.Opacity))
-                    annotation.Draw(session);
+                    annotation.Style.Draw(session, context, annotation);
             }
             else
             {
-                annotation.Draw(session);
+                annotation.Style.Draw(session, context, annotation);
             }
         }
         EndStage();

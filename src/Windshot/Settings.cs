@@ -120,6 +120,12 @@ internal sealed class Settings
         /// <summary>The font new text uses, by family name, e.g. "Segoe UI Variable Display" or "Consolas".</summary>
         public string Font { get; set; } = TextAnnotation.DefaultFontFamily;
 
+        /// <summary>
+        /// The outline, shadow and corner rounding each tool's new layers get (levels 0–10),
+        /// e.g. "Arrow": { "Outline": 2, "DarkOutline": false, "Shadow": 3, "Corners": 0 }.
+        /// </summary>
+        public Dictionary<Tool, LayerStyle> Styles { get; set; } = new();
+
         /// <summary>Close the editor once its image has been copied or saved.</summary>
         public bool CloseAfterSaveOrCopy { get; set; } = true;
 
@@ -217,6 +223,9 @@ internal sealed class Settings
         Appearance ??= new AppearanceSettings();
         Saving ??= new SavingSettings();
         Saving.Folder ??= "";
+
+        Editor.Styles = (Editor.Styles ?? []).Where(entry => entry.Value is not null)
+            .ToDictionary(entry => entry.Key, entry => entry.Value.Clamped());
 
         var sizes = Editor.Sizes ?? [];
         Editor.Sizes = new EditorSettings().Sizes;

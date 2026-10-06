@@ -86,9 +86,13 @@ internal sealed class ShapeAnnotation : BoxAnnotation, IFillable
                 float left = (float)box.Left, right = (float)box.Right, top = (float)box.Top, bottom = (float)box.Bottom;
                 return CanvasGeometry.CreatePolygon(creator, [new((left + right) / 2, top), new(right, bottom), new(left, bottom)]);
             default:
-                return CanvasGeometry.CreateRoundedRectangle(creator, box, Thickness / 2, Thickness / 2);
+                // Rounded as far as the style asks, up to a pill.
+                float radius = Math.Min(Thickness / 2 + Style.CornerRadius(Unit), (float)Math.Min(box.Width, box.Height) / 2);
+                return CanvasGeometry.CreateRoundedRectangle(creator, box, radius, radius);
         }
     }
+
+    public override bool HasCorners => Kind == ShapeKind.Rectangle;
 
     protected override void DrawUnrotated(CanvasDrawingSession ds)
     {

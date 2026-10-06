@@ -36,22 +36,29 @@ public sealed partial class EditorWindow
             Show(button, subject == Tool.Rectangle);
         Show(ShapeSeparator, subject == Tool.Rectangle);
         Show(FillButton, subject == Tool.Rectangle);
+        Show(StyleContainer, Styleable(subject));
 
-        OptionsHint.Text = subject == Tool.Crop
-            ? "Drag the edges or draw a new area. Enter applies, Esc cancels."
-            : "Click a layer to change it, or pick a tool to draw.";
+        OptionsHint.Text = subject switch
+        {
+            Tool.Crop => "Drag the edges or draw a new area. Enter applies, Esc cancels.",
+            Tool.Image => "Drag a corner to resize it; hold Shift to stretch it.",
+            _ => "Click a layer to change it, or pick a tool to draw.",
+        };
         Show(HintContainer, !sized && !colored);
+        SyncLayerStyle();
     }
 
     /// <summary>For layers selected together: their color, if any of them has one, and what else works on them.</summary>
     private void SyncGroupOptions()
     {
-        bool colored = _group.Any(a => !a.IsAreaEffect);
+        bool colored = _group.Any(a => a.HasColor);
         foreach (var element in new UIElement[] { SizeContainer, BlendContainer, FontContainer, TextBackgroundButton, PixelateButton, ShapeSeparator, FillButton })
             Show(element, false);
         foreach (var button in ShapeButtons)
             Show(button, false);
         Show(ColorContainer, colored);
+        Show(StyleContainer, _group.Any(a => a.CanStyle));
+        SyncLayerStyle();
         OptionsHint.Text = $"{_group.Count} layers selected. Drag one to move them all, or press Delete to remove them.";
         Show(HintContainer, true);
     }

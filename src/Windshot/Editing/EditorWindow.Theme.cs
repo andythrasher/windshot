@@ -31,6 +31,7 @@ public sealed partial class EditorWindow
         });
         _theming.Include(ColorFlyoutContent);
         _theming.Include(BeautifyFlyoutContent);
+        _theming.Include(StyleFlyoutContent);
         _theming.Apply(Themes.EffectiveWindow);
 
         Supporter.Changed += OnSupporterChanged;

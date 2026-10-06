@@ -33,6 +33,8 @@ internal enum Tool
     Spotlight,
     Highlighter,
     Crop,
+    /// <summary>Not a tool on the toolbar: inserted images (Insert image, paste or drop), for their options and style.</summary>
+    Image,
 }
 
 public sealed partial class EditorWindow : Window
@@ -157,6 +159,7 @@ public sealed partial class EditorWindow : Window
         InitializeFonts();
         InitializeBlend();
         InitializeShapes();
+        InitializeLayerStyle();
         InitializeMoreColors();
         BuildSwatches();
         BuildBackdropControls();
@@ -192,6 +195,7 @@ public sealed partial class EditorWindow : Window
         // Without the extras, the free choices stood in: keep the remembered ones for later.
         if (Supporter.IsUnlocked)
             prefs.Editor.Font = _font;
+        prefs.Editor.Styles = _toolStyles.Where(entry => entry.Value != LayerStyle.None).ToDictionary(entry => entry.Key, entry => entry.Value);
         prefs.Editor.ShowLayers = _layersOpen;
         prefs.Beautify.Preset = BackdropPresets.All[_backdropPreset].Name;
         prefs.Beautify.Padding = _backdropPadding;
@@ -296,6 +300,7 @@ public sealed partial class EditorWindow : Window
         StepAnnotation => Tool.Step,
         SpotlightAnnotation => Tool.Spotlight,
         HighlighterAnnotation => Tool.Highlighter,
+        ImageAnnotation => Tool.Image,
         _ => Tool.Rectangle,
     };
 
@@ -305,7 +310,7 @@ public sealed partial class EditorWindow : Window
         _group.Clear();
         _imageLayerSelected = false;
         SyncLayerSelection();
-        if (annotation is { IsAreaEffect: false })
+        if (annotation is { HasColor: true })
             ActiveColor = annotation.Color; // picking up an object's color makes it easy to match
         SyncSlider();
         SyncColor();
@@ -335,6 +340,7 @@ public sealed partial class EditorWindow : Window
             Commit();
         }
         SyncTextBackground();
+        SyncLayerStyle(); // a text background has corners to round
         Canvas.Invalidate();
     }
 
@@ -444,7 +450,7 @@ public sealed partial class EditorWindow : Window
         _color = Themes.InSet(_color, _palette);
         _highlightColor = Themes.InSet(_highlightColor, _palette);
         bool recolored = false;
-        foreach (var annotation in _document.Annotations.Where(a => !a.IsAreaEffect))
+        foreach (var annotation in _document.Annotations.Where(a => a.HasColor))
         {
             var color = Themes.InSet(annotation.Color, _palette);
             if (color != annotation.Color)
@@ -499,8 +505,8 @@ public sealed partial class EditorWindow : Window
     {
         CommitTextEdit();
         ActiveColor = color;
-        // A group's blurs and spotlights have no color of their own; everything else takes it.
-        var recolor = Selection.Where(a => !a.IsAreaEffect && a.Color != color).ToList();
+        // A group's blurs, spotlights and images have no color of their own; everything else takes it.
+        var recolor = Selection.Where(a => a.HasColor && a.Color != color).ToList();
         foreach (var annotation in recolor)
             annotation.Color = color;
         if (recolor.Count > 0)
@@ -612,6 +618,7 @@ public sealed partial class EditorWindow : Window
             case VirtualKey.S when ctrl && shift: Save(ask: true); break;
             case VirtualKey.S when ctrl: Save_Click(this, new RoutedEventArgs()); break;
             case VirtualKey.C when !ctrl && !shift: SetTool(Tool.Crop); break;
+            case VirtualKey.V when ctrl: PasteImage(); break;
             case VirtualKey.V when !ctrl: SetTool(Tool.Select); break;
             case VirtualKey.A when !ctrl: SetTool(Tool.Arrow); break;
             case VirtualKey.R when !ctrl: SetTool(Tool.Rectangle); break;
@@ -1095,7 +1102,9 @@ public sealed partial class EditorWindow : Window
         }
         else if (_drag.Handle >= 0)
         {
-            _drag.Target.MoveHandle(_drag.Handle, shift ? Constrain(_drag, p) : p);
+            // Pictures keep their proportions unless Shift is held; shapes keep them only with Shift.
+            bool keep = shift != (_drag.Target is ImageAnnotation);
+            _drag.Target.MoveHandle(_drag.Handle, keep ? Constrain(_drag, p) : p);
         }
         else
         {
@@ -1682,6 +1691,7 @@ public sealed partial class EditorWindow : Window
         [nameof(Tool.Highlighter)] = "highlight",
         [nameof(Tool.Spotlight)] = "flashlight",
         [nameof(Tool.Crop)] = "crop",
+        [nameof(Tool.Image)] = "image",
     };
 
     /// <summary>
@@ -1706,6 +1716,7 @@ public sealed partial class EditorWindow : Window
         BindIcon(TextBackgroundButton, "color_background");
         BindIcon(PinButton, "pin");
         BindIcon(CopyTextButton, "scan_text");
+        BindIcon(InsertImageButton, "image_add");
         BindIcon(LayersButton, "layer");
         var beautify = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
         beautify.Children.Add(Shell.FluentIcons.Create("sparkle", filled: false));

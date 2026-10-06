@@ -71,6 +71,23 @@ internal abstract class Annotation
     /// <summary>Whether sticking out past the image grows the canvas (the "reverse crop").</summary>
     public virtual bool ExtendsCanvas => !IsAreaEffect;
 
+    /// <summary>Whether the layer takes a color from the palette (blurs, spotlights and images don't).</summary>
+    public virtual bool HasColor => !IsAreaEffect;
+
+    // ---- Style -------------------------------------------------------------------------
+
+    /// <summary>Outline, shadow and corner rounding; see <see cref="LayerStyle"/>.</summary>
+    public LayerStyle Style { get; set; } = LayerStyle.None;
+
+    /// <summary>Whether outline and shadow apply: to layers that draw something, not to effects.</summary>
+    public bool CanStyle => !IsEffect;
+
+    /// <summary>Whether the layer has corners for <see cref="LayerStyle.Corners"/> to round.</summary>
+    public virtual bool HasCorners => false;
+
+    /// <summary>How far the outline and shadow reach past the layer.</summary>
+    private float StyleMargin => CanStyle ? Style.Margin(Unit) : 0;
+
     // ---- Rotation ----------------------------------------------------------------------
 
     /// <summary>How far the frame is turned, in radians, clockwise on screen; between -π and π.</summary>
@@ -105,17 +122,20 @@ internal abstract class Annotation
     /// <summary>The bounds in the layer's own frame, before turning.</summary>
     public abstract Rect Frame { get; }
 
-    /// <summary>The axis-aligned bounds on the canvas, of the turned frame.</summary>
+    /// <summary>The axis-aligned bounds on the canvas, of the turned frame, plus any outline and shadow.</summary>
     public Rect Bounds
     {
         get
         {
             var frame = Frame;
-            if (Angle == 0)
-                return frame;
-            var corners = Corners(frame);
-            float minX = corners.Min(p => p.X), minY = corners.Min(p => p.Y);
-            return new Rect(minX, minY, corners.Max(p => p.X) - minX, corners.Max(p => p.Y) - minY);
+            if (Angle != 0)
+            {
+                var corners = Corners(frame);
+                float minX = corners.Min(p => p.X), minY = corners.Min(p => p.Y);
+                frame = new Rect(minX, minY, corners.Max(p => p.X) - minX, corners.Max(p => p.Y) - minY);
+            }
+            float margin = StyleMargin;
+            return margin > 0 ? frame.Inflate(margin) : frame;
         }
     }
 
