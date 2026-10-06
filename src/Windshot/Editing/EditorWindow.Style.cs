@@ -36,7 +36,7 @@ public sealed partial class EditorWindow
             Show(button, subject == Tool.Rectangle);
         Show(ShapeSeparator, subject == Tool.Rectangle);
         Show(FillButton, subject == Tool.Rectangle);
-        Show(StyleContainer, Styleable(subject));
+        ShowStyle(Styleable(subject), onlyPictures: subject == Tool.Image);
 
         OptionsHint.Text = subject switch
         {
@@ -57,7 +57,7 @@ public sealed partial class EditorWindow
         foreach (var button in ShapeButtons)
             Show(button, false);
         Show(ColorContainer, colored);
-        Show(StyleContainer, _group.Any(a => a.CanStyle));
+        ShowStyle(_group.Any(a => a.CanStyle), onlyPictures: _group.All(a => a is ImageAnnotation));
         SyncLayerStyle();
         OptionsHint.Text = $"{_group.Count} layers selected. Drag one to move them all, or press Delete to remove them.";
         Show(HintContainer, true);

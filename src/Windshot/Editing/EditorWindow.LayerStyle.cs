@@ -25,6 +25,28 @@ public sealed partial class EditorWindow
         CornersSlider.ValueChanged += (_, e) => ChangeStyle(s => s with { Corners = (int)e.NewValue });
         LightOutline.Checked += (_, _) => ChangeStyle(s => s with { DarkOutline = false });
         DarkOutline.Checked += (_, _) => ChangeStyle(s => s with { DarkOutline = true });
+
+        // The same controls laid out on the bar, for pictures (see SyncOptions).
+        InlineOutlineColor.Items.Add("White");
+        InlineOutlineColor.Items.Add("Black");
+        InlineOutlineSlider.ValueChanged += (_, e) => ChangeStyle(s => s with { Outline = (int)e.NewValue });
+        InlineShadowSlider.ValueChanged += (_, e) => ChangeStyle(s => s with { Shadow = (int)e.NewValue });
+        InlineCornersSlider.ValueChanged += (_, e) => ChangeStyle(s => s with { Corners = (int)e.NewValue });
+        InlineOutlineColor.SelectionChanged += (_, _) =>
+        {
+            if (InlineOutlineColor.SelectedIndex >= 0)
+                ChangeStyle(s => s with { DarkOutline = InlineOutlineColor.SelectedIndex == 1 });
+        };
+    }
+
+    /// <summary>
+    /// Pictures have nothing else on the options bar, so their style is laid out on it rather
+    /// than in the Style menu: for a selected picture, or a group of nothing but pictures.
+    /// </summary>
+    private void ShowStyle(bool styleable, bool onlyPictures)
+    {
+        Show(StyleContainer, styleable && !onlyPictures);
+        Show(InlineStyleContainer, styleable && onlyPictures);
     }
 
     /// <summary>The selected layers that take a style.</summary>
@@ -77,6 +99,10 @@ public sealed partial class EditorWindow
         LightOutline.IsChecked = !style.DarkOutline;
         DarkOutline.IsChecked = style.DarkOutline;
         CornersSlider.Visibility = corners ? Visibility.Visible : Visibility.Collapsed;
+        InlineOutlineSlider.Value = style.Outline;
+        InlineShadowSlider.Value = style.Shadow;
+        InlineCornersSlider.Value = style.Corners;
+        InlineOutlineColor.SelectedIndex = style.DarkOutline ? 1 : 0;
         _syncingLayerStyle = false;
     }
 }

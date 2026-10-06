@@ -204,6 +204,18 @@
                     </DropDownButton.Flyout>
                 </DropDownButton>
             </AppBarElementContainer>
+            <!-- For pictures, which have nothing else on the bar: the same style, laid out inline. -->
+            <AppBarElementContainer x:Name="InlineStyleContainer" Visibility="Collapsed" VerticalContentAlignment="Center">
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="12,0,4,0">
+                    <TextBlock Text="Outline" VerticalAlignment="Center" />
+                    <Slider x:Name="InlineOutlineSlider" Width="96" Minimum="0" Maximum="10" StepFrequency="1" VerticalAlignment="Center" ToolTipService.ToolTip="Outline" />
+                    <ComboBox x:Name="InlineOutlineColor" Width="96" VerticalAlignment="Center" ToolTipService.ToolTip="Outline color" />
+                    <TextBlock Text="Shadow" Margin="12,0,0,0" VerticalAlignment="Center" />
+                    <Slider x:Name="InlineShadowSlider" Width="96" Minimum="0" Maximum="10" StepFrequency="1" VerticalAlignment="Center" ToolTipService.ToolTip="Shadow" />
+                    <TextBlock Text="Corners" Margin="12,0,0,0" VerticalAlignment="Center" />
+                    <Slider x:Name="InlineCornersSlider" Width="96" Minimum="0" Maximum="10" StepFrequency="1" VerticalAlignment="Center" ToolTipService.ToolTip="Rounded corners" />
+                </StackPanel>
+            </AppBarElementContainer>
             <AppBarElementContainer x:Name="BlendContainer" Visibility="Collapsed" VerticalContentAlignment="Center" ToolTipService.ToolTip="How the highlight mixes with what's under it">
                 <StackPanel Orientation="Horizontal" Spacing="8" Margin="12,0,4,0">
                     <TextBlock Text="Blend" VerticalAlignment="Center" />
