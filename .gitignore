@@ -5,3 +5,7 @@ obj/
 artifacts/
 .claude/
 tools/screenshots/*.png
+# The trailer's music is someone else's licensed track: kept beside the repo, not in it.
+store/trailer/*.mp3
+store/trailer/*.wav
+store/trailer/*.m4a
