@@ -66,8 +66,8 @@ internal sealed class PinWindow : Form
         Bounds = new Rectangle(location, new Size(Math.Max(1, (int)(image.Width * _zoom)), Math.Max(1, (int)(image.Height * _zoom))));
         ContextMenuStrip = BuildMenu();
         double dpiScale = DeviceDpi / 96.0;
-        _openHand = HandCursors.OpenForms(dpiScale) ?? Cursors.SizeAll;
-        _grabHand = HandCursors.GrabForms(dpiScale) ?? Cursors.SizeAll;
+        _openHand = AppCursors.OpenForms(dpiScale) ?? Cursors.SizeAll;
+        _grabHand = AppCursors.GrabForms(dpiScale) ?? Cursors.SizeAll;
         Cursor = _openHand;
         Open.Add(this);
     }

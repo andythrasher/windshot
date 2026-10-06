@@ -1335,21 +1335,28 @@ public sealed partial class EditorWindow : Window
     // ---- Cursor ------------------------------------------------------------------------
 
     private readonly InputCursor _arrowCursor = InputSystemCursor.Create(InputSystemCursorShape.Arrow);
-    private readonly InputCursor _crossCursor = InputSystemCursor.Create(InputSystemCursorShape.Cross);
     private readonly InputCursor _textCursor = InputSystemCursor.Create(InputSystemCursorShape.IBeam);
     private readonly InputCursor _moveCursor = InputSystemCursor.Create(InputSystemCursorShape.SizeAll);
     private readonly InputCursor _resizeNwSeCursor = InputSystemCursor.Create(InputSystemCursorShape.SizeNorthwestSoutheast);
     private readonly InputCursor _resizeNeSwCursor = InputSystemCursor.Create(InputSystemCursorShape.SizeNortheastSouthwest);
     private readonly InputCursor _resizeNsCursor = InputSystemCursor.Create(InputSystemCursorShape.SizeNorthSouth);
     private readonly InputCursor _resizeWeCursor = InputSystemCursor.Create(InputSystemCursorShape.SizeWestEast);
-    private readonly InputCursor _rotateCursor = InputSystemCursor.Create(InputSystemCursorShape.Hand);
-    private InputCursor? _openHandCursor, _grabHandCursor;
+    private InputCursor? _openHandCursor, _grabHandCursor, _rotateCursor, _crossCursor;
 
-    /// <summary>Ready to pan (Space held): an open hand. Made on first use, when the display scale is known.</summary>
-    private InputCursor PanCursor => _openHandCursor ??= Shell.HandCursors.Open(RasterScale) ?? _moveCursor;
+    // Windshot's own cursors (see Shell.AppCursors) are made on first use, when the display
+    // scale is known; each falls back to the nearest system cursor.
+
+    /// <summary>Ready to pan (Space held): an open hand.</summary>
+    private InputCursor PanCursor => _openHandCursor ??= Shell.AppCursors.Open(RasterScale) ?? _moveCursor;
 
     /// <summary>Panning: a grabbing hand.</summary>
-    private InputCursor PanningCursor => _grabHandCursor ??= Shell.HandCursors.Grab(RasterScale) ?? _moveCursor;
+    private InputCursor PanningCursor => _grabHandCursor ??= Shell.AppCursors.Grab(RasterScale) ?? _moveCursor;
+
+    /// <summary>Over the rotate handle, and while turning: a clockwise arrow.</summary>
+    private InputCursor RotateCursor => _rotateCursor ??= Shell.AppCursors.Rotate(RasterScale) ?? InputSystemCursor.Create(InputSystemCursorShape.Hand);
+
+    /// <summary>Drawing tools: a thin crosshair.</summary>
+    private InputCursor CrossCursor => _crossCursor ??= Shell.AppCursors.Cross(RasterScale) ?? InputSystemCursor.Create(InputSystemCursorShape.Cross);
 
     /// <summary>Blur and spotlight can only be grabbed with Select or their own tool.</summary>
     private bool GrabsAreaEffects => _tool is Tool.Select or Tool.Blur or Tool.Spotlight;
@@ -1368,7 +1375,7 @@ public sealed partial class EditorWindow : Window
         {
             Tool.Select => _arrowCursor,
             Tool.Text => _textCursor,
-            _ => _crossCursor,
+            _ => CrossCursor,
         };
 
         if (point is Vector2 p)
@@ -1391,7 +1398,7 @@ public sealed partial class EditorWindow : Window
     private InputCursor HandleCursor(Annotation annotation, int handle)
     {
         if (handle == RotateHandle)
-            return _rotateCursor;
+            return RotateCursor;
         var handles = annotation.Handles;
         if (handles.Count != 4)
             return _moveCursor;

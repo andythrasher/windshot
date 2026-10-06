@@ -179,14 +179,14 @@ public sealed partial class EditorWindow
     private InputCursor CropCursor(Vector2 p)
     {
         if (_cropRect is not Rect crop)
-            return _crossCursor;
+            return CrossCursor;
         return HitCropHandle(crop, p) switch
         {
             0 or 2 => _resizeNwSeCursor,
             1 or 3 => _resizeNeSwCursor,
             4 or 6 => _resizeNsCursor,
             5 or 7 => _resizeWeCursor,
-            _ => crop.Contains(p.ToPoint()) && !crop.Equals(_document.ContentBounds) ? _moveCursor : _crossCursor,
+            _ => crop.Contains(p.ToPoint()) && !crop.Equals(_document.ContentBounds) ? _moveCursor : CrossCursor,
         };
     }
 }

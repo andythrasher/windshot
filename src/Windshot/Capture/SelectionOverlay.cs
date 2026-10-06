@@ -74,7 +74,7 @@ internal sealed class SelectionOverlay : Form
         TopMost = true;
         DoubleBuffered = true;
         KeyPreview = true;
-        Cursor = Cursors.Cross;
+        Cursor = Shell.AppCursors.CrossForms(MonitorScale) ?? Cursors.Cross;
         Bounds = monitorBounds;
     }
 
