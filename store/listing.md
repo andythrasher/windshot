@@ -48,13 +48,16 @@ CAPTURE
 EDIT
 • Arrows, shapes (rectangles, ellipses, triangles and polygons, outlined or filled), text, numbered steps, highlighter, spotlight, blur and pixelate.
 • An options bar shows the settings for whatever you're drawing or have selected.
-• Everything stays editable: move, resize, recolor or restyle any annotation at any time.
+• Everything stays editable: move, resize, rotate, recolor or restyle any annotation at any time.
+• Give anything an outline, a soft shadow or rounder corners so it stands out.
+• Insert pictures (PNG, JPEG or WebP) by pasting or dropping them in.
 • Draw past the edge and the canvas grows to fit.
 • Crop after the fact, and pixelate anything private before you share it.
 • Beautify: set the capture on a gradient backdrop with rounded corners and a shadow.
 
 LAYERS
 • Restack, hide, rename and fade annotations like in a photo editor.
+• Select several at once to recolor, fade, move or delete them together.
 • Blur and spotlight work like adjustment layers on everything beneath them.
 
 SCROLLING CAPTURE
@@ -80,6 +83,14 @@ PRIVATE BY DESIGN
 Windshot lives in the notification area and starts in a blink. It can start with Windows, and every shortcut can be changed in Settings.
 
 ### What's new in this version
+
+1.2:
+• Insert pictures as layers: PNG, JPEG or WebP, from the toolbar, by pasting, or by dropping files on the editor.
+• Style any annotation or picture with an outline, a soft shadow and rounder corners.
+• Select several layers with Ctrl- or Shift-click to recolor, fade, move or delete them together.
+• Save goes straight to your Screenshots folder (change the folder, or ask every time, in Settings). Ctrl+Shift+S saves elsewhere.
+• A more compact toolbar, sized for a mouse.
+• Finer cursors: a thin crosshair, smaller hands, and a rotate cursor.
 
 1.1:
 • New shapes: ellipses, triangles and polygons, outlined or filled. Fill a shape to cover something up.
@@ -114,6 +125,8 @@ Windshot lives in the notification area and starts in a blink. It can start with
 10. Every shortcut is customizable, including Print Screen
 11. No account, no tracking, no network connections of its own
 12. Optional supporter extras: editor themes, color sets, fonts and stickers
+13. Insert pictures as layers, and give anything an outline, shadow or rounded corners
+14. Save straight to your Screenshots folder in one click
 
 ### Search terms (7 max, 30 characters each)
 
