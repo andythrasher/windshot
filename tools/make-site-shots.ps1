@@ -13,7 +13,7 @@ $params.Param[0] = New-Object Drawing.Imaging.EncoderParameter ([Drawing.Imaging
 # Below the headline, down to just under the shadow of the tallest window.
 $crop = New-Object Drawing.Rectangle 0, 330, 3840, 1780
 
-foreach ($file in Get-ChildItem $src -Filter '0*.png') {
+foreach ($file in Get-ChildItem $src -Filter '*.png' | Where-Object BaseName -match '^\d\d-') {
   $img = [Drawing.Image]::FromFile($file.FullName)
   foreach ($width in 960, 1920) {
     $height = [int]($crop.Height * $width / $crop.Width)
