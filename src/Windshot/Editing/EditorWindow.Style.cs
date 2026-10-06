@@ -18,6 +18,11 @@ public sealed partial class EditorWindow
     /// </summary>
     private void SyncOptions()
     {
+        if (_group.Count > 0)
+        {
+            SyncGroupOptions();
+            return;
+        }
         var subject = _selected is { } selected ? ToolFor(selected) : _tool;
         bool sized = _toolWeights.ContainsKey(subject);
         bool colored = subject is Tool.Arrow or Tool.Rectangle or Tool.Text or Tool.Step or Tool.Highlighter;
@@ -36,9 +41,22 @@ public sealed partial class EditorWindow
             ? "Drag the edges or draw a new area. Enter applies, Esc cancels."
             : "Click a layer to change it, or pick a tool to draw.";
         Show(HintContainer, !sized && !colored);
-
-        static void Show(UIElement element, bool show) => element.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
     }
+
+    /// <summary>For layers selected together: their color, if any of them has one, and what else works on them.</summary>
+    private void SyncGroupOptions()
+    {
+        bool colored = _group.Any(a => !a.IsAreaEffect);
+        foreach (var element in new UIElement[] { SizeContainer, BlendContainer, FontContainer, TextBackgroundButton, PixelateButton, ShapeSeparator, FillButton })
+            Show(element, false);
+        foreach (var button in ShapeButtons)
+            Show(button, false);
+        Show(ColorContainer, colored);
+        OptionsHint.Text = $"{_group.Count} layers selected. Drag one to move them all, or press Delete to remove them.";
+        Show(HintContainer, true);
+    }
+
+    private static void Show(UIElement element, bool show) => element.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
 
     // ---- Fonts -------------------------------------------------------------------------
 

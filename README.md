@@ -91,7 +91,9 @@ Ctrl+wheel zooms.
 **Layers** (L, or the toolbar's Layers button) opens a panel listing every object, topmost
 first, with the screenshot at the bottom. Click a layer to select it, drag to restack it (or
 Ctrl+] and Ctrl+[, with Shift for top and bottom), use the eye to hide it (hidden layers aren't
-exported), set its opacity with the slider, and double-click to rename it. Blur, highlight and
+exported), set its opacity with the slider, and double-click to rename it. Ctrl-click or
+Shift-click rows (or Ctrl-click objects on the canvas) to select several layers: then the color,
+the opacity slider and Delete act on all of them, and dragging one moves them together. Blur, highlight and
 spotlight work like adjustment layers: they change everything beneath them, so a blur above an
 arrow blurs the arrow too. New ones start just above the screenshot. Step numbers follow the
 order they were placed, not the stacking. Hiding the screenshot exports just the annotations.

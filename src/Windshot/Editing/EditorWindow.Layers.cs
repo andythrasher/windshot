@@ -12,7 +12,8 @@ namespace Windshot.Editing;
 /// The layers panel (L, or the toolbar's Layers button): every object topmost first, with the
 /// screenshot pinned at the bottom. Click to select, drag to restack, the eye to hide,
 /// double-click to rename; the slider sets the selected layer's opacity. Ctrl+] and Ctrl+[
-/// restack the selection from the keyboard (with Shift, to the top or bottom).
+/// restack the selection from the keyboard (with Shift, to the top or bottom). Ctrl- and
+/// Shift-click select several layers, to recolor, fade, delete or move together.
 /// </summary>
 public sealed partial class EditorWindow
 {
@@ -30,16 +31,74 @@ public sealed partial class EditorWindow
     private bool _imageLayerSelected;
     private bool _layersOpen;
 
+    /// <summary>
+    /// Layers selected together (Ctrl- or Shift-click in the panel, Ctrl-click on the canvas),
+    /// in stacking order: two or more, or empty when there's one selection (<see cref="_selected"/>)
+    /// or none. They can be deleted, faded, recolored and moved together.
+    /// </summary>
+    private readonly List<Annotation> _group = new();
+    /// <summary>Changes with each new group, so edits to one group coalesce into one undo step but not with the next group's.</summary>
+    private object _groupKey = new();
+    /// <summary>Set while the selection comes from clicks in the panel, which then already shows it.</summary>
+    private bool _pickingInPanel;
+
+    /// <summary>Everything selected: the group, the one selected layer, or nothing.</summary>
+    private IReadOnlyList<Annotation> Selection => _group.Count > 0 ? _group : _selected is { } one ? [one] : [];
+
+    /// <summary>Selects several layers at once; one (or none) is an ordinary selection.</summary>
+    private void SelectGroup(IEnumerable<Annotation> layers)
+    {
+        var picked = _document.Annotations.Where(layers.Contains).ToList();
+        if (picked.Count < 2)
+        {
+            Select(picked.FirstOrDefault());
+            return;
+        }
+        Select(null);
+        _group.AddRange(picked);
+        _groupKey = new();
+        SyncLayerSelection();
+        SyncColor();
+        SyncOptions();
+        Canvas.Invalidate();
+    }
+
+    /// <summary>Ctrl-click on the canvas: adds the layer to the selection, or takes it out.</summary>
+    private void ToggleSelected(Annotation annotation)
+    {
+        var layers = Selection.ToList();
+        if (!layers.Remove(annotation))
+            layers.Add(annotation);
+        SelectGroup(layers);
+    }
+
     private void InitializeLayers()
     {
         LayerList.SelectionChanged += (_, _) =>
         {
-            if (_syncingLayers || (LayerList.SelectedItem as FrameworkElement)?.Tag is not Annotation annotation)
+            if (_syncingLayers)
                 return;
+            var picked = LayerList.SelectedItems.OfType<FrameworkElement>().Select(row => row.Tag).OfType<Annotation>().ToList();
+            if (picked.Count == 0)
+            {
+                // Ctrl-clicking the last selected row clears the selection; there's no other way to empty it.
+                if (!_imageLayerSelected)
+                    Select(null);
+                return;
+            }
             if (_tool == Tool.Crop)
                 SetTool(Tool.Select);
             CommitTextEdit();
-            Select(annotation);
+            // The panel already shows this selection; redoing it would lose the list's anchor for Shift-click.
+            _pickingInPanel = true;
+            try
+            {
+                SelectGroup(picked);
+            }
+            finally
+            {
+                _pickingInPanel = false;
+            }
         };
         // Dragging rows restacks the objects (the list is topmost first).
         LayerList.DragItemsCompleted += (_, _) => ApplyLayerOrder();
@@ -90,11 +149,15 @@ public sealed partial class EditorWindow
 
     private void DeleteSelected()
     {
-        if (_selected is not { } annotation)
+        var doomed = Selection.ToList();
+        if (doomed.Count == 0)
             return;
         CommitTextEdit();
-        _document.Annotations.Remove(annotation);
-        (annotation as IDisposable)?.Dispose();
+        foreach (var annotation in doomed)
+        {
+            _document.Annotations.Remove(annotation);
+            (annotation as IDisposable)?.Dispose();
+        }
         Select(null);
         Commit();
     }
@@ -141,7 +204,13 @@ public sealed partial class EditorWindow
         if (_syncingLayers)
             return;
         float opacity = (float)(e.NewValue / 100);
-        if (_selected is { } annotation)
+        if (_group.Count > 0)
+        {
+            foreach (var annotation in _group)
+                annotation.Opacity = opacity;
+            Commit(coalesceKey: ("opacity", _groupKey));
+        }
+        else if (_selected is { } annotation)
         {
             annotation.Opacity = opacity;
             Commit(coalesceKey: ("opacity", annotation));
@@ -320,23 +389,33 @@ public sealed partial class EditorWindow
         return copy;
     }
 
-    /// <summary>Shows the canvas selection in the panel, and the selected layer's opacity on the slider.</summary>
+    /// <summary>
+    /// Shows the canvas selection in the panel, and the selected layer's opacity on the slider
+    /// (for a group, the topmost one's; moving the slider sets them all).
+    /// </summary>
     private void SyncLayerSelection()
     {
-        if (_selected is not null)
+        var selection = Selection;
+        if (selection.Count > 0)
             _imageLayerSelected = false;
         if (!_layersOpen)
             return;
         _syncingLayers = true;
-        LayerList.SelectedItem = LayerRows.FirstOrDefault(row => row.Tag == _selected);
+        var rows = LayerRows.Where(row => selection.Contains((Annotation)row.Tag)).ToList();
+        if (!_pickingInPanel && !rows.ToHashSet().SetEquals(LayerList.SelectedItems.OfType<Grid>()))
+        {
+            LayerList.SelectedItems.Clear();
+            foreach (var row in rows)
+                LayerList.SelectedItems.Add(row);
+        }
         ImageLayerRow.Background = _imageLayerSelected
             ? (Brush)Application.Current.Resources["SubtleFillColorSecondaryBrush"]
             : new SolidColorBrush(Microsoft.UI.Colors.Transparent);
 
-        float? opacity = _selected?.Opacity ?? (_imageLayerSelected ? _document.ImageOpacity : null);
+        float? opacity = selection.Count > 0 ? selection[^1].Opacity : _imageLayerSelected ? _document.ImageOpacity : null;
         LayerOpacity.IsEnabled = opacity is not null;
         LayerOpacity.Value = Math.Round((opacity ?? 1) * 100);
-        DeleteLayerButton.IsEnabled = _selected is not null;
+        DeleteLayerButton.IsEnabled = selection.Count > 0;
         _syncingLayers = false;
     }
 }

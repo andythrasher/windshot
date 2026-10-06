@@ -266,7 +266,7 @@
                     <ListView
                         x:Name="LayerList"
                         Grid.Row="1"
-                        SelectionMode="Single"
+                        SelectionMode="Extended"
                         CanDragItems="True"
                         CanReorderItems="True"
                         AllowDrop="True" />
@@ -297,7 +297,7 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="Opacity" VerticalAlignment="Center" />
                         <Slider x:Name="LayerOpacity" Grid.Column="1" Minimum="0" Maximum="100" StepFrequency="1" VerticalAlignment="Center" IsEnabled="False" />
-                        <Button x:Name="DeleteLayerButton" Grid.Column="2" Width="32" Height="32" Padding="0" Background="Transparent" BorderThickness="0" IsEnabled="False" ToolTipService.ToolTip="Delete layer (Delete)" />
+                        <Button x:Name="DeleteLayerButton" Grid.Column="2" Width="32" Height="32" Padding="0" Background="Transparent" BorderThickness="0" IsEnabled="False" ToolTipService.ToolTip="Delete (Delete)" />
                     </Grid>
                 </Grid>
             </Border>

@@ -83,6 +83,9 @@ public sealed partial class EditorWindow : Window
     /// <param name="Start">Where the drag began, in document coordinates.</param>
     private sealed record DragState(uint PointerId, Annotation Target, int Handle, bool Creating, Vector2 Start)
     {
+        /// <summary>What a move drags: the object, or the whole group it's part of.</summary>
+        public IReadOnlyList<Annotation> Movers { get; init; } = [Target];
+
         /// <summary>How far the whole object has been moved so far (Shift keeps it to one axis).</summary>
         public Vector2 Moved { get; set; }
 
@@ -296,6 +299,7 @@ public sealed partial class EditorWindow : Window
     private void Select(Annotation? annotation)
     {
         _selected = annotation;
+        _group.Clear();
         _imageLayerSelected = false;
         SyncLayerSelection();
         if (annotation is { IsAreaEffect: false })
@@ -492,11 +496,12 @@ public sealed partial class EditorWindow : Window
     {
         CommitTextEdit();
         ActiveColor = color;
-        if (_selected is { IsAreaEffect: false } && _selected.Color != color)
-        {
-            _selected.Color = color;
-            Commit(coalesceKey: ("color", _selected));
-        }
+        // A group's blurs and spotlights have no color of their own; everything else takes it.
+        var recolor = Selection.Where(a => !a.IsAreaEffect && a.Color != color).ToList();
+        foreach (var annotation in recolor)
+            annotation.Color = color;
+        if (recolor.Count > 0)
+            Commit(coalesceKey: ("color", _group.Count > 0 ? _groupKey : _selected));
         SyncColor();
         Canvas.Invalidate();
     }
@@ -623,8 +628,8 @@ public sealed partial class EditorWindow : Window
             case (VirtualKey)219: SetWeight((int)WeightSlider.Value - 1); break; // [
             case (VirtualKey)221: SetWeight((int)WeightSlider.Value + 1); break; // ]
             case VirtualKey.L when !ctrl: SetLayersOpen(!_layersOpen); break;
-            case VirtualKey.Delete or VirtualKey.Back when _selected is not null: DeleteSelected(); break;
-            case VirtualKey.Escape when _selected is not null: Select(null); break;
+            case VirtualKey.Delete or VirtualKey.Back when Selection.Count > 0: DeleteSelected(); break;
+            case VirtualKey.Escape when Selection.Count > 0: Select(null); break;
             default: handled = false; break;
         }
         e.Handled = handled;
@@ -686,6 +691,8 @@ public sealed partial class EditorWindow : Window
 
         if (_selected is { Visible: true } && _selected != _editingText)
             DrawSelection(ds, _selected);
+        foreach (var member in _group.Where(a => a.Visible))
+            DrawOutline(ds, member); // selected together: outlined, without handles
         if (_cropRect is { } crop)
             DrawCropOverlay(ds, crop);
 
@@ -703,12 +710,7 @@ public sealed partial class EditorWindow : Window
         float px = 1 / _view.M11;
         // Text has no edge of its own, and neither does a blur; outline both so the extent is clear.
         if (annotation.Handles.Count == 0 || annotation.IsAreaEffect || annotation is TextAnnotation)
-        {
-            // Turned with the object, so it hugs it.
-            using var dashed = new CanvasStrokeStyle { DashStyle = CanvasDashStyle.Dash };
-            using var outline = CanvasGeometry.CreatePolygon(ds, annotation.Corners(annotation.Frame.Inflate(2 * px)));
-            ds.DrawGeometry(outline, AccentColor, 1.5f * px, dashed);
-        }
+            DrawOutline(ds, annotation);
 
         // The rotate handle, on a stalk from the middle of the top edge.
         var (stalk, rotate) = RotateHandleAt(annotation);
@@ -718,6 +720,15 @@ public sealed partial class EditorWindow : Window
             ds.FillCircle(handle, HandleRadius * px, Color.FromArgb(255, 255, 255, 255));
             ds.DrawCircle(handle, HandleRadius * px, AccentColor, 1.5f * px);
         }
+    }
+
+    /// <summary>A dashed outline around the object, turned with it so it hugs it.</summary>
+    private void DrawOutline(CanvasDrawingSession ds, Annotation annotation)
+    {
+        float px = 1 / _view.M11;
+        using var dashed = new CanvasStrokeStyle { DashStyle = CanvasDashStyle.Dash };
+        using var outline = CanvasGeometry.CreatePolygon(ds, annotation.Corners(annotation.Frame.Inflate(2 * px)));
+        ds.DrawGeometry(outline, AccentColor, 1.5f * px, dashed);
     }
 
     /// <summary>The rotate handle (and the foot of its stalk): above the middle of the top edge, turned with the object.</summary>
@@ -822,21 +833,44 @@ public sealed partial class EditorWindow : Window
             return;
         }
 
+        // Ctrl-click adds an object to the selection, or takes it out.
+        if (e.KeyModifiers.HasFlag(Windows.System.VirtualKeyModifiers.Control))
+        {
+            if (_document.HitTest(p, tolerance, includeAreaEffects: true) is Annotation picked)
+                ToggleSelected(picked);
+            return;
+        }
+
         if (_selected is not null && HitHandle(_selected, p) is int handle)
         {
             StartDrag(e, _selected, handle, creating: false, p);
         }
-        else if (_document.HitTest(p, tolerance, GrabsAreaEffects) is Annotation hit)
+        else if (GrabAt(p, tolerance) is Annotation hit)
         {
             // Clicking an existing object grabs it, whichever tool is active; text too, so
-            // it can be moved with the text tool. Double-clicking text edits it.
-            Select(hit);
+            // it can be moved with the text tool. Double-clicking text edits it. Grabbing one
+            // of a group moves the whole group.
+            if (!_group.Contains(hit))
+                Select(hit);
             StartDrag(e, hit, MoveWhole, creating: false, p);
         }
         else
         {
             CreateAt(e, p);
         }
+    }
+
+    /// <summary>
+    /// What a click grabs: the topmost object there, except that blurs and spotlights need the
+    /// right tool (see <see cref="GrabsAreaEffects"/>), or to be part of the group selected.
+    /// </summary>
+    private Annotation? GrabAt(Vector2 p, float tolerance)
+    {
+        var hit = _document.HitTest(p, tolerance, GrabsAreaEffects);
+        if (_group.Count > 0 && (hit is null || !_group.Contains(hit)) &&
+            _document.HitTest(p, tolerance, includeAreaEffects: true) is { } member && _group.Contains(member))
+            return member;
+        return hit;
     }
 
     private void CreateAt(PointerRoutedEventArgs e, Vector2 p)
@@ -938,6 +972,7 @@ public sealed partial class EditorWindow : Window
             Pivot = pivot,
             StartAngle = MathF.Atan2(p.Y - pivot.Y, p.X - pivot.X),
             FromAngle = target.Angle,
+            Movers = handle == MoveWhole && _group.Contains(target) ? _group.ToList() : [target],
         };
         CanvasHost.CapturePointer(e.Pointer);
         Canvas.Invalidate();
@@ -1064,7 +1099,8 @@ public sealed partial class EditorWindow : Window
             var moved = p - _drag.Start;
             if (shift)
                 moved = Math.Abs(moved.X) >= Math.Abs(moved.Y) ? new Vector2(moved.X, 0) : new Vector2(0, moved.Y);
-            _drag.Target.MoveBy(moved - _drag.Moved);
+            foreach (var mover in _drag.Movers)
+                mover.MoveBy(moved - _drag.Moved);
             _drag.Moved = moved;
         }
         _drag.Changed |= p != _drag.Start;
@@ -1337,7 +1373,7 @@ public sealed partial class EditorWindow : Window
                 cursor = CropCursor(p);
             else if (_selected is not null && HitHandle(_selected, p) is int handle)
                 cursor = HandleCursor(_selected, handle);
-            else if (_document.HitTest(p, HitTolerance / _view.M11, GrabsAreaEffects) is Annotation hit)
+            else if (GrabAt(p, HitTolerance / _view.M11) is not null)
                 cursor = _moveCursor;
         }
         CanvasHost.Cursor = cursor;
