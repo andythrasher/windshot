@@ -149,4 +149,28 @@ foreach ($note in $notes[0..6]) {
     $y += 270; $i++
 }
 $g.Dispose(); $bmp.Save("$out\demo-long.png", [Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose()
+
+# ---- Lumen on a phone, on transparency, to insert as a picture (220 x 440 DIP) ----
+$bmp = New-Object Drawing.Bitmap ([int](220 * $k)), ([int](440 * $k))
+$g = [Drawing.Graphics]::FromImage($bmp)
+$g.SmoothingMode = 'AntiAlias'; $g.TextRenderingHint = 'AntiAliasGridFit'
+$g.Clear([Drawing.Color]::Transparent)
+RR $g (Brush '#1b1f2e') 0 0 220 440 34                      # the phone
+RR $g (Brush '#f6f7fb') 8 8 204 424 27                       # its screen
+RR $g (Brush '#1b1f2e') 82 16 56 14 7                        # camera notch
+T $g 'Today' (F 18 'Bold') '#141a2b' 22 44
+T $g 'Website relaunch' (F 11) '#7a8197' 23 70
+$y = 98
+foreach ($t in $tasks[1..4]) {
+    RR $g (Brush '#ffffff') 18 $y 184 58 10 (New-Object Drawing.Pen (C '#e6e8f0'), ([float](1 * $k)))
+    T $g $t[0] (F 11.5 'Bold') '#1d2433' 30 ($y + 9)
+    $sw = 14 + 6.6 * $t[2].Length
+    RR $g (New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(28, (C $statuses[$t[2]])))) 30 ($y + 31) $sw 18 9
+    T $g $t[2] (F 9.5 'Bold') $statuses[$t[2]] 37 ($y + 33)
+    T $g $t[3] (F 10.5) '#5d6478' 160 ($y + 33)
+    $y += 68
+}
+RR $g (Brush '#2f6fd0') 18 382 184 34 10
+T $g 'Add task' (F 12 'Bold') '#ffffff' 82 389
+$g.Dispose(); $bmp.Save("$out\demo-phone.png", [Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose()
 'done'

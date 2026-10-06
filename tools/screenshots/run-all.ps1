@@ -2,8 +2,8 @@
 # Settings go in settings.json and Windshot restarts before each run (the scripts need a fresh
 # "Started" in the log). Hands off the mouse and keyboard while it runs (about a minute).
 #
-#   powershell -File tools/screenshots/run-all.ps1 [-Runs editor,shapes,themes,scroll]
-param([string[]]$Runs = @('editor', 'shapes', 'themes', 'scroll'))
+#   powershell -File tools/screenshots/run-all.ps1 [-Runs editor,shapes,themes,scroll,pictures]
+param([string[]]$Runs = @('editor', 'shapes', 'themes', 'scroll', 'pictures'))
 $ErrorActionPreference = 'Stop'
 # From the command line (-File), a comma-separated list arrives as one string.
 $Runs = $Runs -split ','
@@ -18,6 +18,7 @@ $runSettings = @{
     editor = $standard
     shapes = $standard
     scroll = $standard
+    pictures = $standard
     themes = '{ "Appearance": { "Window": "Moss", "Colors": "Moss" }, "Editor": { "Shape": "Rectangle", "FillShapes": false, "HighlighterBlend": "Multiply", "Font": "Segoe Print", "ShowLayers": false } }'
 }
 

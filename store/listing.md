@@ -146,6 +146,7 @@ order; the headline is in each image, and the caption (optional, 200 characters)
 7. `07-themes.png`: Supporter themes, color sets and fonts: a one-time purchase. Everything else is free.
 8. `08-pin.png`: Float a capture above your other windows while you work.
 9. `09-settings.png`: Change any shortcut, including Print Screen, and start with Windows.
+10. `10-pictures.png`: Paste or drop in a picture, and give it, or anything else, an outline, a soft shadow and rounded corners.
 ### Store logos
 
 Partner Center can use the package's logos. Optionally upload a 1:1 box art at 1080×1080 or

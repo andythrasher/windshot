@@ -148,7 +148,7 @@
                         <!-- Free to extend past the window's bottom: confined to the window, it
                              would slide up over the toolbar once the color wheel is open, and
                              open behind the "…" menu, which is a window of its own. -->
-                        <Flyout x:Name="ColorFlyout" Placement="Bottom" ShouldConstrainToRootBounds="False">
+                        <Flyout x:Name="ColorFlyout" Placement="BottomEdgeAlignedLeft" ShouldConstrainToRootBounds="False">
                             <StackPanel x:Name="ColorFlyoutContent" Spacing="12">
                                 <!-- Switching sets recolors what's drawn to the new set's matching colors. -->
                                 <!-- For supporters (shown in code). -->
@@ -190,7 +190,7 @@
                     </StackPanel>
                     <DropDownButton.Flyout>
                         <!-- Unconfined like the color menu, so it opens above the "…" menu too. -->
-                        <Flyout x:Name="StyleFlyout" Placement="Bottom" ShouldConstrainToRootBounds="False">
+                        <Flyout x:Name="StyleFlyout" Placement="BottomEdgeAlignedLeft" ShouldConstrainToRootBounds="False">
                             <StackPanel x:Name="StyleFlyoutContent" Width="248" Spacing="8">
                                 <Slider x:Name="OutlineSlider" Header="Outline" Minimum="0" Maximum="10" StepFrequency="1" />
                                 <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,-6,0,0">
