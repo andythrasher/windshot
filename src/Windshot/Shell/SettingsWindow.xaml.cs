@@ -75,7 +75,6 @@ public sealed partial class SettingsWindow : Window
             ShowStrip(WindowThemePreview, theme.WindowSwatches, 18);
             _theming.Apply(theme); // this window previews the editor theme
             Save(s => s.Appearance.Window = theme.Name);
-            ShowSupporter();
         };
         ColorSet.SelectionChanged += (_, _) =>
         {
@@ -84,7 +83,6 @@ public sealed partial class SettingsWindow : Window
             var theme = Themes.All[ColorSet.SelectedIndex];
             ShowStrip(ColorSetPreview, theme.Colors.Select(c => c.Color).ToArray(), 10);
             Save(s => s.Appearance.Colors = theme.Name);
-            ShowSupporter();
         };
         StartWithWindows.Toggled += async (_, _) =>
         {
@@ -125,17 +123,6 @@ public sealed partial class SettingsWindow : Window
             }
         };
         OpenFile.Click += (_, _) => App.OpenSettingsFile();
-        SupporterButton.Click += async (_, _) =>
-        {
-            SupporterButton.IsEnabled = false;
-            string? problem = await Supporter.PurchaseAsync(this);
-            SupporterButton.IsEnabled = true;
-            SupporterProblem.Text = problem ?? "";
-            SupporterProblem.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
-            ShowSupporter();
-        };
-        Supporter.Changed += ShowSupporter;
-        Closed += (_, _) => Supporter.Changed -= ShowSupporter;
 
         Load();
         ShowStatus(App.Instance.ApplyHotkeys());
@@ -196,37 +183,7 @@ public sealed partial class SettingsWindow : Window
         ShowSaveFolder();
         WindowTheme.SelectedIndex = Array.IndexOf(Themes.All, Themes.Find(s.Appearance.Window));
         ColorSet.SelectedIndex = Array.IndexOf(Themes.All, Themes.Find(s.Appearance.Colors));
-        ShowSupporter();
         _loading = false;
-    }
-
-    /// <summary>
-    /// The supporter card, and while the extras are locked, a note on a supporter theme or color
-    /// set that it's only being previewed here.
-    /// </summary>
-    private void ShowSupporter()
-    {
-        bool unlocked = Supporter.IsUnlocked;
-        SupporterTitle.Text = unlocked ? "Thank you for supporting Windshot" : "Become a supporter";
-        SupporterDescription.Text = unlocked
-            ? "Every editor theme, color set, font and sticker is yours, along with the color wheel."
-            : $"Windshot is free. A one-time purchase unlocks {SupporterPrompt.Extras}, and helps keep Windshot going.";
-        SupporterButton.Content = Supporter.Price is { } price ? $"Support for {price}" : "Become a supporter";
-        SupporterButton.Visibility = unlocked ? Visibility.Collapsed : Visibility.Visible;
-
-        var s = Settings.Current.Appearance;
-        var window = Themes.Find(s.Window);
-        var colors = Themes.Find(s.Colors);
-        Note(WindowThemeNote, !unlocked && window != Themes.All[0],
-            $"{window.Name} is a supporter theme. You're previewing it here; editors use Windshot until you become a supporter.");
-        Note(ColorSetNote, !unlocked && colors != Themes.All[0],
-            $"The {colors.Name} colors are for supporters. Editors offer the Windshot colors until you become a supporter.");
-
-        static void Note(TextBlock note, bool show, string text)
-        {
-            note.Text = text;
-            note.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-        }
     }
 
     // ---- Save folder -------------------------------------------------------------------

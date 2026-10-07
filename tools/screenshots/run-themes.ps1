@@ -1,4 +1,4 @@
-# A supporter theme: run with settings.json set to the Moss window and colors and the Segoe
+# Another theme: run with settings.json set to the Moss window and colors and the Segoe
 # Print font (run-all.ps1 does that). Ends with the text selected and the layers panel open.
 . "$PSScriptRoot\lib-shots.ps1"
 AssertFreshStart
@@ -22,7 +22,7 @@ try {
   # Select the text (Font shows on the options bar), then open layers: that refits the image.
   Key @(0x56); Click (B 1150 455)
   Key @(0x4C); Park
-  GrabEditor 'raw-themes' 'Make it yours with supporter themes.' '07-themes'
+  GrabEditor 'raw-themes' 'Make it yours with themes and fonts.' '07-themes'
   CloseEditor
 } finally { $stage.Close() }
 "editors open: $(@(Get-Process Windshot | Where-Object MainWindowTitle -eq 'Windshot').Count)"

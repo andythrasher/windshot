@@ -64,20 +64,6 @@ public sealed partial class EditorWindow
     private void ShapeButton_Click(object sender, RoutedEventArgs e)
     {
         var kind = Enum.Parse<ShapeKind>((string)((FrameworkElement)sender).Tag);
-        if (kind == ShapeKind.Sticker && !Supporter.IsUnlocked)
-        {
-            // Stickers are a supporter extra.
-            SyncShapes();
-            DispatcherQueue.TryEnqueue(async () =>
-            {
-                if (await RequireSupporter("Stickers are"))
-                {
-                    SetShapeKind(ShapeKind.Sticker);
-                    Microsoft.UI.Xaml.Controls.Primitives.FlyoutBase.ShowAttachedFlyout(ShapeStickerButton);
-                }
-            });
-            return;
-        }
         SetShapeKind(kind);
         // The sticker button also opens the stickers to pick from.
         if (kind == ShapeKind.Sticker)

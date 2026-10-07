@@ -198,23 +198,8 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center">
-                            <TextBlock x:Name="SupporterTitle" />
-                            <TextBlock x:Name="SupporterDescription" Style="{StaticResource Description}" />
-                            <TextBlock x:Name="SupporterProblem" Style="{StaticResource Problem}" />
-                        </StackPanel>
-                        <Button x:Name="SupporterButton" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource AccentButtonStyle}" />
-                    </Grid>
-                </Border>
-                <Border Style="{StaticResource Card}">
-                    <Grid ColumnSpacing="16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="Editor theme" />
                             <TextBlock Style="{StaticResource Description}" Text="The editor window's colors, in light and dark mode. This window previews it; editors you open next use it." />
-                            <TextBlock x:Name="WindowThemeNote" Style="{StaticResource Description}" Visibility="Collapsed" />
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
                             <StackPanel x:Name="WindowThemePreview" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center" />
@@ -231,7 +216,6 @@
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="Annotation colors" />
                             <TextBlock Style="{StaticResource Description}" Text="The eight colors in the editor's color menu. Any set goes with any theme." />
-                            <TextBlock x:Name="ColorSetNote" Style="{StaticResource Description}" Visibility="Collapsed" />
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
                             <StackPanel x:Name="ColorSetPreview" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center" />

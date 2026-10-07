@@ -23,7 +23,7 @@ Draft text for Partner Center, field by field. Character limits are Partner Cent
 
 Category: Utility/productivity app. Every content question is "No": no violence, sexual content,
 language, controlled substances, gambling, user-generated content shared with others, location
-sharing, or personal-information sharing. In-app purchases: Yes (the supporter add-on). Expect the
+sharing, or personal-information sharing. In-app purchases: No (everything is free since 1.2). Expect the
 lowest rating in every region (e.g. ESRB Everyone, PEGI 3).
 
 ## Store listing (English, United States)
@@ -70,11 +70,11 @@ COPY TEXT
 PIN TO SCREEN
 • Float a capture above your other windows while you work. Zoom it, fade it, and find it where you left it after a restart.
 
-SUPPORTER EXTRAS (optional, one-time purchase)
-• Seven more editor themes, from calm Moss and Fjord to a loving tribute to Windows 3.1's Hot Dog Stand.
+MAKE IT YOURS
+• Eight editor themes, from calm Moss and Fjord to a loving tribute to Windows 3.1's Hot Dog Stand.
 • Matching annotation color sets, which work with any theme.
 • A color wheel for any color, fonts for text, and 24 stickers: checkmarks, warnings, stars, speech bubbles and more.
-Everything else in Windshot is free, with no limits.
+Every feature is free, with no limits and no purchases.
 
 PRIVATE BY DESIGN
 • No account, no analytics, no ads.
@@ -85,6 +85,7 @@ Windshot lives in the notification area and starts in a blink. It can start with
 ### What's new in this version
 
 1.2:
+• Everything is free now: every theme, color set, font and sticker, and the color wheel, for everyone.
 • Insert pictures as layers: PNG, JPEG or WebP, from the toolbar, by pasting, or by dropping files on the editor.
 • Style any annotation or picture with an outline, a soft shadow and rounder corners.
 • Select several layers with Ctrl- or Shift-click to recolor, fade, move or delete them together.
@@ -124,7 +125,7 @@ Windshot lives in the notification area and starts in a blink. It can start with
 9. Shapes: rectangles, ellipses, triangles and polygons, outlined or filled
 10. Every shortcut is customizable, including Print Screen
 11. No account, no tracking, no network connections of its own
-12. Optional supporter extras: editor themes, color sets, fonts and stickers
+12. Eight editor themes, matching color sets, fonts and stickers, all free
 13. Insert pictures as layers, and give anything an outline, shadow or rounded corners
 14. Save straight to your Screenshots folder in one click
 
@@ -138,12 +139,12 @@ In `store/screenshots`, made by `tools/screenshots` from a fictional demo app. U
 order; the headline is in each image, and the caption (optional, 200 characters) adds detail:
 
 1. `01-annotate.png`: Arrows, shapes, text, numbered steps, highlighter and blur, all still editable.
-2. `02-shapes.png`: Rectangles, ellipses, triangles and polygons, outlined or filled. Stickers are a supporter extra.
+2. `02-shapes.png`: Rectangles, ellipses, triangles and polygons, outlined or filled, and 24 stickers.
 3. `03-capture.png`: Drag a region or click a window. A magnifier and color picker help you land on the exact pixel.
 4. `04-layers.png`: Restack, hide, rename and fade annotations in the layers panel.
 5. `05-scrolling.png`: Scrolling capture stitches a long page into one image.
 6. `06-beautify.png`: A gradient backdrop with rounded corners and a shadow, ready to share.
-7. `07-themes.png`: Supporter themes, color sets and fonts: a one-time purchase. Everything else is free.
+7. `07-themes.png`: Eight editor themes, matching color sets and fonts for text.
 8. `08-pin.png`: Float a capture above your other windows while you work.
 9. `09-settings.png`: Change any shortcut, including Print Screen, and start with Windows.
 10. `10-pictures.png`: Paste or drop in a picture, and give it, or anything else, an outline, a soft shadow and rounded corners.
@@ -160,22 +161,19 @@ Partner Center can use the package's logos. Optionally upload a 1:1 box art at 1
 
 Leave empty (the standard Microsoft Store license applies).
 
-## Add-on: Supporter Pack (9NJ2V9GCKP9F)
+## Add-on: Supporter Pack (9NJ2V9GCKP9F), retired
 
-Durable, lifetime "Forever". In Partner Center: Windshot > Add-ons > Supporter Pack.
-
-- **Title (100 max):** Windshot Supporter Pack
-- **Description (200 max):** Support Windshot and unlock seven more editor themes, matching color sets, a color wheel, fonts for text and 24 stickers. A one-time purchase; Windshot itself stays free.
-- **Keywords:** themes · colors · fonts · stickers · supporter
-- **Icon (optional, 300×300):** the app icon works; the Store falls back to it.
-- **Price:** $4.99, with a launch sale at $1.99 until October 31, 2026. (The app shows whatever the Store's current price is, sale included.)
-- **Age rating:** inherits the app's; the app's questionnaire now answers yes to in-app purchases.
+Sold with 1.1 (one-time, $4.99, launch sale $1.99) to unlock themes, color sets, the color wheel,
+fonts and stickers. From 1.2 everything is free and the app no longer checks for it. In Partner
+Center, stop selling it (Windshot > Add-ons > Supporter Pack > Pricing and availability: make it
+hidden and no longer available for purchase). Buyers lose nothing, since everything it unlocked
+is now free; refunding them is a kind gesture, not a requirement.
 
 ## Submission options
 
 ### Restricted capability: runFullTrust (justification)
 
-Windshot is a Windows desktop app built with WinUI 3 and .NET on the Windows App SDK. It runs as a full-trust desktop process because its core features use desktop APIs: system-wide keyboard shortcuts (RegisterHotKey), capturing the screen across all monitors, a notification-area icon, and always-on-top windows for pinned captures. It makes no network connections of its own (the optional supporter add-on is checked and bought through Microsoft Store) and collects no data.
+Windshot is a Windows desktop app built with WinUI 3 and .NET on the Windows App SDK. It runs as a full-trust desktop process because its core features use desktop APIs: system-wide keyboard shortcuts (RegisterHotKey), capturing the screen across all monitors, a notification-area icon, and always-on-top windows for pinned captures. It makes no network connections of its own and collects no data.
 
 ### Notes for certification
 
