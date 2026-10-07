@@ -178,3 +178,15 @@ same icons by `tools/make-cursors.ps1`.
 - **WinUI 3 + Win2D for the editor; WinForms for tray, hotkey and overlay.** WinForms windows
   appear instantly. It's referenced via `FrameworkReference` rather than `UseWindowsForms`,
   because the latter pulls in WPF's XAML compiler, which breaks the WinUI build.
+
+## License
+
+Windshot's code is released under the [MIT License](LICENSE). It includes third-party
+material under its own licenses; see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
+### The Windshot name and icon
+
+The MIT License covers the code, not the Windshot name or icon. Those identify the official
+app on windshot.app and the Microsoft Store, so please don't use them for a fork or a build you
+distribute, or in a way that suggests it's the official app or endorsed by it. Give your version
+its own name and icon; saying it's "based on Windshot" is fine and welcome.

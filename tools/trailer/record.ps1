@@ -2,15 +2,16 @@
 # with eased pointer movement, like a person would. Scene start times go to marks.json, for
 # tools/trailer/assemble.ps1 to cut to the music. Hands off the mouse and keyboard (about 1.5 min).
 #
-#   powershell -File tools/trailer/record.ps1
+#   powershell -File tools/trailer/record.ps1 [-FfmpegPath <path to ffmpeg.exe>]
 #
 # Like tools/screenshots/run-all.ps1, it puts known settings in place, restarts Windshot, and
 # puts your settings (and clipboard text) back afterwards. Saves go to artifacts\trailer\Screenshots,
 # and the editor stays open after saving, so the finished image is on screen at the end.
+param([string]$FfmpegPath)
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot\..\screenshots\lib-shots.ps1"
-$ffmpeg = Get-ChildItem 'C:\dev\tools\ffmpeg' -Recurse -Filter ffmpeg.exe | Select-Object -First 1 -ExpandProperty FullName
-if (-not $ffmpeg) { throw 'ffmpeg not found under C:\dev\tools\ffmpeg.' }
+. "$PSScriptRoot\find-ffmpeg.ps1"
+$ffmpeg = Find-Ffmpeg $FfmpegPath
 $outDir = Join-Path $PSScriptRoot '..\..\artifacts\trailer'
 New-Item -ItemType Directory -Force $outDir, "$outDir\Screenshots" | Out-Null
 $outDir = (Resolve-Path $outDir).Path

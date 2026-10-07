@@ -2,19 +2,21 @@
 # the brand gradient, a headline per scene, and the recording inset with rounded corners and a
 # shadow; a title card first and an end card last, over the music. Also makes the thumbnail.
 #
-#   powershell -File tools/trailer/assemble.ps1
+#   powershell -File tools/trailer/assemble.ps1 [-FfmpegPath <path to ffmpeg.exe>]
 #
 # Output in artifacts\trailer: Windshot-trailer.mp4 (1920x1080, 30 fps, H.264 + AAC) and
 # Windshot-trailer-thumbnail.png. The music is the track in store\trailer, from 0:34 to its
 # stop at 1:20, so every cut lands on a bar line (120 BPM, a bar every 2 seconds) and the
 # end card plays over the chorus.
+param([string]$FfmpegPath)
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 $root = Resolve-Path (Join-Path $PSScriptRoot '..\..')
 $dir = Join-Path $root 'artifacts\trailer'
 $build = Join-Path $dir 'build'
 New-Item -ItemType Directory -Force $build | Out-Null
-$ffmpeg = Get-ChildItem 'C:\dev\tools\ffmpeg' -Recurse -Filter ffmpeg.exe | Select-Object -First 1 -ExpandProperty FullName
+. "$PSScriptRoot\find-ffmpeg.ps1"
+$ffmpeg = Find-Ffmpeg $FfmpegPath
 $music = Get-ChildItem (Join-Path $root 'store\trailer') -File | Where-Object Extension -in '.mp3', '.wav', '.m4a' | Select-Object -First 1 -ExpandProperty FullName
 $recording = Join-Path $dir 'recording.mkv'
 $musicStart = 34
