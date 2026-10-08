@@ -198,3 +198,9 @@ footer.site a { color: var(--muted); }
   header.site nav { gap: 14px; }
   .hero p.lead { font-size: 18px; }
 }
+
+/* Narrow screens: the links go on their own row under the name. */
+@media (max-width: 540px) {
+  header.site { flex-wrap: wrap; row-gap: 10px; }
+  header.site nav { flex-wrap: wrap; gap: 6px 16px; }
+}
