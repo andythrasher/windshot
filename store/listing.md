@@ -79,6 +79,7 @@ Every feature is free, with no limits and no purchases.
 PRIVATE BY DESIGN
 • No account, no analytics, no ads.
 • Windshot makes no network connections of its own. Your captures go only where you copy, save or pin them.
+• Open source under the MIT License, so anyone can check: github.com/andythrasher/windshot
 
 Windshot lives in the notification area and starts in a blink. It can start with Windows, and every shortcut can be changed in Settings.
 
@@ -86,6 +87,7 @@ Windshot lives in the notification area and starts in a blink. It can start with
 
 1.2:
 • Everything is free now: every theme, color set, font and sticker, and the color wheel, for everyone.
+• Windshot is open source: the code is on GitHub at github.com/andythrasher/windshot.
 • Insert pictures as layers: PNG, JPEG or WebP, from the toolbar, by pasting, or by dropping files on the editor.
 • Style any annotation or picture with an outline, a soft shadow and rounder corners.
 • Select several layers with Ctrl- or Shift-click to recolor, fade, move or delete them together.
@@ -128,6 +130,7 @@ Windshot lives in the notification area and starts in a blink. It can start with
 12. Eight editor themes, matching color sets, fonts and stickers, all free
 13. Insert pictures as layers, and give anything an outline, shadow or rounded corners
 14. Save straight to your Screenshots folder in one click
+15. Free and open source (MIT License), with the code on GitHub
 
 ### Search terms (7 max, 30 characters each)
 
