@@ -150,6 +150,9 @@ internal sealed class ThemedWindow
             resources["ToggleSwitchStrokeOn" + suffix] = new SolidColorBrush(color);
             resources["ToggleSwitchKnobFillOn" + suffix] = new SolidColorBrush(on);
             resources["HyperlinkButtonForeground" + suffix] = new SolidColorBrush(color);
+            resources["CheckBoxCheckBackgroundFillChecked" + suffix] = new SolidColorBrush(color);
+            resources["CheckBoxCheckBackgroundStrokeChecked" + suffix] = new SolidColorBrush(color);
+            resources["CheckBoxCheckGlyphForegroundChecked" + suffix] = new SolidColorBrush(on);
         }
         return resources;
     }

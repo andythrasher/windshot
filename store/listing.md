@@ -180,9 +180,9 @@ Windshot is a Windows desktop app built with WinUI 3 and .NET on the Windows App
 
 ### Notes for certification
 
-Windshot runs in the notification area and opens no window at launch. To test:
+Windshot runs in the notification area. Launched from Start, it shows a welcome window explaining that, with its shortcuts. To test:
 
-- Launch Windshot from Start. A Windshot icon appears in the notification area (it may be under the "show hidden icons" arrow).
+- Launch Windshot from Start. The welcome window opens ("Try a capture" starts one), and a Windshot icon appears in the notification area (it may be under the "show hidden icons" arrow).
 - Press Ctrl+Shift+2, or left-click the notification-area icon, or launch Windshot from Start again, to start a capture. Drag a region (or click a window) and the editor opens.
 - In the editor, use the toolbar to annotate; Ctrl+C copies, Ctrl+S saves, Ctrl+P pins.
 - Ctrl+Shift+3 copies text from a region. Ctrl+Shift+4 starts a scrolling capture; press it again (or Done) to finish.

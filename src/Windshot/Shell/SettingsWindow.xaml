@@ -124,6 +124,19 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Welcome window" />
+                            <TextBlock Style="{StaticResource Description}" Text="Show it when you start Windshot yourself (not when it starts with Windows)." />
+                        </StackPanel>
+                        <ToggleSwitch x:Name="ShowWelcome" Grid.Column="1" MinWidth="0" OnContent="" OffContent="" />
+                    </Grid>
+                </Border>
+                <Border Style="{StaticResource Card}">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="Magnifier while capturing" />
                             <TextBlock Style="{StaticResource Description}" Text="Shows the pixels and color under the cursor. M toggles it while capturing." />
                         </StackPanel>

@@ -64,7 +64,7 @@ function Restart-Windshot {
   if (@(Get-Process Windshot -ErrorAction SilentlyContinue | Where-Object MainWindowTitle -ne '').Count) { throw 'A Windshot window is open; close it first.' }
   Get-Process Windshot -ErrorAction SilentlyContinue | Stop-Process -Force
   Start-Sleep -Milliseconds 800
-  Start-Process $exe
+  Start-Process $exe --no-welcome
   for ($i = 0; $i -lt 40 -and -not ((Get-Content $log -Tail 1) -match 'Started'); $i++) { Start-Sleep -Milliseconds 250 }
   Start-Sleep -Milliseconds 2000
 }

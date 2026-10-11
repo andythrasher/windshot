@@ -44,7 +44,10 @@ the same hotkeys. The packaged app differs from the unpackaged one in two ways: 
 Windows is the package's startup task (Settings > Apps > Startup), and settings, pins and the
 log live in `%LOCALAPPDATA%\Packages\<package family name>\LocalState`.
 
-The app lives in the tray; tick **Start with Windows** in its menu to have it there (with your
+The app lives in the tray. Started by hand (not at sign-in), it opens a welcome window that says
+so, with the shortcuts, the editor theme and Start with Windows; its "Show this when Windshot
+starts" box (or Settings) turns that off, and `--no-welcome` skips it for scripts. The very first
+start also turns on Start with Windows. Tick **Start with Windows** in the tray menu to have it there (with your
 pins) after signing in. That's the usual per-user startup entry, so it also shows in Task
 Manager's Startup apps, and turning it off there is reflected in the menu. **Ctrl+Shift+2** captures: drag a region, or click to capture the
 window under the cursor (click the desktop for the whole monitor). On Windows 11, window
@@ -133,6 +136,7 @@ also hand-editable; comments and trailing commas are fine, and changes apply whe
 - `Hotkeys`: `Capture`, `CopyText` and `ScrollingCapture`, written like `"Ctrl+Shift+2"`, `"Alt+S"` or `"PrintScreen"`
   (for Print Screen, first turn off "Use the Print screen key to open screen capture" in
   Windows Settings → Accessibility → Keyboard).
+- `ShowWelcome` (default `true`): the welcome window when Windshot is started by hand.
 - `Capture`: `ShowMagnifier` (default `true`).
 - `Editor`: per-tool sizes (1–10), colors (`"#RRGGBB"`), pixelate and text background, and
   `CloseAfterSaveOrCopy` (default `true`).

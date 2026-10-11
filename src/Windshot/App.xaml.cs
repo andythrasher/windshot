@@ -72,6 +72,20 @@ public partial class App : Application
         Log.Write($"Started{(AppPackage.IsPackaged ? " (Store package)" : "")}{(atSignIn ? " at sign-in" : "")}; {hotkeys}" + (pins > 0 ? $"; restored {pins} pins" : ""));
         if (commandLine.Contains(SettingsArgument))
             OpenSettings();
+        else if (!atSignIn && Settings.Current.ShowWelcome && !commandLine.Contains(NoWelcomeArgument))
+            _ = WelcomeAsync();
+    }
+
+    /// <summary>For scripts that restart Windshot: start without the welcome window.</summary>
+    private const string NoWelcomeArgument = "--no-welcome";
+
+    private static async Task WelcomeAsync()
+    {
+        // The very first time, Start with Windows starts out on: a tray app that isn't there
+        // after a restart is soon forgotten. The welcome window shows it, with its switch.
+        if (Settings.IsFirstRun)
+            await Autostart.SetAsync(true);
+        WelcomeWindow.ShowOrActivate();
     }
 
     /// <summary>Which shortcuts registered. An empty shortcut is off, which isn't a failure.</summary>
@@ -139,6 +153,7 @@ public partial class App : Application
         else
             Log.Write("Settings reloaded");
         SettingsWindow.Refresh(); // show the hand edit if the window is open
+        WelcomeWindow.Refresh();
     }
 
     private static void OpenSettings() => SettingsWindow.ShowOrActivate();
@@ -212,7 +227,7 @@ public partial class App : Application
         }
     }
 
-    private void StartCapture()
+    internal void StartCapture()
     {
         try
         {

@@ -28,6 +28,12 @@ internal sealed class Settings
         Converters = { new JsonStringEnumConverter<Tool>(), new JsonStringEnumConverter<HighlightBlend>(), new JsonStringEnumConverter<ShapeKind>() },
     });
 
+    /// <summary>Show the welcome window when Windshot is started by hand (never at sign-in).</summary>
+    public bool ShowWelcome { get; set; } = true;
+
+    /// <summary>True when this run had no settings file yet: Windshot's very first start.</summary>
+    public static bool IsFirstRun { get; private set; }
+
     public HotkeySettings Hotkeys { get; set; } = new();
     public CaptureSettings Capture { get; set; } = new();
     public EditorSettings Editor { get; set; } = new();
@@ -170,6 +176,7 @@ internal sealed class Settings
         MigrateFromOldName();
         if (!File.Exists(FilePath))
         {
+            IsFirstRun = true;
             Current = new Settings();
             Save(); // write the defaults so there's something to edit
             return;
