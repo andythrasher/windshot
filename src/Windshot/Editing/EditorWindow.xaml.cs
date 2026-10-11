@@ -35,6 +35,8 @@ internal enum Tool
     Crop,
     /// <summary>Not a tool on the toolbar: inserted images (Insert image, paste or drop), for their options and style.</summary>
     Image,
+    /// <summary>Recordings only: an area the video zooms in to.</summary>
+    Zoom,
 }
 
 public sealed partial class EditorWindow : Window
@@ -299,6 +301,7 @@ public sealed partial class EditorWindow : Window
         BlurAnnotation => Tool.Blur,
         StepAnnotation => Tool.Step,
         SpotlightAnnotation => Tool.Spotlight,
+        ZoomAnnotation => Tool.Zoom,
         HighlighterAnnotation => Tool.Highlighter,
         ImageAnnotation => Tool.Image,
         _ => Tool.Rectangle,
@@ -628,6 +631,7 @@ public sealed partial class EditorWindow : Window
             case VirtualKey.B when !ctrl: SetTool(Tool.Blur); break;
             case VirtualKey.N when !ctrl: SetTool(Tool.Step); break;
             case VirtualKey.S when !ctrl: SetTool(Tool.Spotlight); break;
+            case VirtualKey.Z when !ctrl && IsVideo: SetTool(Tool.Zoom); break;
             case VirtualKey.H when !ctrl: SetTool(Tool.Highlighter); break;
             case VirtualKey.F when !ctrl && FillButton.Visibility == Visibility.Visible:
                 SetFill(FillButton.IsChecked != true);
@@ -704,7 +708,15 @@ public sealed partial class EditorWindow : Window
         if (_checkerBrush is not null)
             ds.FillRectangle(_document.Bounds, _checkerBrush);
 
-        _document.Render(ds, skip: _editingText, time: PlayheadTime);
+        // In a recording, zoom layers move the view like a camera; the selection's handles and the
+        // pointer go through the same move, so they line up with what's shown. While a zoom is
+        // being placed (or the crop set), the view stays out, to show the area being chosen.
+        bool placing = !_playing && (_tool is Tool.Zoom or Tool.Crop || Selection.Any(a => a is ZoomAnnotation));
+        var time = PlayheadTime;
+        _camera = IsVideo && !placing ? _document.Camera(time) : Matrix3x2.Identity;
+        // A moving layer, once selected, holds still where it was placed (except while playing), so it can be edited.
+        _document.Render(ds, skip: _editingText, time: time, still: _playing ? null : Selection, zoom: !placing);
+        ds.Transform = Shown;
         _editingText?.DrawChrome(ds); // the text box draws the letters on top
 
         if (_selected is { Visible: true } && _selected != _editingText)
@@ -716,7 +728,7 @@ public sealed partial class EditorWindow : Window
 
         if (_textDrag is not null)
         {
-            float px = 1 / _view.M11;
+            float px = 1 / ShownScale;
             using var dashed = new CanvasStrokeStyle { DashStyle = CanvasDashStyle.Dash };
             ds.DrawRectangle(new Windows.Foundation.Rect(_textDrag.Start.ToPoint(), _textDrag.End.ToPoint()), AccentColor, 1.5f * px, dashed);
         }
@@ -725,15 +737,23 @@ public sealed partial class EditorWindow : Window
 
     private void DrawSelection(CanvasDrawingSession ds, Annotation annotation)
     {
-        float px = 1 / _view.M11;
+        float px = 1 / ShownScale;
         // Text has no edge of its own, and neither does a blur; outline both so the extent is clear.
         if (annotation.Handles.Count == 0 || annotation.IsAreaEffect || annotation is TextAnnotation)
             DrawOutline(ds, annotation);
+        // A zoom also shows what will fill the video: its area, made the video's shape.
+        if (annotation is ZoomAnnotation zoom)
+            ds.DrawRectangle(zoom.Framing(_document.Card), Color.FromArgb(200, 255, 255, 255), 1 * px);
 
         // The rotate handle, on a stalk from the middle of the top edge.
-        var (stalk, rotate) = RotateHandleAt(annotation);
-        ds.DrawLine(stalk, rotate, AccentColor, 1.5f * px);
-        foreach (var handle in annotation.Handles.Append(rotate))
+        var handles = annotation.Handles.AsEnumerable();
+        if (annotation.CanRotate)
+        {
+            var (stalk, rotate) = RotateHandleAt(annotation);
+            ds.DrawLine(stalk, rotate, AccentColor, 1.5f * px);
+            handles = handles.Append(rotate);
+        }
+        foreach (var handle in handles)
         {
             ds.FillCircle(handle, HandleRadius * px, Color.FromArgb(255, 255, 255, 255));
             ds.DrawCircle(handle, HandleRadius * px, AccentColor, 1.5f * px);
@@ -743,7 +763,7 @@ public sealed partial class EditorWindow : Window
     /// <summary>A dashed outline around the object, turned with it so it hugs it.</summary>
     private void DrawOutline(CanvasDrawingSession ds, Annotation annotation)
     {
-        float px = 1 / _view.M11;
+        float px = 1 / ShownScale;
         using var dashed = new CanvasStrokeStyle { DashStyle = CanvasDashStyle.Dash };
         using var outline = CanvasGeometry.CreatePolygon(ds, annotation.Corners(annotation.Frame.Inflate(2 * px)));
         ds.DrawGeometry(outline, AccentColor, 1.5f * px, dashed);
@@ -755,7 +775,7 @@ public sealed partial class EditorWindow : Window
         var frame = annotation.Frame;
         var stalk = annotation.ToCanvas(new Vector2((float)(frame.X + frame.Width / 2), (float)frame.Top));
         var up = Vector2.TransformNormal(-Vector2.UnitY, Matrix3x2.CreateRotation(annotation.Angle));
-        return (stalk, stalk + up * (RotateHandleReach / _view.M11));
+        return (stalk, stalk + up * (RotateHandleReach / ShownScale));
     }
 
     /// <summary>The middle of the object, which turning goes around.</summary>
@@ -802,9 +822,18 @@ public sealed partial class EditorWindow : Window
              * Matrix3x2.CreateTranslation(left, ViewPadding);
     }
 
+    /// <summary>In a recording, how a zoom layer has moved the view as last drawn (identity otherwise).</summary>
+    private Matrix3x2 _camera = Matrix3x2.Identity;
+
+    /// <summary>From the canvas to the control, as shown: the view, after any zoom in a recording.</summary>
+    private Matrix3x2 Shown => _camera * _view;
+
+    /// <summary>Control pixels per canvas pixel, as shown: for sizing handles and reach.</summary>
+    private float ShownScale => Shown.M11;
+
     private Vector2 ToDocument(Vector2 controlPoint)
     {
-        Matrix3x2.Invert(_view, out var inverse);
+        Matrix3x2.Invert(Shown, out var inverse);
         return Vector2.Transform(controlPoint, inverse);
     }
 
@@ -838,7 +867,7 @@ public sealed partial class EditorWindow : Window
         }
 
         var p = ToDocument(point.Position.ToVector2());
-        float tolerance = HitTolerance / _view.M11;
+        float tolerance = HitTolerance / ShownScale;
 
         if (_polygonDraft is not null)
         {
@@ -906,7 +935,7 @@ public sealed partial class EditorWindow : Window
             return;
         }
 
-        int weight = _toolWeights[_tool];
+        int weight = _toolWeights.GetValueOrDefault(_tool, 4);
         if (_tool == Tool.Text)
         {
             // Text is created on release: a click places it at the default size, while a
@@ -931,6 +960,7 @@ public sealed partial class EditorWindow : Window
             Tool.Arrow => new ArrowAnnotation(p, _color, weight, Unit),
             Tool.Blur => new BlurAnnotation(p, _pixelate, weight, Unit),
             Tool.Spotlight => new SpotlightAnnotation(p, weight, Unit),
+            Tool.Zoom => new ZoomAnnotation(p, Unit),
             Tool.Highlighter => new HighlighterAnnotation(p, _highlightColor, weight, Unit) { Blend = _highlightBlend },
             _ => new ShapeAnnotation(p, _shapeKind, _color, weight, Unit) { Filled = _fillShapes, StickerIcon = _sticker },
         };
@@ -943,7 +973,7 @@ public sealed partial class EditorWindow : Window
     {
         var text = new TextAnnotation(drag.Start, _color, _toolWeights[Tool.Text], Unit) { Boxed = _textBoxed, FontFamily = _font };
         var box = new Windows.Foundation.Rect(drag.Start.ToPoint(), drag.End.ToPoint());
-        float minBox = 12 / _view.M11; // a few screen pixels of wobble still counts as a click
+        float minBox = 12 / ShownScale; // a few screen pixels of wobble still counts as a click
 
         if (box.Width >= minBox && box.Height >= minBox)
         {
@@ -970,14 +1000,14 @@ public sealed partial class EditorWindow : Window
     /// <summary>The handle under <paramref name="p"/>: an index into the handles, <see cref="RotateHandle"/>, or null.</summary>
     private int? HitHandle(Annotation annotation, Vector2 p)
     {
-        float reach = (HandleRadius + HitTolerance) / _view.M11;
+        float reach = (HandleRadius + HitTolerance) / ShownScale;
         var handles = annotation.Handles;
         for (int i = 0; i < handles.Count; i++)
         {
             if (Vector2.Distance(handles[i], p) <= reach)
                 return i;
         }
-        if (Vector2.Distance(RotateHandleAt(annotation).Handle, p) <= reach)
+        if (annotation.CanRotate && Vector2.Distance(RotateHandleAt(annotation).Handle, p) <= reach)
             return RotateHandle;
         return null;
     }
@@ -1208,7 +1238,7 @@ public sealed partial class EditorWindow : Window
             e.Handled = true;
             return;
         }
-        if (_document.HitTest(p, HitTolerance / _view.M11, includeAreaEffects: false, PlayheadTime) is TextAnnotation text)
+        if (_document.HitTest(p, HitTolerance / ShownScale, includeAreaEffects: false, PlayheadTime) is TextAnnotation text)
         {
             Select(text);
             BeginTextEdit(text, isNew: false);
@@ -1380,7 +1410,7 @@ public sealed partial class EditorWindow : Window
     private InputCursor CrossCursor => _crossCursor ??= Shell.AppCursors.Cross(RasterScale) ?? InputSystemCursor.Create(InputSystemCursorShape.Cross);
 
     /// <summary>Blur and spotlight can only be grabbed with Select or their own tool.</summary>
-    private bool GrabsAreaEffects => _tool is Tool.Select or Tool.Blur or Tool.Spotlight;
+    private bool GrabsAreaEffects => _tool is Tool.Select or Tool.Blur or Tool.Spotlight or Tool.Zoom;
 
     /// <summary>
     /// Crosshair for drawing tools, I-beam for text, arrow for select; over something that
@@ -1405,7 +1435,7 @@ public sealed partial class EditorWindow : Window
                 cursor = CropCursor(p);
             else if (_selected is not null && HitHandle(_selected, p) is int handle)
                 cursor = HandleCursor(_selected, handle);
-            else if (GrabAt(p, HitTolerance / _view.M11) is not null)
+            else if (GrabAt(p, HitTolerance / ShownScale) is not null)
                 cursor = _moveCursor;
         }
         CanvasHost.Cursor = cursor;
@@ -1447,7 +1477,7 @@ public sealed partial class EditorWindow : Window
         _editingIsNew = isNew;
         _textBeforeEdit = text.Text;
 
-        float scale = _view.M11;
+        float scale = ShownScale;
         var color = new SolidColorBrush(text.TextColor);
         var clear = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
         var box = new TextBox
@@ -1476,7 +1506,7 @@ public sealed partial class EditorWindow : Window
         }
 
         // Turned text is typed turned: the box turns about its top-left, where the text starts.
-        var position = Vector2.Transform(text.ToCanvas(text.Position), _view);
+        var position = Vector2.Transform(text.ToCanvas(text.Position), Shown);
         Microsoft.UI.Xaml.Controls.Canvas.SetLeft(box, position.X);
         Microsoft.UI.Xaml.Controls.Canvas.SetTop(box, position.Y);
         if (text.Angle != 0)
@@ -1711,6 +1741,7 @@ public sealed partial class EditorWindow : Window
         [nameof(Tool.Step)] = "number_circle_1",
         [nameof(Tool.Highlighter)] = "highlight",
         [nameof(Tool.Spotlight)] = "flashlight",
+        [nameof(Tool.Zoom)] = "zoom_in",
         [nameof(Tool.Crop)] = "crop",
         [nameof(Tool.Image)] = "image",
     };

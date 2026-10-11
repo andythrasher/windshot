@@ -66,7 +66,7 @@ In the editor: **A** arrow, **R** rectangle, **T** text (click, or drag a box to
 and wrapping width; the toolbar's text background toggle sets it on a colored box), **B** blur (**P** toggles pixelate,
 the default and the safer choice for hiding text), **N** numbered steps (they renumber when
 one is deleted), **S** spotlight (dims everything else), **H** highlighter (keeps its own color, yellow by
-default), **C** crop, **V** select. **[** and **]** (or the
+default), **Z** zoom (recordings only), **C** crop, **V** select. **[** and **]** (or the
 Size slider) and **1–8** (colors) change the selected object, or the next one drawn. Drag
 handles to reshape arrows and rectangles, or a text box's corners to scale its text; double-click text to edit it.
 **Style** on the options bar gives arrows, shapes, text, steps and images an outline (white or
@@ -108,8 +108,14 @@ trimmed is dimmed, not deleted); Space plays and pauses, the arrow keys step a f
 jump to the ends. Everything you draw sits on every frame, and beautify and crop apply throughout.
 Each layer can show for just part of the recording: select it, and its bar appears under the
 strip; drag its ends to set when it appears and goes, or drag the bar to move it. New layers
-start at the playhead. Fade in and Fade out (None, Quick or Slow) are on the options bar, with
-**Whole video** to show it throughout; selecting a layer that isn't showing moves the playhead to it.
+start at the playhead. The options bar's **Animate** menu has Fade in and Fade out (None, Quick
+or Slow), Motion (a slow zoom in or out, or a pan left, right, up or down, across the layer's time,
+starting from where it was placed; a selected layer holds still so it can be edited) and **Show for
+the whole video**; selecting a layer that isn't showing moves the playhead to it. The **Zoom** tool
+(Z) marks an area for the video to zoom in to: during the layer's time the view eases in until the
+area (widened to the video's shape) fills the frame, annotations included, then eases back out. Its
+Zoom in and Zoom out settings are how long that takes, and it lasts four seconds to start with.
+While a zoom is selected or being drawn, the view stays zoomed out to show its area.
 With nothing selected, the options bar has the sound switch, the format Save and Copy make (MP4,
 or an animated GIF) and a size limit. Save puts videos in *Videos\Screen Recordings* (Settings
 has its own folder, frame rate and pointer settings), and Copy copies the video as a file, which

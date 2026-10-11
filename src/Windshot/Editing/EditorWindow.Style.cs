@@ -42,6 +42,7 @@ public sealed partial class EditorWindow
         {
             Tool.Crop => "Drag the edges or draw a new area. Enter applies, Esc cancels.",
             Tool.Image => "Drag a corner to resize it; hold Shift to stretch it.",
+            Tool.Zoom => "Drag over an area: during the layer's time, the video zooms in to it, then back out.",
             _ => "Click a layer to change it, or pick a tool to draw.",
         };
         // A recording, with nothing selected: its sound and export settings take the hint's place.

@@ -64,6 +64,8 @@ RECORD VIDEO
 • Press Ctrl+Shift+5, select an area or click a window, and record it with the sound your PC plays.
 • Annotate the recording in the same editor: arrows, text, steps, blur and beautify sit on every frame.
 • Trim it by dragging the ends of the timeline, then save or copy it as an MP4 video or an animated GIF.
+• Choose when each annotation shows, fade it in and out, or give it a slow zoom or pan.
+• Zoom the video in on what matters, and back out, with smooth camera moves.
 
 SCROLLING CAPTURE
 • Capture a whole web page or long document in one tall image.
@@ -89,6 +91,11 @@ PRIVATE BY DESIGN
 Windshot lives in the notification area and starts in a blink. It can start with Windows, and every shortcut can be changed in Settings.
 
 ### What's new in this version
+
+1.5:
+• Zoom in on part of a recording: the new Zoom tool (Z) marks an area, and the video eases in to it and back out, annotations and all.
+• Give annotations a slow zoom or pan while they show.
+• Fades and motion are together in a new Animate menu on the options bar.
 
 1.4:
 • Choose when each annotation shows in a recording: select it, then drag the ends of its bar under the timeline, or drag the bar to move it.
@@ -151,6 +158,7 @@ Windshot lives in the notification area and starts in a blink. It can start with
 15. Free and open source (MIT License), with the code on GitHub
 16. Record an area or window with the PC's sound, then annotate and trim it
 17. Save or copy recordings as MP4 video or small animated GIFs
+18. Time, fade, pan and zoom annotations in recordings, and zoom the video in on what matters
 
 ### Search terms (7 max, 30 characters each)
 

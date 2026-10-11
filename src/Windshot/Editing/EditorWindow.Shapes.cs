@@ -150,7 +150,7 @@ public sealed partial class EditorWindow
     private void PolygonPressed(Vector2 p, bool shift)
     {
         var draft = _polygonDraft!;
-        float reach = (HandleRadius + HitTolerance) / _view.M11;
+        float reach = (HandleRadius + HitTolerance) / ShownScale;
         if (draft.Points.Count >= 3 && Vector2.Distance(p, draft.Points[0]) <= reach)
         {
             FinishPolygon();
@@ -209,7 +209,7 @@ public sealed partial class EditorWindow
     {
         if (_polygonDraft is not { } draft)
             return;
-        float px = 1 / _view.M11;
+        float px = 1 / ShownScale;
         using var dashed = new CanvasStrokeStyle { DashStyle = CanvasDashStyle.Dash };
         ds.DrawLine(draft.Points[^1], _polygonCursor, AccentColor, 1.5f * px, dashed);
         if (draft.Points.Count >= 3)

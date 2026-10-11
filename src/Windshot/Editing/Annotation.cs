@@ -75,8 +75,22 @@ internal abstract class Annotation
         return (float)(shown * shown * (3 - 2 * shown));
     }
 
-    /// <summary>Whether the layer covers the whole recording, with no fades: as on a screenshot.</summary>
-    public bool Always => Start <= TimeSpan.Zero && End is null && FadeIn == FadeLength.None && FadeOut == FadeLength.None;
+    /// <summary>In a recording: a slow zoom or pan across the layer's time (Ken Burns), starting from where it was placed.</summary>
+    public LayerMotion Motion { get; set; }
+
+    /// <summary>Whether <see cref="Motion"/> applies: to layers that draw something, not to effects.</summary>
+    public bool CanMove => !IsEffect;
+
+    /// <summary>How far through its time the layer is at <paramref name="time"/>, 0 to 1, eased at both ends.</summary>
+    public float ProgressAt(TimeSpan time, TimeSpan length)
+    {
+        double span = ((End ?? length) - Start).TotalSeconds;
+        double p = span <= 0 ? 0 : Math.Clamp((time - Start).TotalSeconds / span, 0, 1);
+        return (float)(p * p * (3 - 2 * p));
+    }
+
+    /// <summary>Whether the layer covers the whole recording, with no fades or motion: as on a screenshot.</summary>
+    public bool Always => Start <= TimeSpan.Zero && End is null && FadeIn == FadeLength.None && FadeOut == FadeLength.None && Motion == LayerMotion.None;
 
     /// <summary>A name given in the layers panel; null shows the default one.</summary>
     public string? Name { get; set; }
@@ -124,6 +138,9 @@ internal abstract class Annotation
     private float StyleMargin => CanStyle ? Style.Margin(Unit) : 0;
 
     // ---- Rotation ----------------------------------------------------------------------
+
+    /// <summary>Whether the layer can be turned (a zoom's area can't: it's the shape of the video).</summary>
+    public virtual bool CanRotate => true;
 
     /// <summary>How far the frame is turned, in radians, clockwise on screen; between -π and π.</summary>
     public float Angle { get; private set; }
@@ -336,4 +353,16 @@ internal static class FadeLengths
         FadeLength.Slow => 1.0,
         _ => 0,
     };
+}
+
+/// <summary>A layer's slow movement across its time in a recording.</summary>
+internal enum LayerMotion
+{
+    None,
+    ZoomIn,
+    ZoomOut,
+    PanLeft,
+    PanRight,
+    PanUp,
+    PanDown,
 }

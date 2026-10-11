@@ -73,7 +73,7 @@ public sealed partial class EditorWindow
 
     private int? HitCropHandle(Rect crop, Vector2 p)
     {
-        float reach = (HandleRadius + HitTolerance) / _view.M11;
+        float reach = (HandleRadius + HitTolerance) / ShownScale;
         var handles = CropHandles(crop);
         for (int i = 0; i < handles.Length; i++)
         {
@@ -142,7 +142,7 @@ public sealed partial class EditorWindow
 
     private void DrawCropOverlay(CanvasDrawingSession ds, Rect crop)
     {
-        float px = 1 / _view.M11;
+        float px = 1 / ShownScale;
         using (var all = CanvasGeometry.CreateRectangle(ds, _document.Bounds))
         using (var kept = CanvasGeometry.CreateRectangle(ds, crop))
         using (var outside = all.CombineWith(kept, Matrix3x2.Identity, CanvasGeometryCombine.Exclude))

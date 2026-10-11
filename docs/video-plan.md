@@ -1,6 +1,6 @@
 # Video recording and annotation: plan
 
-Status: phase 1 (1.3) submitted 2026-10-10; phase 2 (1.4, timing and fades) built and tested 2026-10-11; phase 3 (motion) next. Phase 1 records the selected area; a clicked window is recorded as its rectangle, not followed if it moves. Decided so far: system audio (no microphone yet), MP4 and GIF
+Status: phase 1 (1.3) submitted 2026-10-10; phase 2 (1.4, timing and fades) built and tested 2026-10-11; phase 3 (1.5, motion and the Zoom layer) built and tested 2026-10-11. Phase 1 records the selected area; a clicked window is recorded as its rectangle, not followed if it moves. Decided so far: system audio (no microphone yet), MP4 and GIF
 export, editing stays in the existing editor with a timeline added, trimming by dragging only.
 
 ## How it fits the current code
@@ -141,7 +141,12 @@ Learned, to carry into phase 1:
    annotations over the whole clip, MP4/GIF export, save/copy, mute, the close prompt. Privacy
    policy, README, site and Store listing updates.
 2. **1.4, Timing and fades:** layer bars on the timeline, fade in/out.
-3. **1.5, Motion:** Ken Burns presets for layers, the Zoom layer.
+3. **1.5, Motion:** Ken Burns presets for layers, the Zoom layer. As built: fades and motion moved
+   into one Animate menu (the inline pickers overflowed the options bar). Motion starts from where
+   the layer was placed and eases across its time; a selected layer holds still while paused so its
+   handles line up. The Zoom layer is a camera: `Document.Camera` maps the zoomed area onto the card,
+   scaling geometrically; the editor draws chrome and maps the pointer through it, and turns it off
+   while a zoom is selected or drawn (or while cropping) so the area can be seen.
 
 ## Not in scope (for now)
 

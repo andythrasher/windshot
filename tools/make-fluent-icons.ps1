@@ -16,7 +16,7 @@ $icons = @(
     'number_circle_1', 'highlight', 'flashlight',
     'crop', 'arrow_reset', 'layer', 'eye', 'eye_off', 'image', 'delete', 'grid_dots', 'color_background', 'sparkle', 'pin', 'scan_text', 'folder_open', 'image_add', 'square_shadow',
     # Video
-    'play', 'pause', 'speaker_2', 'speaker_mute', 'video',
+    'play', 'pause', 'speaker_2', 'speaker_mute', 'video', 'zoom_in', 'timer',
     # Shapes tool
     'shapes', 'oval', 'triangle', 'pentagon', 'paint_bucket', 'sticker',
     # Stickers (Editing/Stickers.cs)

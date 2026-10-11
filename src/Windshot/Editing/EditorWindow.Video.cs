@@ -68,6 +68,7 @@ public sealed partial class EditorWindow
         _length = _trimEnd = _document.Length = video.Length;
         Title = "Windshot recording";
         Timeline.Visibility = Visibility.Visible;
+        ZoomToolButton.Visibility = Visibility.Visible;
         PinButton.Visibility = Visibility.Collapsed;
         ToolTipService.SetToolTip(CopyButton, "Copy the video (Ctrl+C), to paste into a chat, an email or a folder");
         if (Settings.Current.Saving.SaveWithoutAsking)
@@ -533,9 +534,15 @@ public sealed partial class EditorWindow
         Canvas.Invalidate();
     }
 
-    // ---- Fades -------------------------------------------------------------------------
+    // ---- Fades and motion --------------------------------------------------------------
 
     private bool _syncingFades;
+
+    private static readonly (LayerMotion Motion, string Name)[] Motions =
+    [
+        (LayerMotion.None, "None"), (LayerMotion.ZoomIn, "Zoom in"), (LayerMotion.ZoomOut, "Zoom out"),
+        (LayerMotion.PanLeft, "Pan left"), (LayerMotion.PanRight, "Pan right"), (LayerMotion.PanUp, "Pan up"), (LayerMotion.PanDown, "Pan down"),
+    ];
 
     private void InitializeFades()
     {
@@ -545,8 +552,12 @@ public sealed partial class EditorWindow
             picker.Items.Add("Quick");
             picker.Items.Add("Slow");
         }
+        foreach (var (_, name) in Motions)
+            MotionPicker.Items.Add(name);
+        AnimateIcon.Content = Shell.FluentIcons.Create("timer", filled: false);
         FadeInPicker.SelectionChanged += (_, _) => SetFade(fadeIn: true, (FadeLength)Math.Max(0, FadeInPicker.SelectedIndex));
         FadeOutPicker.SelectionChanged += (_, _) => SetFade(fadeIn: false, (FadeLength)Math.Max(0, FadeOutPicker.SelectedIndex));
+        MotionPicker.SelectionChanged += (_, _) => SetMotion(Motions[Math.Max(0, MotionPicker.SelectedIndex)].Motion);
         WholeVideoButton.Click += (_, _) =>
         {
             foreach (var layer in Selection)
@@ -576,16 +587,38 @@ public sealed partial class EditorWindow
         Canvas.Invalidate();
     }
 
-    /// <summary>Shows the selection's fades (the first layer's, for several); hidden for a screenshot or no selection.</summary>
+    private void SetMotion(LayerMotion motion)
+    {
+        if (_syncingFades || Selection.Count == 0)
+            return;
+        foreach (var layer in Selection.Where(a => a.CanMove))
+            layer.Motion = motion;
+        Commit();
+        Canvas.Invalidate();
+    }
+
+    /// <summary>
+    /// Shows the selection's fades and motion (the first layer's, for several); hidden for a
+    /// screenshot or no selection. For a zoom, its fades are how it zooms in and out.
+    /// </summary>
     private void SyncFades()
     {
         bool show = IsVideo && Selection.Count > 0;
         Show(FadeContainer, show);
         if (show)
         {
+            bool zoom = Selection.All(a => a is ZoomAnnotation);
+            FadeInPicker.Header = zoom ? "Zoom in" : "Fade in";
+            FadeOutPicker.Header = zoom ? "Zoom out" : "Fade out";
+            ToolTipService.SetToolTip(FadeInPicker, zoom ? "How the view zooms in: at once, quickly or slowly" : "How the layer appears: at once, or fading in quickly or slowly");
+            ToolTipService.SetToolTip(FadeOutPicker, zoom ? "How the view zooms back out: at once, quickly or slowly" : "How the layer goes: at once, or fading out quickly or slowly");
+            AnimateLabel.Text = zoom ? "Zoom" : "Animate";
+            Show(MotionPicker, Selection.Any(a => a.CanMove));
             _syncingFades = true;
             FadeInPicker.SelectedIndex = (int)Selection[0].FadeIn;
             FadeOutPicker.SelectedIndex = (int)Selection[0].FadeOut;
+            var first = Selection.FirstOrDefault(a => a.CanMove);
+            MotionPicker.SelectedIndex = first is null ? 0 : Array.FindIndex(Motions, m => m.Motion == first.Motion);
             _syncingFades = false;
         }
         if (IsVideo)
@@ -595,7 +628,8 @@ public sealed partial class EditorWindow
     /// <summary>Selecting a layer that isn't showing at the playhead moves the playhead into it, so you can see it.</summary>
     private void ShowSelectedLayer()
     {
-        if (!IsVideo || TimedLayer is not { } layer || layer.ShownAt(_position, _length) > 0)
+        // (Within its time counts, even at the very start of a fade: a new layer stays where it was put.)
+        if (!IsVideo || TimedLayer is not { } layer || (_position >= layer.Start && _position <= (layer.End ?? _length)))
             return;
         Pause();
         var into = TimeSpan.FromSeconds(Math.Min(1, ((layer.End ?? _length) - layer.Start).TotalSeconds / 2));

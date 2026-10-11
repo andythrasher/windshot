@@ -152,32 +152,139 @@ internal sealed class Document : IDisposable
     /// </summary>
     /// <param name="skip">An annotation the editor is showing some other way, e.g. text being typed.</param>
     /// <param name="frame">For exporting a recording: the frame to draw, instead of <see cref="Base"/>.</param>
-    /// <param name="time">For a recording: the moment to draw, so layers show (and fade) by their timing.</param>
-    public void Render(CanvasDrawingSession ds, Annotation? skip = null, CanvasBitmap? frame = null, TimeSpan? time = null)
+    /// <param name="time">For a recording: the moment to draw, so layers show (and fade, move and zoom) by their timing.</param>
+    /// <param name="still">Layers to draw where they were placed, without their motion (the editor's selection, so its handles line up).</param>
+    /// <param name="zoom">Whether zoom layers zoom; the editor turns it off while one is being placed.</param>
+    public void Render(CanvasDrawingSession ds, Annotation? skip = null, CanvasBitmap? frame = null, TimeSpan? time = null,
+        IReadOnlyCollection<Annotation>? still = null, bool zoom = true)
     {
         NumberSteps();
 
-        // The card (what beautify rounds and shadows) covers the expansion only when every
-        // added side got a fill; otherwise it's just the image, and partial fills sit outside it.
         var fills = ExpansionFills(out bool complete);
         bool fillsInCard = complete && fills.Count > 0;
-        var card = fillsInCard ? ContentBounds : ImageBounds;
-        // A crop cuts the card down too, so beautify rounds the cropped corners.
-        if (CropOverride is Rect crop)
-            card = card.IntersectWith(crop) is { IsEmpty: false } inside ? inside : crop;
+        var card = CardBounds(fillsInCard);
         if (Backdrop is not null)
             DrawBackdrop(ds, Backdrop, card);
 
+        var camera = zoom ? CameraFor(card, time) : Matrix3x2.Identity;
+        // Zoomed in, the frame is enlarged: smoothly, even where the editor would show hard pixels.
+        var interpolation = ImageInterpolation;
+        if (!camera.IsIdentity && interpolation == CanvasImageInterpolation.NearestNeighbor)
+            ImageInterpolation = CanvasImageInterpolation.HighQualityCubic;
+
         using var context = new LayerContext(ds, card, CornerRadius);
-        var scene = Compose(context, frame ?? Base, fills, fillsInCard, skip, time);
+        var scene = Compose(context, frame ?? Base, fills, fillsInCard, skip, time, still);
+        ImageInterpolation = interpolation;
         // Everything past the crop is hidden, on screen as in the export (which would only
         // trim it at the canvas edge, leaving it on the beautify backdrop).
         using (CropOverride is Rect cropRect ? ds.CreateLayer(1, cropRect) : null)
+        {
             ds.DrawImage(scene);
+            if (!camera.IsIdentity)
+            {
+                // A zoom fills the card with the area it's on, like a camera moving in.
+                using var shape = context.CardShape(ds) ?? CanvasGeometry.CreateRectangle(ds, card);
+                using (ds.CreateLayer(1, shape))
+                {
+                    ds.FillRectangle(card, Microsoft.UI.Colors.Black);
+                    var transform = ds.Transform;
+                    ds.Transform = camera * transform;
+                    ds.DrawImage(scene);
+                    ds.Transform = transform;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// The card: what beautify rounds and shadows, and what a zoom fills. It covers the expansion
+    /// only when every added side got a fill; otherwise it's just the image, and partial fills
+    /// sit outside it. A crop cuts it down too, so beautify rounds the cropped corners.
+    /// </summary>
+    private Rect CardBounds(bool fillsInCard)
+    {
+        var card = fillsInCard ? ContentBounds : ImageBounds;
+        if (CropOverride is Rect crop)
+            card = card.IntersectWith(crop) is { IsEmpty: false } inside ? inside : crop;
+        return card;
+    }
+
+    /// <summary>
+    /// For a recording: how a zoom layer showing at <paramref name="time"/> moves the view, from
+    /// the canvas to the screen, or identity when none is. The editor maps the pointer through it.
+    /// </summary>
+    public Matrix3x2 Camera(TimeSpan? time)
+    {
+        if (time is null || !Annotations.Any(a => a is ZoomAnnotation))
+            return Matrix3x2.Identity;
+        return CameraFor(Card, time);
+    }
+
+    /// <summary>The card as the next render will draw it (see <see cref="CardBounds"/>).</summary>
+    public Rect Card
+    {
+        get
+        {
+            var fills = ExpansionFills(out bool complete);
+            return CardBounds(complete && fills.Count > 0);
+        }
+    }
+
+    private Matrix3x2 CameraFor(Rect card, TimeSpan? time)
+    {
+        if (time is not { } t || card.Width < 1 || card.Height < 1)
+            return Matrix3x2.Identity;
+        // The one most zoomed in wins (the topmost, if they tie), so overlapping zooms hand over smoothly.
+        ZoomAnnotation? zoom = null;
+        float amount = 0;
+        foreach (var z in Annotations.OfType<ZoomAnnotation>().Where(z => z.Visible))
+        {
+            float shown = ShownAt(z, t);
+            if (shown > 0 && shown >= amount && z.Shape.Width >= 1 && z.Shape.Height >= 1)
+                (zoom, amount) = (z, shown);
+        }
+        if (zoom is null)
+            return Matrix3x2.Identity;
+
+        // Scale evenly (geometrically), so zooming feels the same speed all the way in, and
+        // move toward the area in step with it, as if zooming about one fixed point.
+        var target = zoom.Framing(card);
+        double full = card.Width / target.Width;
+        if (full <= 1.0001)
+            return Matrix3x2.Identity;
+        double scale = Math.Pow(full, amount);
+        double done = (1 - 1 / scale) / (1 - 1 / full);
+        double x = card.X + (target.X - card.X) * done, y = card.Y + (target.Y - card.Y) * done;
+        return Matrix3x2.CreateTranslation(-(float)x, -(float)y)
+             * Matrix3x2.CreateScale((float)scale)
+             * Matrix3x2.CreateTranslation((float)card.X, (float)card.Y);
+    }
+
+    /// <summary>How a layer's motion has moved it at <paramref name="time"/>: identity when it has none.</summary>
+    public Matrix3x2 MotionOf(Annotation annotation, TimeSpan? time)
+    {
+        if (time is not { } t || annotation.Motion == LayerMotion.None || !annotation.CanMove)
+            return Matrix3x2.Identity;
+        float p = annotation.ProgressAt(t, Length);
+        var bounds = annotation.Bounds;
+        var center = new Vector2((float)(bounds.X + bounds.Width / 2), (float)(bounds.Y + bounds.Height / 2));
+        // Pans travel a tenth of the video across the layer's time; zooms grow or shrink it by a quarter.
+        float across = (float)ImageBounds.Width * 0.1f * p, down = (float)ImageBounds.Height * 0.1f * p;
+        return annotation.Motion switch
+        {
+            LayerMotion.ZoomIn => Matrix3x2.CreateScale(1 + 0.25f * p, center),
+            LayerMotion.ZoomOut => Matrix3x2.CreateScale(1 - 0.2f * p, center),
+            LayerMotion.PanLeft => Matrix3x2.CreateTranslation(-across, 0),
+            LayerMotion.PanRight => Matrix3x2.CreateTranslation(across, 0),
+            LayerMotion.PanUp => Matrix3x2.CreateTranslation(0, -down),
+            LayerMotion.PanDown => Matrix3x2.CreateTranslation(0, down),
+            _ => Matrix3x2.Identity,
+        };
     }
 
     /// <summary>The layer stack as one image, built bottom-up from command lists and effects.</summary>
-    private ICanvasImage Compose(LayerContext context, CanvasBitmap image, List<(Rect Band, Windows.UI.Color Color)> fills, bool fillsInCard, Annotation? skip, TimeSpan? time)
+    private ICanvasImage Compose(LayerContext context, CanvasBitmap image, List<(Rect Band, Windows.UI.Color Color)> fills, bool fillsInCard, Annotation? skip, TimeSpan? time,
+        IReadOnlyCollection<Annotation>? still)
     {
         var bottom = context.NewList();
         using (var s = bottom.CreateDrawingSession())
@@ -235,6 +342,8 @@ internal sealed class Document : IDisposable
                 session = stage.CreateDrawingSession();
                 session.DrawImage(below);
             }
+            var motion = still?.Contains(annotation) == true ? Matrix3x2.Identity : MotionOf(annotation, time);
+            session.Transform = motion;
             if (opacity < 1)
             {
                 using (session.CreateLayer(opacity))
@@ -244,6 +353,7 @@ internal sealed class Document : IDisposable
             {
                 annotation.Style.Draw(session, context, annotation);
             }
+            session.Transform = Matrix3x2.Identity;
         }
         EndStage();
         return below;
@@ -305,7 +415,8 @@ internal sealed class Document : IDisposable
         var shown = Annotations.Where(a => a.Visible && ShownAt(a, time) > 0).ToList();
         var ordered = shown.Where(a => !a.IsAreaEffect).AsEnumerable().Reverse()
             .Concat(includeAreaEffects ? shown.Where(a => a.IsAreaEffect).AsEnumerable().Reverse() : []);
-        return ordered.FirstOrDefault(a => a.HitTest(point, tolerance));
+        // A moving layer is grabbed where it is at the moment, not where it was placed.
+        return ordered.FirstOrDefault(a => a.HitTest(Matrix3x2.Invert(MotionOf(a, time), out var back) ? Vector2.Transform(point, back) : point, tolerance));
     }
 
     /// <summary>Renders the full canvas to a PNG. Without a backdrop, area outside the image is transparent.</summary>

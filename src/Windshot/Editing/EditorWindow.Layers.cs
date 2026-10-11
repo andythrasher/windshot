@@ -133,6 +133,9 @@ public sealed partial class EditorWindow
     /// screenshot (and any effects already there), so a new blur or highlight marks the
     /// screenshot rather than the annotations. Drag it higher to make it cover them too.
     /// </summary>
+    /// <summary>How long a new zoom lasts, zooming in and out included.</summary>
+    private static readonly TimeSpan ZoomLength = TimeSpan.FromSeconds(4);
+
     private void AddLayer(Annotation annotation)
     {
         // New layers come in with their tool's style (see the Style menu).
@@ -140,7 +143,12 @@ public sealed partial class EditorWindow
             annotation.Style = ToolStyle(ToolFor(annotation));
         // In a recording, a new layer starts where the playhead is and lasts to the end.
         if (IsVideo)
+        {
             annotation.Start = _position > _trimStart + FrameStep ? _position : TimeSpan.Zero;
+            // A zoom is a moment, not the rest of the video: a few seconds, to start with.
+            if (annotation is ZoomAnnotation && annotation.Start + ZoomLength < _length - FrameStep)
+                annotation.End = annotation.Start + ZoomLength;
+        }
         var list = _document.Annotations;
         if (!annotation.IsEffect)
         {
@@ -330,6 +338,7 @@ public sealed partial class EditorWindow
         BlurAnnotation blur => blur.Pixelate ? "Pixelate" : "Blur",
         StepAnnotation step => $"Step {step.Number}",
         SpotlightAnnotation => "Spotlight",
+        ZoomAnnotation => "Zoom",
         HighlighterAnnotation => "Highlight",
         ShapeAnnotation { Kind: ShapeKind.Sticker } sticker => Stickers.NameOf(sticker.StickerIcon),
         ShapeAnnotation shape => shape.Kind.ToString(),
