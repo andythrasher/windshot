@@ -90,6 +90,23 @@ internal sealed unsafe class MediaReader : IDisposable
                 continue; // e.g. a format change notice
             try
             {
+                // Video: the sample's own buffer, for its true row pitch (see TryCopy2D).
+                if (_stream != MF.FirstAudioStream)
+                {
+                    IntPtr first;
+                    if (((delegate* unmanaged[Stdcall]<IntPtr, uint, IntPtr*, int>)Com.Slot(sample, 40))(sample, 0, &first) >= 0)
+                    {
+                        try
+                        {
+                            if (TryCopy2D(first) is { } pixels)
+                                return (pixels, TimeSpan.FromTicks(timestamp));
+                        }
+                        finally
+                        {
+                            Com.Release(first);
+                        }
+                    }
+                }
                 IntPtr buffer;
                 Com.Check(((delegate* unmanaged[Stdcall]<IntPtr, IntPtr*, int>)Com.Slot(sample, 41))(sample, &buffer), "ConvertToContiguousBuffer");
                 try
@@ -99,7 +116,7 @@ internal sealed unsafe class MediaReader : IDisposable
                     Com.Check(((delegate* unmanaged[Stdcall]<IntPtr, byte**, uint*, uint*, int>)Com.Slot(buffer, 3))(buffer, &data, &max, &length), "Lock");
                     try
                     {
-                        return (Copy(data, (int)length), TimeSpan.FromTicks(timestamp));
+                        return (Copy(data, Stride, (int)length), TimeSpan.FromTicks(timestamp));
                     }
                     finally
                     {
@@ -118,19 +135,67 @@ internal sealed unsafe class MediaReader : IDisposable
         }
     }
 
-    private byte[] Copy(byte* data, int length)
+    private static readonly Guid IID_IMF2DBuffer = new("7DC9D5F9-9ED9-44ec-9BBF-0600BB589FBB");
+
+    /// <summary>
+    /// A frame through IMF2DBuffer, which gives its true row pitch: decoders pad rows (a frame
+    /// 1978 pixels wide may be stored 1984 wide), and the media type doesn't always say so.
+    /// Null when the buffer isn't a 2D one.
+    /// </summary>
+    private byte[]? TryCopy2D(IntPtr buffer)
+    {
+        IntPtr buffer2D;
+        var iid = IID_IMF2DBuffer;
+        if (((delegate* unmanaged[Stdcall]<IntPtr, Guid*, IntPtr*, int>)Com.Slot(buffer, 0))(buffer, &iid, &buffer2D) < 0)
+            return null;
+        try
+        {
+            byte* scanline0;
+            int pitch;
+            if (((delegate* unmanaged[Stdcall]<IntPtr, byte**, int*, int>)Com.Slot(buffer2D, 3))(buffer2D, &scanline0, &pitch) < 0)
+                return null;
+            try
+            {
+                // Scanline 0 is the top row, whichever way the rows are stored (a negative pitch
+                // walks up through memory).
+                return CopyRows(scanline0, pitch);
+            }
+            finally
+            {
+                ((delegate* unmanaged[Stdcall]<IntPtr, int>)Com.Slot(buffer2D, 4))(buffer2D);
+            }
+        }
+        finally
+        {
+            Com.Release(buffer2D);
+        }
+    }
+
+    private byte[] Copy(byte* data, int stride, int length)
     {
         if (_stream == MF.FirstAudioStream)
             return new ReadOnlySpan<byte>(data, length).ToArray();
+        // Without a pitch from the buffer, the media type's stride, unless the buffer's size
+        // says otherwise: decoders pad the rows, and sometimes the height (to a multiple of 16),
+        // while the media type still gives the unpadded stride.
+        if (Height > 0 && length != Math.Abs((long)stride) * Height)
+        {
+            int padded = (Height + 15) & ~15;
+            int rows = length % Height == 0 ? Height : length % padded == 0 ? padded : Height;
+            if (length / rows >= Width * 4)
+                stride = Math.Sign(stride == 0 ? 1 : stride) * (length / rows);
+        }
+        // A negative stride means the rows are stored bottom-up: start from the last one.
+        return CopyRows(stride < 0 ? data + (Height - 1) * (long)-stride : data, stride);
+    }
+
+    /// <summary>Copies rows starting at the top one, <paramref name="pitch"/> bytes apart, into tightly packed, opaque BGRA.</summary>
+    private byte[] CopyRows(byte* top, int pitch)
+    {
         int row = Width * 4;
         var pixels = new byte[row * Height];
-        int stride = Math.Abs(Stride);
         for (int y = 0; y < Height; y++)
-        {
-            // A negative stride means the rows are stored bottom-up.
-            int from = (Stride < 0 ? Height - 1 - y : y) * stride;
-            new ReadOnlySpan<byte>(data + from, row).CopyTo(pixels.AsSpan(y * row, row));
-        }
+            new ReadOnlySpan<byte>(top + (long)y * pitch, row).CopyTo(pixels.AsSpan(y * row, row));
         // RGB32's fourth byte is padding, usually 0. Win2D would read that as transparent (so
         // scaling or blending a frame would let what's underneath show through): make it opaque.
         var words = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(pixels.AsSpan());

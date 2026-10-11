@@ -261,7 +261,14 @@ public sealed partial class EditorWindow
                 float width = height * reader.Width / reader.Height;
                 for (int i = 0; i < count && !token.IsCancellationRequested; i++)
                 {
-                    reader.Seek(length * ((i + 0.5) / count));
+                    try
+                    {
+                        reader.Seek(length * ((i + 0.5) / count));
+                    }
+                    catch (Exception) when (i > 0)
+                    {
+                        break; // past the end of the file (older recordings could end early); the strip repeats the last one
+                    }
                     if (reader.Read() is not { } frame)
                         break;
                     using var full = CanvasBitmap.CreateFromBytes(device, frame.Data, reader.Width, reader.Height,

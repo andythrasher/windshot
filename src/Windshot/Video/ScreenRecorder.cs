@@ -27,6 +27,8 @@ internal sealed partial class ScreenRecorder : IDisposable
     private GraphicsCaptureSession? _session;
     private long _startTicks;
     private long _lastSlot = -1;
+    /// <summary>The last frame written, to hold at the end (see <see cref="HoldLastFrame"/>).</summary>
+    private CanvasRenderTarget? _lastFrame;
     private int _kept, _dropped;
 
     public string Path { get; }
@@ -145,10 +147,38 @@ internal sealed partial class ScreenRecorder : IDisposable
     {
         var length = Elapsed;
         EndCapture();
+        HoldLastFrame(length);
         _audio?.Stop(_startTicks + length.Ticks);
         await _writer.FinishAsync();
         Log.Write($"Recorded {length.TotalSeconds:F1} s at {Width}x{Height}: {_kept} frames kept, {_dropped} dropped{(_audio is null ? ", no sound" : "")}");
         return length;
+    }
+
+    /// <summary>
+    /// Windows only sends a frame when the screen changes, so if nothing moved at the end, the
+    /// file would stop at the last change. The last frame goes in again at the end, so the video
+    /// lasts as long as the recording (and its sound).
+    /// </summary>
+    private void HoldLastFrame(TimeSpan length)
+    {
+        long finalSlot = (long)Math.Round(length / _interval) - 1;
+        if (_lastFrame is not { } last || finalSlot <= _lastSlot)
+            return;
+        try
+        {
+            // Twice, a frame apart: the encoder makes the last frame as long as the gap before it.
+            for (long slot = Math.Max(_lastSlot + 1, finalSlot - 1); slot <= finalSlot; slot++)
+            {
+                var copy = new CanvasRenderTarget(_device, Width, Height, 96, DirectXPixelFormat.B8G8R8A8UIntNormalized, CanvasAlphaMode.Ignore);
+                using (var ds = copy.CreateDrawingSession())
+                    ds.DrawImage(last);
+                _writer.AddFrame(copy, _interval * slot, copy.Dispose, wait: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Holding the last frame failed: {ex.Message}");
+        }
     }
 
     public async Task CancelAsync()
@@ -191,6 +221,7 @@ internal sealed partial class ScreenRecorder : IDisposable
             if (_writer.AddFrame(target, time, () => _free.Add(target), wait: false))
             {
                 _lastSlot = slot;
+                _lastFrame = target;
                 _kept++;
             }
             else
