@@ -97,6 +97,7 @@ Windshot lives in the notification area and starts in a blink. It can start with
 • Give annotations a slow zoom or pan while they show.
 • New ways for annotations to come in and go out: pop, wipes (right, left, in from the edges, out from the center) and radial wipes, with sharp or feathered edges. New highlights wipe on like a pen stroke.
 • Transitions and motion are together in a new Animate menu on the options bar.
+• The timeline snaps: layer bars line up with each other and with the playhead, and so do the trim handles. A band along the top shows where your other layers are.
 
 1.4:
 • Choose when each annotation shows in a recording: select it, then drag the ends of its bar under the timeline, or drag the bar to move it.
