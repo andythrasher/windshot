@@ -112,7 +112,11 @@ public sealed partial class EditorWindow
         TimelineCanvas.PointerPressed += Timeline_PointerPressed;
         TimelineCanvas.PointerMoved += Timeline_PointerMoved;
         TimelineCanvas.PointerReleased += Timeline_PointerReleased;
-        TimelineCanvas.PointerCaptureLost += (_, _) => _timelineDrag = TimelineDrag.None;
+        TimelineCanvas.PointerCaptureLost += (_, _) =>
+        {
+            _timelineDrag = TimelineDrag.None;
+            Canvas.Invalidate();
+        };
         TimelineCanvas.SizeChanged += (_, _) => TimelineCanvas.Invalidate();
 
         InitializeVideoOptions(video);
@@ -484,6 +488,7 @@ public sealed partial class EditorWindow
         _layerTimingChanged = false;
         _timelineDrag = TimelineDrag.None;
         TimelineCanvas.ReleasePointerCapture(e.Pointer);
+        Canvas.Invalidate(); // a scrub has ended: the selection shows in full again
     }
 
     /// <summary>Layers last at least this long, so their bar stays big enough to grab.</summary>

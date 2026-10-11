@@ -714,10 +714,20 @@ public sealed partial class EditorWindow : Window
         bool placing = !_playing && (_tool is Tool.Zoom or Tool.Crop || Selection.Any(a => a is ZoomAnnotation));
         var time = PlayheadTime;
         _camera = IsVideo && !placing ? _document.Camera(time) : Matrix3x2.Identity;
-        // A moving layer, once selected, holds still where it was placed (except while playing), so it can be edited.
-        _document.Render(ds, skip: _editingText, time: time, still: _playing ? null : Selection, zoom: !placing);
+        // The selection holds still and shows in full (no motion or transition) while paused, so
+        // it can be edited; playing or scrubbing shows it animating, like everything else.
+        bool animating = _playing || _timelineDrag == TimelineDrag.Scrub;
+        _document.Render(ds, skip: _editingText, time: time, still: animating ? null : Selection, zoom: !placing);
         ds.Transform = Shown;
         _editingText?.DrawChrome(ds); // the text box draws the letters on top
+
+        // Paused, layers partway in or out (a highlight at the start of its wipe, say) get a faint
+        // outline, so they can be found and clicked even where they don't show yet.
+        if (IsVideo && !animating)
+        {
+            foreach (var layer in _document.Annotations.Where(a => a.Visible && a is not ZoomAnnotation && !Selection.Contains(a) && _document.MidTransition(a, time)))
+                DrawOutline(ds, layer, Color.FromArgb(150, 160, 160, 160), _document.MotionOf(layer, time));
+        }
 
         if (_selected is { Visible: true } && _selected != _editingText)
             DrawSelection(ds, _selected);
@@ -761,12 +771,17 @@ public sealed partial class EditorWindow : Window
     }
 
     /// <summary>A dashed outline around the object, turned with it so it hugs it.</summary>
-    private void DrawOutline(CanvasDrawingSession ds, Annotation annotation)
+    /// <param name="color">The accent color, unless given.</param>
+    /// <param name="moved">Where the layer's motion has taken it, if anywhere.</param>
+    private void DrawOutline(CanvasDrawingSession ds, Annotation annotation, Color? color = null, Matrix3x2? moved = null)
     {
         float px = 1 / ShownScale;
         using var dashed = new CanvasStrokeStyle { DashStyle = CanvasDashStyle.Dash };
-        using var outline = CanvasGeometry.CreatePolygon(ds, annotation.Corners(annotation.Frame.Inflate(2 * px)));
-        ds.DrawGeometry(outline, AccentColor, 1.5f * px, dashed);
+        var corners = annotation.Corners(annotation.Frame.Inflate(2 * px));
+        if (moved is { } motion)
+            corners = corners.Select(c => Vector2.Transform(c, motion)).ToArray();
+        using var outline = CanvasGeometry.CreatePolygon(ds, corners);
+        ds.DrawGeometry(outline, color ?? AccentColor, 1.5f * px, dashed);
     }
 
     /// <summary>The rotate handle (and the foot of its stalk): above the middle of the top edge, turned with the object.</summary>

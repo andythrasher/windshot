@@ -44,6 +44,13 @@ internal sealed class Document : IDisposable
     /// <summary>How much of a layer shows at a time in a recording (always all of it in a screenshot).</summary>
     public float ShownAt(Annotation annotation, TimeSpan? time) => time is { } t ? annotation.ShownAt(t, Length) : 1;
 
+    /// <summary>Whether a layer is within its time in a recording (always, in a screenshot), however far into a transition.</summary>
+    public bool InTime(Annotation annotation, TimeSpan? time) => time is not { } t || (t >= annotation.Start && t <= (annotation.End ?? Length));
+
+    /// <summary>Whether a layer is partway through coming in or going out at <paramref name="time"/>.</summary>
+    public bool MidTransition(Annotation annotation, TimeSpan? time) =>
+        time is { } t && InTime(annotation, t) && annotation.TransitionAt(t, Length) is var (comeIn, goOut) && (comeIn < 1 || goOut > 0);
+
     /// <summary>Device pixels per DIP on the monitor the capture came from.</summary>
     public double SourceScale { get; }
 
@@ -301,8 +308,9 @@ internal sealed class Document : IDisposable
             }
         }
 
-        // In a recording, layers outside their time aren't there at all; fading ones are partly there.
-        var visible = Annotations.Where(a => a.Visible && a != skip && ShownAt(a, time) > 0).ToList();
+        // In a recording, layers outside their time aren't there at all; ones partway in or out are partly there.
+        // A layer held still (being edited) shows in full throughout its time.
+        var visible = Annotations.Where(a => a.Visible && a != skip && (ShownAt(a, time) > 0 || (still?.Contains(a) == true && InTime(a, time)))).ToList();
         var spotlights = visible.OfType<SpotlightAnnotation>().ToList();
         ICanvasImage below = bottom;
 
@@ -320,7 +328,7 @@ internal sealed class Document : IDisposable
 
         foreach (var annotation in visible)
         {
-            var (opacity, pop, mask) = Transitioning(context, annotation, time);
+            var (opacity, pop, mask) = Transitioning(context, annotation, still?.Contains(annotation) == true ? null : time);
             if (annotation.IsEffect)
             {
                 EndStage();
@@ -472,7 +480,8 @@ internal sealed class Document : IDisposable
         // Nothing outside the crop can be grabbed, nor anything hidden: they aren't shown.
         if (CropOverride is Rect crop && !crop.Contains(point.ToPoint()))
             return null;
-        var shown = Annotations.Where(a => a.Visible && ShownAt(a, time) > 0).ToList();
+        // Anything within its time can be grabbed, even where a transition hides it (the editor outlines those).
+        var shown = Annotations.Where(a => a.Visible && InTime(a, time)).ToList();
         var ordered = shown.Where(a => !a.IsAreaEffect).AsEnumerable().Reverse()
             .Concat(includeAreaEffects ? shown.Where(a => a.IsAreaEffect).AsEnumerable().Reverse() : []);
         // A moving layer is grabbed where it is at the moment, not where it was placed.

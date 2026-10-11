@@ -115,7 +115,10 @@ counterclockwise; wipes can have sharp or feathered edges, and going out, a wipe
 way (a wipe right clears it left to right). New highlights wipe right, like a pen stroke. Effects
 can't pop, and spotlights only fade. Motion (a slow zoom in or out, or a pan left, right, up or down, across the layer's time,
 starting from where it was placed; a selected layer holds still so it can be edited) and **Show for
-the whole video** are there too; selecting a layer that isn't showing moves the playhead to it. The **Zoom** tool
+the whole video** are there too; selecting a layer that isn't showing moves the playhead to it.
+While paused, the selected layer shows in full, without its transitions or motion, so it can be
+edited; playing or scrubbing shows it animating. Other layers partway in or out at the playhead get
+a faint dashed outline, and can be clicked even where they don't show yet. The **Zoom** tool
 (Z) marks an area for the video to zoom in to: during the layer's time the view eases in until the
 area (widened to the video's shape) fills the frame, annotations included, then eases back out. Its
 Zoom in and Zoom out settings are how long that takes, and it lasts four seconds to start with.
