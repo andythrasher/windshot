@@ -38,6 +38,12 @@ internal sealed class Document : IDisposable
     /// <summary>The bottom layer as shown now: the current frame of a recording, or the screenshot.</summary>
     public CanvasBitmap Base => Frame ?? Image;
 
+    /// <summary>For a recording: how long it is. Layers set to last "to the end" last this long.</summary>
+    public TimeSpan Length { get; set; }
+
+    /// <summary>How much of a layer shows at a time in a recording (always all of it in a screenshot).</summary>
+    public float ShownAt(Annotation annotation, TimeSpan? time) => time is { } t ? annotation.ShownAt(t, Length) : 1;
+
     /// <summary>Device pixels per DIP on the monitor the capture came from.</summary>
     public double SourceScale { get; }
 
@@ -146,7 +152,8 @@ internal sealed class Document : IDisposable
     /// </summary>
     /// <param name="skip">An annotation the editor is showing some other way, e.g. text being typed.</param>
     /// <param name="frame">For exporting a recording: the frame to draw, instead of <see cref="Base"/>.</param>
-    public void Render(CanvasDrawingSession ds, Annotation? skip = null, CanvasBitmap? frame = null)
+    /// <param name="time">For a recording: the moment to draw, so layers show (and fade) by their timing.</param>
+    public void Render(CanvasDrawingSession ds, Annotation? skip = null, CanvasBitmap? frame = null, TimeSpan? time = null)
     {
         NumberSteps();
 
@@ -162,7 +169,7 @@ internal sealed class Document : IDisposable
             DrawBackdrop(ds, Backdrop, card);
 
         using var context = new LayerContext(ds, card, CornerRadius);
-        var scene = Compose(context, frame ?? Base, fills, fillsInCard, skip);
+        var scene = Compose(context, frame ?? Base, fills, fillsInCard, skip, time);
         // Everything past the crop is hidden, on screen as in the export (which would only
         // trim it at the canvas edge, leaving it on the beautify backdrop).
         using (CropOverride is Rect cropRect ? ds.CreateLayer(1, cropRect) : null)
@@ -170,7 +177,7 @@ internal sealed class Document : IDisposable
     }
 
     /// <summary>The layer stack as one image, built bottom-up from command lists and effects.</summary>
-    private ICanvasImage Compose(LayerContext context, CanvasBitmap image, List<(Rect Band, Windows.UI.Color Color)> fills, bool fillsInCard, Annotation? skip)
+    private ICanvasImage Compose(LayerContext context, CanvasBitmap image, List<(Rect Band, Windows.UI.Color Color)> fills, bool fillsInCard, Annotation? skip, TimeSpan? time)
     {
         var bottom = context.NewList();
         using (var s = bottom.CreateDrawingSession())
@@ -187,7 +194,8 @@ internal sealed class Document : IDisposable
             }
         }
 
-        var visible = Annotations.Where(a => a.Visible && a != skip).ToList();
+        // In a recording, layers outside their time aren't there at all; fading ones are partly there.
+        var visible = Annotations.Where(a => a.Visible && a != skip && ShownAt(a, time) > 0).ToList();
         var spotlights = visible.OfType<SpotlightAnnotation>().ToList();
         ICanvasImage below = bottom;
 
@@ -205,6 +213,7 @@ internal sealed class Document : IDisposable
 
         foreach (var annotation in visible)
         {
+            float opacity = annotation.Opacity * ShownAt(annotation, time);
             if (annotation.IsEffect)
             {
                 EndStage();
@@ -214,8 +223,8 @@ internal sealed class Document : IDisposable
                     SpotlightAnnotation spot => spot == spotlights[^1] ? SpotlightAnnotation.Dim(context, below, spotlights) : below,
                     _ => annotation.ApplyTo(context, below),
                 };
-                if (applied != below && annotation.Opacity < 1)
-                    applied = context.Blend(below, applied, annotation.Opacity);
+                if (applied != below && opacity < 1)
+                    applied = context.Blend(below, applied, opacity);
                 below = applied;
                 continue;
             }
@@ -226,9 +235,9 @@ internal sealed class Document : IDisposable
                 session = stage.CreateDrawingSession();
                 session.DrawImage(below);
             }
-            if (annotation.Opacity < 1)
+            if (opacity < 1)
             {
-                using (session.CreateLayer(annotation.Opacity))
+                using (session.CreateLayer(opacity))
                     annotation.Style.Draw(session, context, annotation);
             }
             else
@@ -286,13 +295,14 @@ internal sealed class Document : IDisposable
     /// Area effects fill their whole region; leaving them out lets you start an arrow inside
     /// a blur or spotlight instead of accidentally grabbing it.
     /// </param>
-    public Annotation? HitTest(Vector2 point, float tolerance, bool includeAreaEffects)
+    /// <param name="time">In a recording, the playhead: layers not showing then can't be grabbed.</param>
+    public Annotation? HitTest(Vector2 point, float tolerance, bool includeAreaEffects, TimeSpan? time = null)
     {
         // Topmost first: regular annotations paint above area effects.
         // Nothing outside the crop can be grabbed, nor anything hidden: they aren't shown.
         if (CropOverride is Rect crop && !crop.Contains(point.ToPoint()))
             return null;
-        var shown = Annotations.Where(a => a.Visible).ToList();
+        var shown = Annotations.Where(a => a.Visible && ShownAt(a, time) > 0).ToList();
         var ordered = shown.Where(a => !a.IsAreaEffect).AsEnumerable().Reverse()
             .Concat(includeAreaEffects ? shown.Where(a => a.IsAreaEffect).AsEnumerable().Reverse() : []);
         return ordered.FirstOrDefault(a => a.HitTest(point, tolerance));

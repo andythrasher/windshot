@@ -49,6 +49,7 @@ public sealed partial class EditorWindow
         Show(VideoOptionsContainer, video);
         Show(HintContainer, !sized && !colored && !video);
         SyncLayerStyle();
+        SyncFades();
     }
 
     /// <summary>For layers selected together: their color, if any of them has one, and what else works on them.</summary>
@@ -65,6 +66,7 @@ public sealed partial class EditorWindow
         SyncLayerStyle();
         OptionsHint.Text = $"{_group.Count} layers selected. Drag one to move them all, or press Delete to remove them.";
         Show(HintContainer, true);
+        SyncFades();
     }
 
     private static void Show(UIElement element, bool show) => element.Visibility = show ? Visibility.Visible : Visibility.Collapsed;

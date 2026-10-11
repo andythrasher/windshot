@@ -90,6 +90,10 @@ Windshot lives in the notification area and starts in a blink. It can start with
 
 ### What's new in this version
 
+1.4:
+• Choose when each annotation shows in a recording: select it, then drag the ends of its bar under the timeline, or drag the bar to move it.
+• Fade annotations in and out, quickly or slowly.
+
 1.3:
 • Record video: Ctrl+Shift+5 records an area or a window, with the sound your PC plays.
 • Recordings open in the editor, with a timeline to play, scrub and trim them. Everything you draw shows on every frame.

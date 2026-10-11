@@ -43,6 +43,41 @@ internal abstract class Annotation
     /// <summary>0 to 1: how strongly the layer shows over (or, for effects, changes) what's beneath it.</summary>
     public float Opacity { get; set; } = 1;
 
+    // ---- In a recording ----------------------------------------------------------------
+
+    /// <summary>In a recording: when the layer appears, on the recording's clock (not the trim's).</summary>
+    public TimeSpan Start { get; set; }
+
+    /// <summary>In a recording: when it goes, or null to stay to the end.</summary>
+    public TimeSpan? End { get; set; }
+
+    public FadeLength FadeIn { get; set; }
+    public FadeLength FadeOut { get; set; }
+
+    /// <summary>
+    /// How much of the layer shows at <paramref name="time"/> in a recording, 0 to 1: nothing
+    /// outside its time, and ramping up and down through its fades (eased, so they start and
+    /// finish gently). Fades fit inside the layer's time, never past it.
+    /// </summary>
+    public float ShownAt(TimeSpan time, TimeSpan length)
+    {
+        var end = End ?? length;
+        if (time < Start || time > end)
+            return 0;
+        double span = (end - Start).TotalSeconds;
+        double fadeIn = Math.Min(FadeIn.Seconds(), span / 2), fadeOut = Math.Min(FadeOut.Seconds(), span / 2);
+        double shown = 1;
+        if (fadeIn > 0)
+            shown = Math.Min(shown, (time - Start).TotalSeconds / fadeIn);
+        if (fadeOut > 0)
+            shown = Math.Min(shown, (end - time).TotalSeconds / fadeOut);
+        shown = Math.Clamp(shown, 0, 1);
+        return (float)(shown * shown * (3 - 2 * shown));
+    }
+
+    /// <summary>Whether the layer covers the whole recording, with no fades: as on a screenshot.</summary>
+    public bool Always => Start <= TimeSpan.Zero && End is null && FadeIn == FadeLength.None && FadeOut == FadeLength.None;
+
     /// <summary>A name given in the layers panel; null shows the default one.</summary>
     public string? Name { get; set; }
 
@@ -283,4 +318,22 @@ internal abstract class BoxAnnotation : TwoPointAnnotation
             case 3: End = new Vector2(position.X, End.Y); Start = new Vector2(Start.X, position.Y); break;
         }
     }
+}
+
+/// <summary>How long a layer takes to fade in or out in a recording.</summary>
+internal enum FadeLength
+{
+    None,
+    Quick,
+    Slow,
+}
+
+internal static class FadeLengths
+{
+    public static double Seconds(this FadeLength fade) => fade switch
+    {
+        FadeLength.Quick => 0.3,
+        FadeLength.Slow => 1.0,
+        _ => 0,
+    };
 }

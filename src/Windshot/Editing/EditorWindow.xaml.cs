@@ -213,7 +213,7 @@ public sealed partial class EditorWindow : Window
         AppWindow.Move(new PointInt32(workArea.X, workArea.Y));
         int chromeWidth = (int)(2 * ViewPadding * capture.Scale + 120);
         // A recording also has the timeline along the bottom.
-        int chromeHeight = (int)((2 * ViewPadding + 122 + (capture.Video is null ? 0 : 72)) * capture.Scale);
+        int chromeHeight = (int)((2 * ViewPadding + 122 + (capture.Video is null ? 0 : 100)) * capture.Scale);
         // The minimum keeps the whole toolbar visible.
         int width = Math.Clamp(capture.Width + chromeWidth, (int)(1060 * capture.Scale), (int)(workArea.Width * 0.85));
         int height = Math.Clamp(capture.Height + chromeHeight, (int)(360 * capture.Scale), (int)(workArea.Height * 0.85));
@@ -320,6 +320,7 @@ public sealed partial class EditorWindow : Window
         SyncFont();
         SyncShapes();
         SyncOptions();
+        ShowSelectedLayer();
         Canvas.Invalidate();
     }
 
@@ -703,7 +704,7 @@ public sealed partial class EditorWindow : Window
         if (_checkerBrush is not null)
             ds.FillRectangle(_document.Bounds, _checkerBrush);
 
-        _document.Render(ds, skip: _editingText);
+        _document.Render(ds, skip: _editingText, time: PlayheadTime);
         _editingText?.DrawChrome(ds); // the text box draws the letters on top
 
         if (_selected is { Visible: true } && _selected != _editingText)
@@ -854,7 +855,7 @@ public sealed partial class EditorWindow : Window
         // Ctrl-click adds an object to the selection, or takes it out.
         if (e.KeyModifiers.HasFlag(Windows.System.VirtualKeyModifiers.Control))
         {
-            if (_document.HitTest(p, tolerance, includeAreaEffects: true) is Annotation picked)
+            if (_document.HitTest(p, tolerance, includeAreaEffects: true, PlayheadTime) is Annotation picked)
                 ToggleSelected(picked);
             return;
         }
@@ -884,9 +885,9 @@ public sealed partial class EditorWindow : Window
     /// </summary>
     private Annotation? GrabAt(Vector2 p, float tolerance)
     {
-        var hit = _document.HitTest(p, tolerance, GrabsAreaEffects);
+        var hit = _document.HitTest(p, tolerance, GrabsAreaEffects, PlayheadTime);
         if (_group.Count > 0 && (hit is null || !_group.Contains(hit)) &&
-            _document.HitTest(p, tolerance, includeAreaEffects: true) is { } member && _group.Contains(member))
+            _document.HitTest(p, tolerance, includeAreaEffects: true, PlayheadTime) is { } member && _group.Contains(member))
             return member;
         return hit;
     }
@@ -1207,7 +1208,7 @@ public sealed partial class EditorWindow : Window
             e.Handled = true;
             return;
         }
-        if (_document.HitTest(p, HitTolerance / _view.M11, includeAreaEffects: false) is TextAnnotation text)
+        if (_document.HitTest(p, HitTolerance / _view.M11, includeAreaEffects: false, PlayheadTime) is TextAnnotation text)
         {
             Select(text);
             BeginTextEdit(text, isNew: false);

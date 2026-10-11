@@ -138,6 +138,9 @@ public sealed partial class EditorWindow
         // New layers come in with their tool's style (see the Style menu).
         if (annotation.CanStyle && annotation.Style == LayerStyle.None)
             annotation.Style = ToolStyle(ToolFor(annotation));
+        // In a recording, a new layer starts where the playhead is and lasts to the end.
+        if (IsVideo)
+            annotation.Start = _position > _trimStart + FrameStep ? _position : TimeSpan.Zero;
         var list = _document.Annotations;
         if (!annotation.IsEffect)
         {

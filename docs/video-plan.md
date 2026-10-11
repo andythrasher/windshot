@@ -1,6 +1,6 @@
 # Video recording and annotation: plan
 
-Status: phase 1 (1.3) built and tested (2026-10-10); phase 2 (timing and fades) next. Phase 1 records the selected area; a clicked window is recorded as its rectangle, not followed if it moves. Decided so far: system audio (no microphone yet), MP4 and GIF
+Status: phase 1 (1.3) submitted 2026-10-10; phase 2 (1.4, timing and fades) built and tested 2026-10-11; phase 3 (motion) next. Phase 1 records the selected area; a clicked window is recorded as its rectangle, not followed if it moves. Decided so far: system audio (no microphone yet), MP4 and GIF
 export, editing stays in the existing editor with a timeline added, trimming by dragging only.
 
 ## How it fits the current code

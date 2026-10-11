@@ -90,7 +90,7 @@ internal static class VideoExport
                     ds.Transform = transform;
                     var interpolation = document.ImageInterpolation;
                     document.ImageInterpolation = scale < 1 ? CanvasImageInterpolation.HighQualityCubic : CanvasImageInterpolation.NearestNeighbor;
-                    document.Render(ds, frame: bitmap);
+                    document.Render(ds, frame: bitmap, time: frame.Time);
                     document.ImageInterpolation = interpolation;
                 }
 

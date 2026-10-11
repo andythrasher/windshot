@@ -106,6 +106,10 @@ asks once for permission to leave it off). Recordings go straight into the edito
 timeline along the bottom plays, scrubs and trims them: drag the ends of the strip (what's
 trimmed is dimmed, not deleted); Space plays and pauses, the arrow keys step a frame, Home and End
 jump to the ends. Everything you draw sits on every frame, and beautify and crop apply throughout.
+Each layer can show for just part of the recording: select it, and its bar appears under the
+strip; drag its ends to set when it appears and goes, or drag the bar to move it. New layers
+start at the playhead. Fade in and Fade out (None, Quick or Slow) are on the options bar, with
+**Whole video** to show it throughout; selecting a layer that isn't showing moves the playhead to it.
 With nothing selected, the options bar has the sound switch, the format Save and Copy make (MP4,
 or an animated GIF) and a size limit. Save puts videos in *Videos\Screen Recordings* (Settings
 has its own folder, frame rate and pointer settings), and Copy copies the video as a file, which

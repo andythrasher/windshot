@@ -44,8 +44,15 @@ public sealed partial class EditorWindow
     private bool _spacePanned;
 
     /// <summary>What a drag on the timeline is doing.</summary>
-    private enum TimelineDrag { None, Scrub, TrimStart, TrimEnd }
+    private enum TimelineDrag { None, Scrub, TrimStart, TrimEnd, LayerStart, LayerEnd, LayerMove }
     private TimelineDrag _timelineDrag;
+    /// <summary>Moving a layer's bar: where along it the pointer took hold.</summary>
+    private TimeSpan _layerGrab;
+    private bool _layerTimingChanged;
+
+    private const float StripHeight = 50;
+    private const float LaneTop = 58;
+    private const float LaneHeight = 18;
 
     private const float StripInset = 10;
     private const float HandleWidth = 10;
@@ -58,7 +65,7 @@ public sealed partial class EditorWindow
     private void InitializeVideo(RecordedVideo video)
     {
         _video = video;
-        _length = _trimEnd = video.Length;
+        _length = _trimEnd = _document.Length = video.Length;
         Title = "Windshot recording";
         Timeline.Visibility = Visibility.Visible;
         PinButton.Visibility = Visibility.Collapsed;
@@ -88,7 +95,7 @@ public sealed partial class EditorWindow
             {
                 // The file's own length is the one to trust, if it's known.
                 if (natural > TimeSpan.Zero && _trimEnd == _length)
-                    _length = _trimEnd = natural;
+                    _length = _trimEnd = _document.Length = natural;
                 ShowTime();
             });
         };
@@ -108,6 +115,7 @@ public sealed partial class EditorWindow
         TimelineCanvas.SizeChanged += (_, _) => TimelineCanvas.Invalidate();
 
         InitializeVideoOptions(video);
+        InitializeFades();
         CancelExportButton.Click += (_, _) => _export?.Cancel();
         AppWindow.Closing += VideoWindow_Closing;
         ShowTime();
@@ -276,7 +284,16 @@ public sealed partial class EditorWindow
         }
     }
 
-    private Rect Strip => new(StripInset, 2, Math.Max(1, TimelineCanvas.ActualWidth - 2 * StripInset), Math.Max(1, TimelineCanvas.ActualHeight - 4));
+    private Rect Strip => new(StripInset, 2, Math.Max(1, TimelineCanvas.ActualWidth - 2 * StripInset), StripHeight);
+
+    /// <summary>Under the strip: the selected layer's time.</summary>
+    private Rect Lane => new(StripInset, LaneTop, Math.Max(1, TimelineCanvas.ActualWidth - 2 * StripInset), LaneHeight);
+
+    /// <summary>The one layer whose time the lane shows: the selection, if it's a single layer.</summary>
+    private Annotation? TimedLayer => _group.Count == 0 ? _selected : null;
+
+    /// <summary>In a recording, the moment shown: where playback is, or the playhead. Null for a screenshot.</summary>
+    private TimeSpan? PlayheadTime => !IsVideo ? null : _playing && _player is not null ? _player.PlaybackSession.Position : _position;
 
     private float XAt(TimeSpan t)
     {
@@ -337,52 +354,144 @@ public sealed partial class EditorWindow
             ds.DrawLine(mid, (float)(strip.Y + strip.Height * 0.32), mid, (float)(strip.Y + strip.Height * 0.68), Color.FromArgb(230, 255, 255, 255), 2);
         }
 
-        // The playhead.
+        DrawLane(ds, sender, dark, accent);
+
+        // The playhead, through the strip and the lane.
         float head = XAt(Clamp(_position, TimeSpan.Zero, _length));
-        ds.DrawLine(head, (float)strip.Y - 1, head, (float)strip.Bottom + 1, Color.FromArgb(160, 0, 0, 0), 4);
-        ds.DrawLine(head, (float)strip.Y - 1, head, (float)strip.Bottom + 1, Color.FromArgb(255, 255, 255, 255), 2);
+        float bottom = (float)Lane.Bottom + 1;
+        ds.DrawLine(head, (float)strip.Y - 1, head, bottom, Color.FromArgb(160, 0, 0, 0), 4);
+        ds.DrawLine(head, (float)strip.Y - 1, head, bottom, Color.FromArgb(255, 255, 255, 255), 2);
+    }
+
+    /// <summary>The selected layer's bar: when it shows, with its fades as ramps at the ends.</summary>
+    private void DrawLane(CanvasDrawingSession ds, CanvasControl sender, bool dark, Color accent)
+    {
+        var lane = Lane;
+        var background = dark ? Color.FromArgb(255, 38, 38, 38) : Color.FromArgb(255, 232, 232, 232);
+        ds.FillRoundedRectangle(lane, 4, 4, background);
+        var muted = dark ? Color.FromArgb(255, 150, 150, 150) : Color.FromArgb(255, 110, 110, 110);
+        using var small = new Microsoft.Graphics.Canvas.Text.CanvasTextFormat
+        {
+            FontSize = 11,
+            FontFamily = "Segoe UI Variable Text",
+            VerticalAlignment = Microsoft.Graphics.Canvas.Text.CanvasVerticalAlignment.Center,
+        };
+        if (TimedLayer is not { } layer)
+        {
+            small.HorizontalAlignment = Microsoft.Graphics.Canvas.Text.CanvasHorizontalAlignment.Center;
+            ds.DrawText(_group.Count > 0 ? "Select one layer to set when it shows" : "Select a layer to set when it shows", lane, muted, small);
+            return;
+        }
+
+        var end = layer.End ?? _length;
+        float x0 = XAt(layer.Start), x1 = Math.Max(x0 + 2, XAt(end));
+        var bar = new Rect(x0, lane.Y + 1, x1 - x0, lane.Height - 2);
+        using var shape = CanvasGeometry.CreateRoundedRectangle(sender, bar, 4, 4);
+        using (ds.CreateLayer(1, shape))
+        {
+            ds.FillRectangle(bar, Color.FromArgb(150, accent.R, accent.G, accent.B));
+            // Fades: the bar ramps up and down across them.
+            double span = Math.Max(0.001, (end - layer.Start).TotalSeconds);
+            float fadeIn = (float)(bar.Width * Math.Min(layer.FadeIn.Seconds(), span / 2) / span);
+            float fadeOut = (float)(bar.Width * Math.Min(layer.FadeOut.Seconds(), span / 2) / span);
+            if (fadeIn > 0)
+                FillTriangle(ds, sender, new(x0, (float)bar.Y), new(x0 + fadeIn, (float)bar.Y), new(x0, (float)bar.Bottom), background);
+            if (fadeOut > 0)
+                FillTriangle(ds, sender, new(x1, (float)bar.Y), new(x1 - fadeOut, (float)bar.Y), new(x1, (float)bar.Bottom), background);
+        }
+        ds.DrawRoundedRectangle(bar, 4, 4, accent, 1.5f);
+        foreach (float x in new[] { x0 + 3, x1 - 3 })
+            ds.DrawLine(x, (float)bar.Y + 4, x, (float)bar.Bottom - 4, Color.FromArgb(230, 255, 255, 255), 2);
+
+        // What it is and when, if there's room.
+        var text = new Rect(x0 + 10, bar.Y, Math.Max(0, x1 - x0 - 20), bar.Height);
+        if (text.Width > 60)
+        {
+            using (ds.CreateLayer(1, text))
+                ds.DrawText($"{LayerName(layer)} · {Format(layer.Start)}–{Format(end)}", text,
+                    dark ? Color.FromArgb(255, 255, 255, 255) : Color.FromArgb(255, 20, 20, 20), small);
+        }
+    }
+
+    private static void FillTriangle(CanvasDrawingSession ds, ICanvasResourceCreator creator, Vector2 a, Vector2 b, Vector2 c, Color color)
+    {
+        using var triangle = CanvasGeometry.CreatePolygon(creator, [a, b, c]);
+        ds.FillGeometry(triangle, color);
+    }
+
+    /// <summary>What the pointer is over on the timeline: the trim handles, the strip, or the layer's bar.</summary>
+    private TimelineDrag HitTimeline(Vector2 p)
+    {
+        if (p.Y >= LaneTop - 2)
+        {
+            if (TimedLayer is not { } layer)
+                return TimelineDrag.None;
+            float x0 = XAt(layer.Start), x1 = XAt(layer.End ?? _length);
+            if (Math.Abs(p.X - x0) <= 7)
+                return TimelineDrag.LayerStart;
+            if (Math.Abs(p.X - x1) <= 7)
+                return TimelineDrag.LayerEnd;
+            return p.X > x0 && p.X < x1 ? TimelineDrag.LayerMove : TimelineDrag.None;
+        }
+        float start = XAt(_trimStart), end = XAt(_trimEnd);
+        return Math.Abs(p.X - (start + HandleWidth / 2)) <= HandleWidth ? TimelineDrag.TrimStart
+            : Math.Abs(p.X - (end - HandleWidth / 2)) <= HandleWidth ? TimelineDrag.TrimEnd
+            : TimelineDrag.Scrub;
     }
 
     private void Timeline_PointerPressed(object sender, PointerRoutedEventArgs e)
     {
         if (_export is not null)
             return;
-        float x = (float)e.GetCurrentPoint(TimelineCanvas).Position.X;
-        float start = XAt(_trimStart), end = XAt(_trimEnd);
-        _timelineDrag = Math.Abs(x - (start + HandleWidth / 2)) <= HandleWidth ? TimelineDrag.TrimStart
-            : Math.Abs(x - (end - HandleWidth / 2)) <= HandleWidth ? TimelineDrag.TrimEnd
-            : TimelineDrag.Scrub;
+        var p = e.GetCurrentPoint(TimelineCanvas).Position.ToVector2();
+        _timelineDrag = HitTimeline(p);
+        if (_timelineDrag == TimelineDrag.None)
+            return;
+        if (_timelineDrag == TimelineDrag.LayerMove)
+            _layerGrab = TimeAt(p.X) - TimedLayer!.Start;
+        _layerTimingChanged = false;
         Pause();
         TimelineCanvas.CapturePointer(e.Pointer);
-        DragTimeline(x);
+        DragTimeline(p.X);
         e.Handled = true;
     }
 
     private void Timeline_PointerMoved(object sender, PointerRoutedEventArgs e)
     {
-        float x = (float)e.GetCurrentPoint(TimelineCanvas).Position.X;
+        var p = e.GetCurrentPoint(TimelineCanvas).Position.ToVector2();
         if (_timelineDrag != TimelineDrag.None)
         {
-            DragTimeline(x);
+            DragTimeline(p.X);
             return;
         }
-        // Show that the ends can be dragged.
-        float start = XAt(_trimStart), end = XAt(_trimEnd);
-        bool onHandle = Math.Abs(x - (start + HandleWidth / 2)) <= HandleWidth || Math.Abs(x - (end - HandleWidth / 2)) <= HandleWidth;
-        TimelineHost.Cursor = onHandle ? _resizeWeCursor : null;
+        // Show what can be dragged.
+        TimelineHost.Cursor = HitTimeline(p) switch
+        {
+            TimelineDrag.TrimStart or TimelineDrag.TrimEnd or TimelineDrag.LayerStart or TimelineDrag.LayerEnd => _resizeWeCursor,
+            TimelineDrag.LayerMove => _moveCursor,
+            _ => null,
+        };
     }
 
     private void Timeline_PointerReleased(object sender, PointerRoutedEventArgs e)
     {
         if (_timelineDrag is TimelineDrag.TrimStart or TimelineDrag.TrimEnd)
             Log.Write($"Trimmed to {_trimStart.TotalSeconds:F2}–{_trimEnd.TotalSeconds:F2} s");
+        // A layer's time is part of the document, so it's undoable.
+        if (_layerTimingChanged)
+            Commit();
+        _layerTimingChanged = false;
         _timelineDrag = TimelineDrag.None;
         TimelineCanvas.ReleasePointerCapture(e.Pointer);
     }
 
+    /// <summary>Layers last at least this long, so their bar stays big enough to grab.</summary>
+    private static readonly TimeSpan MinLayerLength = TimeSpan.FromSeconds(0.2);
+
     private void DragTimeline(float x)
     {
         var t = TimeAt(x);
+        var layer = TimedLayer;
         switch (_timelineDrag)
         {
             case TimelineDrag.TrimStart:
@@ -398,7 +507,99 @@ public sealed partial class EditorWindow
             case TimelineDrag.Scrub:
                 SeekTo(Clamp(t, _trimStart, _trimEnd));
                 break;
+            case TimelineDrag.LayerStart when layer is not null:
+                layer.Start = Clamp(t, TimeSpan.Zero, (layer.End ?? _length) - MinLayerLength);
+                if (layer.Start < FrameStep)
+                    layer.Start = TimeSpan.Zero; // snaps to the very start
+                _layerTimingChanged = true;
+                SeekTo(layer.Start);
+                break;
+            case TimelineDrag.LayerEnd when layer is not null:
+                var end = Clamp(t, layer.Start + MinLayerLength, _length);
+                layer.End = end > _length - FrameStep ? null : end; // to the end, wherever that is
+                _layerTimingChanged = true;
+                SeekTo((layer.End ?? _length) - FrameStep);
+                break;
+            case TimelineDrag.LayerMove when layer is not null:
+                var length = (layer.End ?? _length) - layer.Start;
+                var start = Clamp(t - _layerGrab, TimeSpan.Zero, _length - length);
+                bool toEnd = layer.End is null && start + length >= _length - FrameStep;
+                layer.Start = start;
+                layer.End = toEnd ? null : start + length;
+                _layerTimingChanged = true;
+                SeekTo(layer.Start);
+                break;
         }
+        Canvas.Invalidate();
+    }
+
+    // ---- Fades -------------------------------------------------------------------------
+
+    private bool _syncingFades;
+
+    private void InitializeFades()
+    {
+        foreach (var picker in new[] { FadeInPicker, FadeOutPicker })
+        {
+            picker.Items.Add("None");
+            picker.Items.Add("Quick");
+            picker.Items.Add("Slow");
+        }
+        FadeInPicker.SelectionChanged += (_, _) => SetFade(fadeIn: true, (FadeLength)Math.Max(0, FadeInPicker.SelectedIndex));
+        FadeOutPicker.SelectionChanged += (_, _) => SetFade(fadeIn: false, (FadeLength)Math.Max(0, FadeOutPicker.SelectedIndex));
+        WholeVideoButton.Click += (_, _) =>
+        {
+            foreach (var layer in Selection)
+            {
+                layer.Start = TimeSpan.Zero;
+                layer.End = null;
+            }
+            Commit();
+            TimelineCanvas.Invalidate();
+            Canvas.Invalidate();
+        };
+    }
+
+    private void SetFade(bool fadeIn, FadeLength fade)
+    {
+        if (_syncingFades || Selection.Count == 0)
+            return;
+        foreach (var layer in Selection)
+        {
+            if (fadeIn)
+                layer.FadeIn = fade;
+            else
+                layer.FadeOut = fade;
+        }
+        Commit();
+        TimelineCanvas.Invalidate();
+        Canvas.Invalidate();
+    }
+
+    /// <summary>Shows the selection's fades (the first layer's, for several); hidden for a screenshot or no selection.</summary>
+    private void SyncFades()
+    {
+        bool show = IsVideo && Selection.Count > 0;
+        Show(FadeContainer, show);
+        if (show)
+        {
+            _syncingFades = true;
+            FadeInPicker.SelectedIndex = (int)Selection[0].FadeIn;
+            FadeOutPicker.SelectedIndex = (int)Selection[0].FadeOut;
+            _syncingFades = false;
+        }
+        if (IsVideo)
+            TimelineCanvas.Invalidate();
+    }
+
+    /// <summary>Selecting a layer that isn't showing at the playhead moves the playhead into it, so you can see it.</summary>
+    private void ShowSelectedLayer()
+    {
+        if (!IsVideo || TimedLayer is not { } layer || layer.ShownAt(_position, _length) > 0)
+            return;
+        Pause();
+        var into = TimeSpan.FromSeconds(Math.Min(1, ((layer.End ?? _length) - layer.Start).TotalSeconds / 2));
+        SeekTo(Clamp(layer.Start + into, _trimStart, _trimEnd));
     }
 
     // ---- Video options -----------------------------------------------------------------
