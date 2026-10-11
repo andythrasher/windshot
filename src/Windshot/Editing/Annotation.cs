@@ -51,8 +51,34 @@ internal abstract class Annotation
     /// <summary>In a recording: when it goes, or null to stay to the end.</summary>
     public TimeSpan? End { get; set; }
 
+    /// <summary>How long it takes to come in; None appears at once.</summary>
     public FadeLength FadeIn { get; set; }
+
+    /// <summary>How long it takes to go out; None goes at once.</summary>
     public FadeLength FadeOut { get; set; }
+
+    /// <summary>How it comes in, over <see cref="FadeIn"/>.</summary>
+    public Transition InStyle { get; set; }
+
+    /// <summary>How it goes out, over <see cref="FadeOut"/>.</summary>
+    public Transition OutStyle { get; set; }
+
+    /// <summary>Whether wipes have soft edges rather than sharp ones.</summary>
+    public bool FeatheredWipes { get; set; }
+
+    /// <summary>
+    /// How far through its transitions the layer is at <paramref name="time"/>, unsmoothed: In
+    /// runs 0 to 1 as it comes in (1 once it's in, or with none), Out 0 to 1 as it goes.
+    /// </summary>
+    public (float In, float Out) TransitionAt(TimeSpan time, TimeSpan length)
+    {
+        var end = End ?? length;
+        double span = (end - Start).TotalSeconds;
+        double fadeIn = Math.Min(FadeIn.Seconds(), span / 2), fadeOut = Math.Min(FadeOut.Seconds(), span / 2);
+        double comeIn = fadeIn > 0 ? Math.Clamp((time - Start).TotalSeconds / fadeIn, 0, 1) : 1;
+        double goOut = fadeOut > 0 ? Math.Clamp(1 - (end - time).TotalSeconds / fadeOut, 0, 1) : 0;
+        return ((float)comeIn, (float)goOut);
+    }
 
     /// <summary>
     /// How much of the layer shows at <paramref name="time"/> in a recording, 0 to 1: nothing

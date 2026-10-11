@@ -108,10 +108,14 @@ trimmed is dimmed, not deleted); Space plays and pauses, the arrow keys step a f
 jump to the ends. Everything you draw sits on every frame, and beautify and crop apply throughout.
 Each layer can show for just part of the recording: select it, and its bar appears under the
 strip; drag its ends to set when it appears and goes, or drag the bar to move it. New layers
-start at the playhead. The options bar's **Animate** menu has Fade in and Fade out (None, Quick
-or Slow), Motion (a slow zoom in or out, or a pan left, right, up or down, across the layer's time,
+start at the playhead. The options bar's **Animate** menu sets how a layer comes in and goes out: at
+once, or Quick or Slow with a fade, a pop (it grows in with a little overshoot), a wipe right or
+left, a wipe in from the edges or out from the center, or a radial wipe clockwise or
+counterclockwise; wipes can have sharp or feathered edges, and going out, a wipe continues the same
+way (a wipe right clears it left to right). New highlights wipe right, like a pen stroke. Effects
+can't pop, and spotlights only fade. Motion (a slow zoom in or out, or a pan left, right, up or down, across the layer's time,
 starting from where it was placed; a selected layer holds still so it can be edited) and **Show for
-the whole video**; selecting a layer that isn't showing moves the playhead to it. The **Zoom** tool
+the whole video** are there too; selecting a layer that isn't showing moves the playhead to it. The **Zoom** tool
 (Z) marks an area for the video to zoom in to: during the layer's time the view eases in until the
 area (widened to the video's shape) fills the frame, annotations included, then eases back out. Its
 Zoom in and Zoom out settings are how long that takes, and it lasts four seconds to start with.

@@ -534,7 +534,7 @@ public sealed partial class EditorWindow
         Canvas.Invalidate();
     }
 
-    // ---- Fades and motion --------------------------------------------------------------
+    // ---- Transitions and motion --------------------------------------------------------
 
     private bool _syncingFades;
 
@@ -544,19 +544,34 @@ public sealed partial class EditorWindow
         (LayerMotion.PanLeft, "Pan left"), (LayerMotion.PanRight, "Pan right"), (LayerMotion.PanUp, "Pan up"), (LayerMotion.PanDown, "Pan down"),
     ];
 
+    /// <summary>What the In and Out style pickers list for the selection; null is None (at once).</summary>
+    private List<Transition?> _styleChoices = new();
+
     private void InitializeFades()
     {
-        foreach (var picker in new[] { FadeInPicker, FadeOutPicker })
+        foreach (var picker in new[] { InSpeedPicker, OutSpeedPicker })
         {
-            picker.Items.Add("None");
             picker.Items.Add("Quick");
             picker.Items.Add("Slow");
         }
+        EdgePicker.Items.Add("Sharp");
+        EdgePicker.Items.Add("Feathered");
         foreach (var (_, name) in Motions)
             MotionPicker.Items.Add(name);
         AnimateIcon.Content = Shell.FluentIcons.Create("timer", filled: false);
-        FadeInPicker.SelectionChanged += (_, _) => SetFade(fadeIn: true, (FadeLength)Math.Max(0, FadeInPicker.SelectedIndex));
-        FadeOutPicker.SelectionChanged += (_, _) => SetFade(fadeIn: false, (FadeLength)Math.Max(0, FadeOutPicker.SelectedIndex));
+        InStylePicker.SelectionChanged += (_, _) => SetTransition(comingIn: true);
+        OutStylePicker.SelectionChanged += (_, _) => SetTransition(comingIn: false);
+        InSpeedPicker.SelectionChanged += (_, _) => SetTransition(comingIn: true);
+        OutSpeedPicker.SelectionChanged += (_, _) => SetTransition(comingIn: false);
+        EdgePicker.SelectionChanged += (_, _) =>
+        {
+            if (_syncingFades || Selection.Count == 0)
+                return;
+            foreach (var layer in Selection)
+                layer.FeatheredWipes = EdgePicker.SelectedIndex == 1;
+            Commit();
+            Canvas.Invalidate();
+        };
         MotionPicker.SelectionChanged += (_, _) => SetMotion(Motions[Math.Max(0, MotionPicker.SelectedIndex)].Motion);
         WholeVideoButton.Click += (_, _) =>
         {
@@ -571,19 +586,32 @@ public sealed partial class EditorWindow
         };
     }
 
-    private void SetFade(bool fadeIn, FadeLength fade)
+    /// <summary>Applies the In or Out pickers (style and speed) to the selection.</summary>
+    private void SetTransition(bool comingIn)
     {
         if (_syncingFades || Selection.Count == 0)
             return;
+        var stylePicker = comingIn ? InStylePicker : OutStylePicker;
+        var speedPicker = comingIn ? InSpeedPicker : OutSpeedPicker;
+        var style = stylePicker.SelectedIndex > 0 ? _styleChoices[stylePicker.SelectedIndex] : null;
+        var length = style is null ? FadeLength.None : speedPicker.SelectedIndex == 1 ? FadeLength.Slow : FadeLength.Quick;
         foreach (var layer in Selection)
         {
-            if (fadeIn)
-                layer.FadeIn = fade;
+            if (comingIn)
+            {
+                layer.FadeIn = length;
+                if (style is { } s)
+                    layer.InStyle = s;
+            }
             else
-                layer.FadeOut = fade;
+            {
+                layer.FadeOut = length;
+                if (style is { } s)
+                    layer.OutStyle = s;
+            }
         }
         Commit();
-        TimelineCanvas.Invalidate();
+        SyncFades();
         Canvas.Invalidate();
     }
 
@@ -598,8 +626,19 @@ public sealed partial class EditorWindow
     }
 
     /// <summary>
-    /// Shows the selection's fades and motion (the first layer's, for several); hidden for a
-    /// screenshot or no selection. For a zoom, its fades are how it zooms in and out.
+    /// The styles a layer can come in and go out with: a zoom just zooms, spotlights (which dim
+    /// as one) can only fade, and other effects can't pop.
+    /// </summary>
+    private static IEnumerable<Transition> StylesFor(Annotation layer) => layer switch
+    {
+        ZoomAnnotation or SpotlightAnnotation => [Transition.Fade],
+        { IsEffect: true } => Transitions.All.Select(t => t.Style).Where(t => t != Transition.Pop),
+        _ => Transitions.All.Select(t => t.Style),
+    };
+
+    /// <summary>
+    /// Shows the selection's transitions and motion (the first layer's, for several); hidden for
+    /// a screenshot or no selection. For a zoom, they're how it zooms in and out.
     /// </summary>
     private void SyncFades()
     {
@@ -608,17 +647,39 @@ public sealed partial class EditorWindow
         if (show)
         {
             bool zoom = Selection.All(a => a is ZoomAnnotation);
-            FadeInPicker.Header = zoom ? "Zoom in" : "Fade in";
-            FadeOutPicker.Header = zoom ? "Zoom out" : "Fade out";
-            ToolTipService.SetToolTip(FadeInPicker, zoom ? "How the view zooms in: at once, quickly or slowly" : "How the layer appears: at once, or fading in quickly or slowly");
-            ToolTipService.SetToolTip(FadeOutPicker, zoom ? "How the view zooms back out: at once, quickly or slowly" : "How the layer goes: at once, or fading out quickly or slowly");
+            InHeader.Text = zoom ? "Zoom in" : "In";
+            OutHeader.Text = zoom ? "Zoom out" : "Out";
             AnimateLabel.Text = zoom ? "Zoom" : "Animate";
             Show(MotionPicker, Selection.Any(a => a.CanMove));
+
             _syncingFades = true;
-            FadeInPicker.SelectedIndex = (int)Selection[0].FadeIn;
-            FadeOutPicker.SelectedIndex = (int)Selection[0].FadeOut;
-            var first = Selection.FirstOrDefault(a => a.CanMove);
-            MotionPicker.SelectedIndex = first is null ? 0 : Array.FindIndex(Motions, m => m.Motion == first.Motion);
+            // The styles every selected layer can do.
+            var styles = Selection.Select(StylesFor).Aggregate((a, b) => a.Intersect(b)).ToList();
+            var choices = new List<Transition?> { null };
+            choices.AddRange(styles.Select(s => (Transition?)s));
+            if (!choices.SequenceEqual(_styleChoices))
+            {
+                _styleChoices = choices;
+                foreach (var picker in new[] { InStylePicker, OutStylePicker })
+                {
+                    picker.Items.Clear();
+                    picker.Items.Add("None");
+                    foreach (var style in styles)
+                        picker.Items.Add(zoom ? "Smooth" : Transitions.All.First(t => t.Style == style).Name);
+                }
+            }
+            var first = Selection[0];
+            InStylePicker.SelectedIndex = first.FadeIn == FadeLength.None ? 0 : Math.Max(1, _styleChoices.IndexOf(first.InStyle));
+            OutStylePicker.SelectedIndex = first.FadeOut == FadeLength.None ? 0 : Math.Max(1, _styleChoices.IndexOf(first.OutStyle));
+            InSpeedPicker.SelectedIndex = first.FadeIn == FadeLength.Slow ? 1 : 0;
+            OutSpeedPicker.SelectedIndex = first.FadeOut == FadeLength.Slow ? 1 : 0;
+            InSpeedPicker.IsEnabled = first.FadeIn != FadeLength.None;
+            OutSpeedPicker.IsEnabled = first.FadeOut != FadeLength.None;
+            Show(EdgePicker, (first.FadeIn != FadeLength.None && first.InStyle.IsWipe() && _styleChoices.Contains(first.InStyle))
+                || (first.FadeOut != FadeLength.None && first.OutStyle.IsWipe() && _styleChoices.Contains(first.OutStyle)));
+            EdgePicker.SelectedIndex = first.FeatheredWipes ? 1 : 0;
+            var moving = Selection.FirstOrDefault(a => a.CanMove);
+            MotionPicker.SelectedIndex = moving is null ? 0 : Array.FindIndex(Motions, m => m.Motion == moving.Motion);
             _syncingFades = false;
         }
         if (IsVideo)

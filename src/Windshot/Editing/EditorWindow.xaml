@@ -265,7 +265,7 @@
                     Background="Transparent"
                     BorderThickness="0"
                     Margin="4,0"
-                    ToolTipService.ToolTip="Animate: fade it in and out, or slowly zoom or pan it">
+                    ToolTipService.ToolTip="Animate: how it comes in and goes out (fade, pop or wipe), and a slow zoom or pan">
                     <StackPanel Orientation="Horizontal" Spacing="10">
                         <ContentPresenter x:Name="AnimateIcon" VerticalAlignment="Center" />
                         <TextBlock x:Name="AnimateLabel" Text="Animate" VerticalAlignment="Center" />
@@ -273,9 +273,31 @@
                     <DropDownButton.Flyout>
                         <!-- Unconfined like the style menu, so it opens above the "…" menu too. -->
                         <Flyout x:Name="AnimateFlyout" Placement="BottomEdgeAlignedLeft" ShouldConstrainToRootBounds="False">
-                            <StackPanel x:Name="AnimateFlyoutContent" Width="220" Spacing="12">
-                                <ComboBox x:Name="FadeInPicker" Header="Fade in" HorizontalAlignment="Stretch" ToolTipService.ToolTip="How the layer appears: at once, or fading in quickly or slowly" />
-                                <ComboBox x:Name="FadeOutPicker" Header="Fade out" HorizontalAlignment="Stretch" ToolTipService.ToolTip="How the layer goes: at once, or fading out quickly or slowly" />
+                            <StackPanel x:Name="AnimateFlyoutContent" Width="300" Spacing="12">
+                                <!-- Each way in and out: a style, and how long it takes. -->
+                                <StackPanel Spacing="4">
+                                    <TextBlock x:Name="InHeader" Text="In" />
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="96" />
+                                        </Grid.ColumnDefinitions>
+                                        <ComboBox x:Name="InStylePicker" HorizontalAlignment="Stretch" ToolTipService.ToolTip="How the layer appears" />
+                                        <ComboBox x:Name="InSpeedPicker" Grid.Column="1" HorizontalAlignment="Stretch" ToolTipService.ToolTip="How long it takes: Quick (0.3 seconds) or Slow (1 second)" />
+                                    </Grid>
+                                </StackPanel>
+                                <StackPanel Spacing="4">
+                                    <TextBlock x:Name="OutHeader" Text="Out" />
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="96" />
+                                        </Grid.ColumnDefinitions>
+                                        <ComboBox x:Name="OutStylePicker" HorizontalAlignment="Stretch" ToolTipService.ToolTip="How the layer goes" />
+                                        <ComboBox x:Name="OutSpeedPicker" Grid.Column="1" HorizontalAlignment="Stretch" ToolTipService.ToolTip="How long it takes: Quick (0.3 seconds) or Slow (1 second)" />
+                                    </Grid>
+                                </StackPanel>
+                                <ComboBox x:Name="EdgePicker" Header="Wipe edges" HorizontalAlignment="Stretch" ToolTipService.ToolTip="Sharp or soft edges on wipes" />
                                 <ComboBox x:Name="MotionPicker" Header="Motion" HorizontalAlignment="Stretch" ToolTipService.ToolTip="Slowly zoom or pan the layer while it shows, starting from where you placed it" />
                                 <Button x:Name="WholeVideoButton" Content="Show for the whole video" HorizontalAlignment="Stretch" ToolTipService.ToolTip="Show it from the start of the video to the end" />
                             </StackPanel>

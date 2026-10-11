@@ -148,6 +148,9 @@ public sealed partial class EditorWindow
             // A zoom is a moment, not the rest of the video: a few seconds, to start with.
             if (annotation is ZoomAnnotation && annotation.Start + ZoomLength < _length - FrameStep)
                 annotation.End = annotation.Start + ZoomLength;
+            // A highlight is drawn on, left to right, like a pen stroke.
+            if (annotation is HighlighterAnnotation)
+                (annotation.InStyle, annotation.FadeIn) = (Transition.WipeRight, FadeLength.Slow);
         }
         var list = _document.Annotations;
         if (!annotation.IsEffect)

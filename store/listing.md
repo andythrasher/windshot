@@ -64,7 +64,7 @@ RECORD VIDEO
 • Press Ctrl+Shift+5, select an area or click a window, and record it with the sound your PC plays.
 • Annotate the recording in the same editor: arrows, text, steps, blur and beautify sit on every frame.
 • Trim it by dragging the ends of the timeline, then save or copy it as an MP4 video or an animated GIF.
-• Choose when each annotation shows, fade it in and out, or give it a slow zoom or pan.
+• Choose when each annotation shows, fade, pop or wipe it in and out, or give it a slow zoom or pan.
 • Zoom the video in on what matters, and back out, with smooth camera moves.
 
 SCROLLING CAPTURE
@@ -95,7 +95,8 @@ Windshot lives in the notification area and starts in a blink. It can start with
 1.5:
 • Zoom in on part of a recording: the new Zoom tool (Z) marks an area, and the video eases in to it and back out, annotations and all.
 • Give annotations a slow zoom or pan while they show.
-• Fades and motion are together in a new Animate menu on the options bar.
+• New ways for annotations to come in and go out: pop, wipes (right, left, in from the edges, out from the center) and radial wipes, with sharp or feathered edges. New highlights wipe on like a pen stroke.
+• Transitions and motion are together in a new Animate menu on the options bar.
 
 1.4:
 • Choose when each annotation shows in a recording: select it, then drag the ends of its bar under the timeline, or drag the bar to move it.

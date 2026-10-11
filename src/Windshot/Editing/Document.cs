@@ -320,7 +320,7 @@ internal sealed class Document : IDisposable
 
         foreach (var annotation in visible)
         {
-            float opacity = annotation.Opacity * ShownAt(annotation, time);
+            var (opacity, pop, mask) = Transitioning(context, annotation, time);
             if (annotation.IsEffect)
             {
                 EndStage();
@@ -330,7 +330,9 @@ internal sealed class Document : IDisposable
                     SpotlightAnnotation spot => spot == spotlights[^1] ? SpotlightAnnotation.Dim(context, below, spotlights) : below,
                     _ => annotation.ApplyTo(context, below),
                 };
-                if (applied != below && opacity < 1)
+                if (applied != below && mask is not null)
+                    applied = context.Blend(below, context.Own(new AlphaMaskEffect { Source = applied, AlphaMask = mask }), opacity);
+                else if (applied != below && opacity < 1)
                     applied = context.Blend(below, applied, opacity);
                 below = applied;
                 continue;
@@ -343,8 +345,17 @@ internal sealed class Document : IDisposable
                 session.DrawImage(below);
             }
             var motion = still?.Contains(annotation) == true ? Matrix3x2.Identity : MotionOf(annotation, time);
-            session.Transform = motion;
-            if (opacity < 1)
+            session.Transform = pop * motion;
+            if (mask is not null)
+            {
+                // Wiping: the layer drawn on its own, through the wipe's mask.
+                var content = context.NewList();
+                using (var s = content.CreateDrawingSession())
+                    annotation.Style.Draw(s, context, annotation);
+                using (session.CreateLayer(opacity))
+                    session.DrawImage(context.Own(new AlphaMaskEffect { Source = content, AlphaMask = mask }));
+            }
+            else if (opacity < 1)
             {
                 using (session.CreateLayer(opacity))
                     annotation.Style.Draw(session, context, annotation);
@@ -357,6 +368,55 @@ internal sealed class Document : IDisposable
         }
         EndStage();
         return below;
+    }
+
+    /// <summary>
+    /// A layer partway through coming in or going out: how opaque it is, how a pop has sized it,
+    /// and the mask of any wipe. Effects can't pop, and spotlights (which dim as one) can only
+    /// fade, so those fade instead.
+    /// </summary>
+    private (float Opacity, Matrix3x2 Pop, ICanvasImage? Mask) Transitioning(LayerContext context, Annotation annotation, TimeSpan? time)
+    {
+        float opacity = annotation.Opacity;
+        if (time is not { } t)
+            return (opacity, Matrix3x2.Identity, null);
+        var (comeIn, goOut) = annotation.TransitionAt(t, Length);
+        if (comeIn >= 1 && goOut <= 0)
+            return (opacity, Matrix3x2.Identity, null);
+
+        Transition Effective(Transition style) => annotation is SpotlightAnnotation || (annotation.IsEffect && style == Transition.Pop)
+            ? Transition.Fade : style;
+        var styleIn = Effective(annotation.InStyle);
+        var styleOut = Effective(annotation.OutStyle);
+        float scale = 1;
+        if (comeIn < 1)
+        {
+            if (styleIn == Transition.Fade)
+                opacity *= Transitions.Smooth(comeIn);
+            else if (styleIn == Transition.Pop)
+            {
+                scale *= Transitions.PopIn(comeIn);
+                opacity *= Transitions.Smooth(Math.Min(1, comeIn * 2.5f));
+            }
+        }
+        if (goOut > 0)
+        {
+            if (styleOut == Transition.Fade)
+                opacity *= Transitions.Smooth(1 - goOut);
+            else if (styleOut == Transition.Pop)
+            {
+                scale *= Transitions.PopOut(goOut);
+                opacity *= 1 - Transitions.Smooth(Math.Clamp((goOut - 0.6f) / 0.4f, 0, 1));
+            }
+        }
+        var pop = Matrix3x2.Identity;
+        if (scale != 1)
+        {
+            var b = annotation.Bounds;
+            pop = Matrix3x2.CreateScale(scale, new Vector2((float)(b.X + b.Width / 2), (float)(b.Y + b.Height / 2)));
+        }
+        var mask = annotation is SpotlightAnnotation ? null : Transitions.WipeMask(context, annotation, comeIn, goOut);
+        return (opacity, pop, mask);
     }
 
     /// <summary>Steps count 1, 2, 3… in the order they were placed, whatever their stacking; hidden ones are skipped.</summary>
