@@ -85,6 +85,9 @@ Windshot lives in the notification area and starts in a blink. It can start with
 
 ### What's new in this version
 
+1.2.2:
+• A welcome window when you start Windshot: where to find it, your shortcuts, the editor theme and Start with Windows, plus a button to try a capture. Turn it off with its checkbox or in Settings.
+
 1.2:
 • Everything is free now: every theme, color set, font and sticker, and the color wheel, for everyone.
 • Windshot is open source: the code is on GitHub at github.com/andythrasher/windshot.
