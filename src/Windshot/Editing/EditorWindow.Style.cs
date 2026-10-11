@@ -44,13 +44,17 @@ public sealed partial class EditorWindow
             Tool.Image => "Drag a corner to resize it; hold Shift to stretch it.",
             _ => "Click a layer to change it, or pick a tool to draw.",
         };
-        Show(HintContainer, !sized && !colored);
+        // A recording, with nothing selected: its sound and export settings take the hint's place.
+        bool video = IsVideo && subject == Tool.Select;
+        Show(VideoOptionsContainer, video);
+        Show(HintContainer, !sized && !colored && !video);
         SyncLayerStyle();
     }
 
     /// <summary>For layers selected together: their color, if any of them has one, and what else works on them.</summary>
     private void SyncGroupOptions()
     {
+        Show(VideoOptionsContainer, false);
         bool colored = _group.Any(a => a.HasColor);
         foreach (var element in new UIElement[] { SizeContainer, BlendContainer, FontContainer, TextBackgroundButton, PixelateButton, ShapeSeparator, FillButton })
             Show(element, false);

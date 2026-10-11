@@ -63,6 +63,36 @@ internal sealed class Settings
         public string EffectiveFolder =>
             string.IsNullOrWhiteSpace(Folder) ? DefaultFolder : Environment.ExpandEnvironmentVariables(Folder.Trim());
     }
+    public VideoSettings Video { get; set; } = new();
+
+    public sealed class VideoSettings
+    {
+        /// <summary>Frames per second to record: 30 or 60.</summary>
+        public int FrameRate { get; set; } = 30;
+
+        /// <summary>Show the mouse pointer in recordings.</summary>
+        public bool Cursor { get; set; } = true;
+
+        /// <summary>Record what the PC plays; the recording bar's switch, remembered.</summary>
+        public bool Sound { get; set; } = true;
+
+        /// <summary>Where Save puts videos. Empty means Videos\Screen Recordings (where Snipping Tool saves them).</summary>
+        public string Folder { get; set; } = "";
+
+        /// <summary>What Save and Copy make: "MP4" or "GIF".</summary>
+        public string Format { get; set; } = "MP4";
+
+        /// <summary>Largest height to export at (0 keeps the recording's size), e.g. 1080 or 720.</summary>
+        public int MaxHeight { get; set; }
+
+        public static string DefaultFolder =>
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "Screen Recordings");
+
+        [JsonIgnore]
+        public string EffectiveFolder =>
+            string.IsNullOrWhiteSpace(Folder) ? DefaultFolder : Environment.ExpandEnvironmentVariables(Folder.Trim());
+    }
+
     public AppearanceSettings Appearance { get; set; } = new();
 
     public sealed class AppearanceSettings
@@ -90,6 +120,9 @@ internal sealed class Settings
 
         /// <summary>Pick an area and scroll it to capture more than fits on screen. Press again to finish.</summary>
         public string ScrollingCapture { get; set; } = "Ctrl+Shift+4";
+
+        /// <summary>Pick an area and record a video of it. Press again to stop.</summary>
+        public string Record { get; set; } = "Ctrl+Shift+5";
     }
 
     public sealed class EditorSettings
@@ -230,6 +263,10 @@ internal sealed class Settings
         Appearance ??= new AppearanceSettings();
         Saving ??= new SavingSettings();
         Saving.Folder ??= "";
+        Video ??= new VideoSettings();
+        Video.Folder ??= "";
+        Video.FrameRate = Video.FrameRate >= 45 ? 60 : 30;
+        Hotkeys.Record ??= "";
 
         Editor.Styles = (Editor.Styles ?? []).Where(entry => entry.Value is not null)
             .ToDictionary(entry => entry.Key, entry => entry.Value.Clamped());

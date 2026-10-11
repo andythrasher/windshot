@@ -11,6 +11,8 @@
     <ApplicationIcon>Assets\Windshot.ico</ApplicationIcon>
     <RuntimeIdentifier>$(NETCoreSdkRuntimeIdentifier)</RuntimeIdentifier>
     <Nullable>enable</Nullable>
+    <!-- Video calls COM (WASAPI, Media Foundation) through vtables: see Video/Com.cs. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ImplicitUsings>enable</ImplicitUsings>
 
     <UseWinUI>true</UseWinUI>

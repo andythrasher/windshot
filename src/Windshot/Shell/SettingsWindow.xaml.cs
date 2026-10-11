@@ -26,7 +26,8 @@ public sealed partial class SettingsWindow : Window
         _theming = new ThemedWindow(this, Root);
         _shortcuts = new ShortcutEditor(CaptureShortcut, CaptureReset, CaptureProblem,
             ScrollingShortcut, ScrollingReset, ScrollingProblem,
-            CopyTextShortcut, CopyTextReset, CopyTextProblem, changed: WelcomeWindow.Refresh);
+            CopyTextShortcut, CopyTextReset, CopyTextProblem,
+            RecordShortcut, RecordReset, RecordProblem, changed: WelcomeWindow.Refresh);
 
         // Added as items rather than bound: binding a .NET list fails in the trimmed build.
         foreach (var preset in BackdropPresets.All)
@@ -83,23 +84,20 @@ public sealed partial class SettingsWindow : Window
         };
         BeautifyPadding.ValueChanged += (_, e) => Save(s => s.Beautify.Padding = e.NewValue);
         SaveWithoutAsking.Toggled += (_, _) => Save(s => s.Saving.SaveWithoutAsking = SaveWithoutAsking.IsOn);
-        OpenSaveFolder.Content = FluentIcons.Create("folder_open", filled: false);
-        ResetSaveFolder.Content = FluentIcons.Create("arrow_reset", filled: false);
-        ChangeSaveFolder.Click += async (_, _) => await PickSaveFolderAsync();
-        ResetSaveFolder.Click += (_, _) => SetSaveFolder("");
-        OpenSaveFolder.Click += (_, _) =>
+        _saveFolder = new FolderRow(this, "Save folder", SaveFolderPath, SaveFolderProblem, ChangeSaveFolder, OpenSaveFolder, ResetSaveFolder,
+            Windows.Storage.Pickers.PickerLocationId.PicturesLibrary, Settings.SavingSettings.DefaultFolder,
+            () => Settings.Current.Saving.Folder, folder => Settings.Current.Saving.Folder = folder, () => Settings.Current.Saving.EffectiveFolder);
+        _videoFolder = new FolderRow(this, "Video folder", VideoFolderPath, VideoFolderProblem, ChangeVideoFolder, OpenVideoFolder, ResetVideoFolder,
+            Windows.Storage.Pickers.PickerLocationId.VideosLibrary, Settings.VideoSettings.DefaultFolder,
+            () => Settings.Current.Video.Folder, folder => Settings.Current.Video.Folder = folder, () => Settings.Current.Video.EffectiveFolder);
+        VideoFrameRate.Items.Add("30 frames a second");
+        VideoFrameRate.Items.Add("60 frames a second");
+        VideoFrameRate.SelectionChanged += (_, _) =>
         {
-            string folder = Settings.Current.Saving.EffectiveFolder;
-            try
-            {
-                Directory.CreateDirectory(folder); // the default doesn't exist until the first save
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(folder) { UseShellExecute = true });
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
-            {
-                ShowSaveFolderProblem($"Couldn't open {folder}: {ex.Message}");
-            }
+            if (VideoFrameRate.SelectedIndex >= 0)
+                Save(s => s.Video.FrameRate = VideoFrameRate.SelectedIndex == 1 ? 60 : 30);
         };
+        VideoCursor.Toggled += (_, _) => Save(s => s.Video.Cursor = VideoCursor.IsOn);
         OpenFile.Click += (_, _) => App.OpenSettingsFile();
 
         Load();
@@ -149,62 +147,105 @@ public sealed partial class SettingsWindow : Window
             p => p.Name.Equals(s.Beautify.Preset, StringComparison.OrdinalIgnoreCase)));
         BeautifyPadding.Value = Math.Clamp(s.Beautify.Padding, 16, 160);
         SaveWithoutAsking.IsOn = s.Saving.SaveWithoutAsking;
-        ShowSaveFolder();
+        _saveFolder.Show();
+        _videoFolder.Show();
+        VideoFrameRate.SelectedIndex = s.Video.FrameRate >= 60 ? 1 : 0;
+        VideoCursor.IsOn = s.Video.Cursor;
         WindowTheme.SelectedIndex = Array.IndexOf(Themes.All, Themes.Find(s.Appearance.Window));
         ColorSet.SelectedIndex = Array.IndexOf(Themes.All, Themes.Find(s.Appearance.Colors));
         _loading = false;
     }
 
-    // ---- Save folder -------------------------------------------------------------------
+    // ---- Folders -----------------------------------------------------------------------
 
-    private void ShowSaveFolder()
-    {
-        var saving = Settings.Current.Saving;
-        SaveFolderPath.Text = saving.EffectiveFolder;
-        ResetSaveFolder.Visibility = string.IsNullOrWhiteSpace(saving.Folder) ? Visibility.Collapsed : Visibility.Visible;
-        SaveFolderProblem.Visibility = Visibility.Collapsed;
-    }
+    private readonly FolderRow _saveFolder;
+    private readonly FolderRow _videoFolder;
 
-    private void ShowSaveFolderProblem(string text)
+    /// <summary>A folder setting: its path, Change…, open it, and back to the default.</summary>
+    private sealed class FolderRow
     {
-        SaveFolderProblem.Text = text;
-        SaveFolderProblem.Visibility = Visibility.Visible;
-    }
+        private readonly Window _window;
+        private readonly string _name;
+        private readonly TextBlock _path, _problem;
+        private readonly Button _reset;
+        private readonly Windows.Storage.Pickers.PickerLocationId _start;
+        private readonly string _default;
+        private readonly Func<string> _get;
+        private readonly Action<string> _set;
+        private readonly Func<string> _effective;
 
-    private async Task PickSaveFolderAsync()
-    {
-        var picker = new Windows.Storage.Pickers.FolderPicker { SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.PicturesLibrary };
-        picker.FileTypeFilter.Add("*");
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
-        Windows.Storage.StorageFolder? picked;
-        try
+        public FolderRow(Window window, string name, TextBlock path, TextBlock problem, Button change, Button open, Button reset,
+            Windows.Storage.Pickers.PickerLocationId start, string defaultFolder, Func<string> get, Action<string> set, Func<string> effective)
         {
-            picked = await picker.PickSingleFolderAsync();
+            (_window, _name, _path, _problem, _reset, _start, _default, _get, _set, _effective) =
+                (window, name, path, problem, reset, start, defaultFolder, get, set, effective);
+            open.Content = FluentIcons.Create("folder_open", filled: false);
+            reset.Content = FluentIcons.Create("arrow_reset", filled: false);
+            change.Click += async (_, _) => await PickAsync();
+            reset.Click += (_, _) => Set("");
+            open.Click += (_, _) =>
+            {
+                string folder = _effective();
+                try
+                {
+                    Directory.CreateDirectory(folder); // the default doesn't exist until the first save
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(folder) { UseShellExecute = true });
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+                {
+                    ShowProblem($"Couldn't open {folder}: {ex.Message}");
+                }
+            };
         }
-        catch (Exception ex)
-        {
-            Log.Write($"Folder picker failed: {ex.Message}");
-            ShowSaveFolderProblem("Couldn't show the folder picker. You can type a folder into the settings file instead.");
-            return;
-        }
-        if (picked is null)
-            return;
-        // Libraries and other virtual folders have no path to save into.
-        if (string.IsNullOrEmpty(picked.Path))
-        {
-            ShowSaveFolderProblem($"{picked.DisplayName} isn't a folder on disk. Pick a folder inside it.");
-            return;
-        }
-        // Picking the default folder itself goes back to following Pictures (e.g. if it moves to OneDrive).
-        SetSaveFolder(string.Equals(Path.TrimEndingDirectorySeparator(picked.Path), Settings.SavingSettings.DefaultFolder, StringComparison.OrdinalIgnoreCase) ? "" : picked.Path);
-    }
 
-    private void SetSaveFolder(string folder)
-    {
-        Settings.Current.Saving.Folder = folder;
-        Settings.Save();
-        Log.Write($"Save folder set to {Settings.Current.Saving.EffectiveFolder}");
-        ShowSaveFolder();
+        public void Show()
+        {
+            _path.Text = _effective();
+            _reset.Visibility = string.IsNullOrWhiteSpace(_get()) ? Visibility.Collapsed : Visibility.Visible;
+            _problem.Visibility = Visibility.Collapsed;
+        }
+
+        private void ShowProblem(string text)
+        {
+            _problem.Text = text;
+            _problem.Visibility = Visibility.Visible;
+        }
+
+        private async Task PickAsync()
+        {
+            var picker = new Windows.Storage.Pickers.FolderPicker { SuggestedStartLocation = _start };
+            picker.FileTypeFilter.Add("*");
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(_window));
+            Windows.Storage.StorageFolder? picked;
+            try
+            {
+                picked = await picker.PickSingleFolderAsync();
+            }
+            catch (Exception ex)
+            {
+                Log.Write($"Folder picker failed: {ex.Message}");
+                ShowProblem("Couldn't show the folder picker. You can type a folder into the settings file instead.");
+                return;
+            }
+            if (picked is null)
+                return;
+            // Libraries and other virtual folders have no path to save into.
+            if (string.IsNullOrEmpty(picked.Path))
+            {
+                ShowProblem($"{picked.DisplayName} isn't a folder on disk. Pick a folder inside it.");
+                return;
+            }
+            // Picking the default folder itself goes back to following Pictures or Videos (e.g. if it moves to OneDrive).
+            Set(string.Equals(Path.TrimEndingDirectorySeparator(picked.Path), _default, StringComparison.OrdinalIgnoreCase) ? "" : picked.Path);
+        }
+
+        private void Set(string folder)
+        {
+            _set(folder);
+            Settings.Save();
+            Log.Write($"{_name} set to {_effective()}");
+            Show();
+        }
     }
 
     /// <summary>Shows a theme's colors beside its picker.</summary>

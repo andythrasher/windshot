@@ -32,6 +32,9 @@ internal sealed class ThemedWindow
     /// <summary>Also gives this element (a flyout's content) the theme's accent. Call before <see cref="Apply"/>.</summary>
     public void Include(FrameworkElement element) => _extras.Add((element, null));
 
+    /// <summary>Gives an element shown later outside the window's content (e.g. a dialog) the current theme's accent.</summary>
+    public void Style(FrameworkElement element) => Replace(element, null, Theme);
+
     public void Apply(Theme theme)
     {
         Theme = theme;

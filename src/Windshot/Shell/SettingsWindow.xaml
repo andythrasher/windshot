@@ -101,6 +101,23 @@
                         </StackPanel>
                     </Grid>
                 </Border>
+                <Border Style="{StaticResource Card}">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Record video" />
+                            <TextBlock Style="{StaticResource Description}" Text="Record an area or window, with the PC's sound. Press it again to stop." />
+                            <TextBlock x:Name="RecordProblem" Style="{StaticResource Problem}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                            <Button x:Name="RecordShortcut" Style="{StaticResource ShortcutButton}" />
+                            <Button x:Name="RecordReset" ToolTipService.ToolTip="Reset to the default" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
 
                 <TextBlock Text="General" Style="{StaticResource Section}" />
                 <Border Style="{StaticResource Card}">
@@ -199,6 +216,52 @@
                             <Button x:Name="ChangeSaveFolder" Content="Change…" />
                             <Button x:Name="OpenSaveFolder" ToolTipService.ToolTip="Open the folder" />
                             <Button x:Name="ResetSaveFolder" ToolTipService.ToolTip="Back to Pictures\Screenshots" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <TextBlock Text="Video" Style="{StaticResource Section}" />
+                <Border Style="{StaticResource Card}">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Frame rate" />
+                            <TextBlock Style="{StaticResource Description}" Text="60 is smoother for fast movement; 30 makes smaller files." />
+                        </StackPanel>
+                        <ComboBox x:Name="VideoFrameRate" Grid.Column="1" MinWidth="168" VerticalAlignment="Center" />
+                    </Grid>
+                </Border>
+                <Border Style="{StaticResource Card}">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Show the mouse pointer" />
+                            <TextBlock Style="{StaticResource Description}" Text="Include the pointer in recordings." />
+                        </StackPanel>
+                        <ToggleSwitch x:Name="VideoCursor" Grid.Column="1" MinWidth="0" OnContent="" OffContent="" />
+                    </Grid>
+                </Border>
+                <Border Style="{StaticResource Card}">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Video folder" />
+                            <TextBlock x:Name="VideoFolderPath" Style="{StaticResource Description}" IsTextSelectionEnabled="True" />
+                            <TextBlock x:Name="VideoFolderProblem" Style="{StaticResource Problem}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                            <Button x:Name="ChangeVideoFolder" Content="Change…" />
+                            <Button x:Name="OpenVideoFolder" ToolTipService.ToolTip="Open the folder" />
+                            <Button x:Name="ResetVideoFolder" ToolTipService.ToolTip="Back to Videos\Screen Recordings" />
                         </StackPanel>
                     </Grid>
                 </Border>

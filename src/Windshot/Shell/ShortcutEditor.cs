@@ -8,7 +8,7 @@ using Windows.UI.Core;
 namespace Windshot.Shell;
 
 /// <summary>
-/// The three shortcut rows shared by the settings and welcome windows. Shortcuts are recorded
+/// The shortcut rows shared by the settings and welcome windows. Shortcuts are recorded
 /// by clicking one and pressing the new keys; Windshot's hotkeys are let go of meanwhile, so
 /// the current combination can be pressed without starting a capture.
 /// </summary>
@@ -26,7 +26,8 @@ internal sealed class ShortcutEditor
     /// <param name="changed">Called after a shortcut is saved, e.g. to update the other window.</param>
     public ShortcutEditor(Button capture, Button captureReset, TextBlock captureProblem,
         Button scrolling, Button scrollingReset, TextBlock scrollingProblem,
-        Button copyText, Button copyTextReset, TextBlock copyTextProblem, Action changed)
+        Button copyText, Button copyTextReset, TextBlock copyTextProblem,
+        Button record, Button recordReset, TextBlock recordProblem, Action changed)
     {
         _changed = changed;
         var defaults = new Settings.HotkeySettings();
@@ -35,6 +36,7 @@ internal sealed class ShortcutEditor
             new("Capture", capture, captureReset, captureProblem, h => h.Capture, (h, v) => h.Capture = v, defaults.Capture, s => s.Capture),
             new("Scrolling capture", scrolling, scrollingReset, scrollingProblem, h => h.ScrollingCapture, (h, v) => h.ScrollingCapture = v, defaults.ScrollingCapture, s => s.ScrollingCapture),
             new("Copy text", copyText, copyTextReset, copyTextProblem, h => h.CopyText, (h, v) => h.CopyText = v, defaults.CopyText, s => s.CopyText),
+            new("Record video", record, recordReset, recordProblem, h => h.Record, (h, v) => h.Record = v, defaults.Record, s => s.Record),
         ];
         foreach (var row in _rows)
         {

@@ -26,7 +26,8 @@ public sealed partial class WelcomeWindow : Window
         _theming = new ThemedWindow(this, Root);
         _shortcuts = new ShortcutEditor(CaptureShortcut, CaptureReset, CaptureProblem,
             ScrollingShortcut, ScrollingReset, ScrollingProblem,
-            CopyTextShortcut, CopyTextReset, CopyTextProblem, changed: SettingsWindow.Refresh);
+            CopyTextShortcut, CopyTextReset, CopyTextProblem,
+            RecordShortcut, RecordReset, RecordProblem, changed: SettingsWindow.Refresh);
 
         if (File.Exists(AppIcon.FilePath))
         {

@@ -34,7 +34,7 @@ internal sealed class ScrollingCapture
         _area = area;
         _scale = scale;
         _onCaptured = onCaptured;
-        _frame = new AreaFrame(area, scale);
+        _frame = new AreaFrame(area, scale, Color.FromArgb(64, 132, 214));
         _panel = new ScrollPanel(area, scale);
         _panelBounds = _panel.Bounds;
         _panel.Done += Finish;
@@ -240,94 +240,16 @@ internal sealed class ScrollingCapture
         public void Dispose() => _bitmap.Dispose();
     }
 
-    // ---- Windows -----------------------------------------------------------------------
-
-    private const int WS_EX_TOOLWINDOW = 0x80;
-    private const int WS_EX_TRANSPARENT = 0x20;
-    private const int WS_EX_NOACTIVATE = 0x08000000;
-    private const int WS_EX_TOPMOST = 0x8;
-    private const uint WDA_EXCLUDEFROMCAPTURE = 0x11;
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool SetWindowDisplayAffinity(IntPtr hwnd, uint affinity);
-
-    /// <summary>Keeps a window out of screen captures, so it never ends up in a frame even if it overlaps the area.</summary>
-    private static void ExcludeFromCapture(Form form)
-    {
-        if (!SetWindowDisplayAffinity(form.Handle, WDA_EXCLUDEFROMCAPTURE))
-            Log.Write($"Couldn't exclude {form.GetType().Name} from capture (error {Marshal.GetLastWin32Error()})");
-    }
-
-    /// <summary>A click-through outline just outside the area being captured.</summary>
-    private sealed class AreaFrame : Form
-    {
-        private static readonly Color Key = Color.FromArgb(255, 0, 255);
-        private static readonly Color Outline = Color.FromArgb(64, 132, 214);
-        private readonly int _thickness;
-
-        public AreaFrame(Rectangle area, double scale)
-        {
-            _thickness = Math.Max(2, (int)Math.Round(2 * scale));
-            FormBorderStyle = FormBorderStyle.None;
-            StartPosition = FormStartPosition.Manual;
-            AutoScaleMode = AutoScaleMode.None;
-            ShowInTaskbar = false;
-            TopMost = true;
-            BackColor = Key;
-            TransparencyKey = Key;
-            var bounds = area;
-            bounds.Inflate(_thickness, _thickness);
-            Bounds = bounds;
-        }
-
-        protected override bool ShowWithoutActivation => true;
-
-        protected override CreateParams CreateParams
-        {
-            get
-            {
-                var cp = base.CreateParams;
-                cp.ExStyle |= WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE | WS_EX_TOPMOST;
-                return cp;
-            }
-        }
-
-        protected override void OnHandleCreated(EventArgs e)
-        {
-            base.OnHandleCreated(e);
-            ExcludeFromCapture(this);
-        }
-
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            using var pen = new Pen(Outline, _thickness) { Alignment = System.Drawing.Drawing2D.PenAlignment.Inset };
-            e.Graphics.DrawRectangle(pen, 0, 0, ClientSize.Width - 1, ClientSize.Height - 1);
-        }
-    }
-
     /// <summary>Progress and the Done and Cancel buttons, beside the area. Doesn't take focus, so keys still scroll the app.</summary>
-    private sealed class ScrollPanel : Form
+    private sealed class ScrollPanel : FloatingPanel
     {
         private const string AutoLabel = "Auto-scroll";
         private readonly Label _status;
         private readonly Button _autoButton;
-        private readonly Font _font;
         private bool _auto;
 
-        public ScrollPanel(Rectangle area, double scale)
+        public ScrollPanel(Rectangle area, double scale) : base(scale)
         {
-            int S(double dip) => (int)Math.Round(dip * scale);
-            _font = new Font("Segoe UI", (float)(14 * scale), FontStyle.Regular, GraphicsUnit.Pixel);
-
-            FormBorderStyle = FormBorderStyle.None;
-            StartPosition = FormStartPosition.Manual;
-            AutoScaleMode = AutoScaleMode.None;
-            ShowInTaskbar = false;
-            TopMost = true;
-            KeyPreview = true;
-            BackColor = Color.FromArgb(32, 32, 32);
-            Font = _font;
-
             _status = new Label
             {
                 ForeColor = Color.White,
@@ -336,25 +258,19 @@ internal sealed class ScrollingCapture
                 Bounds = new Rectangle(S(14), 0, S(250), S(44)),
                 Text = "Scroll down to capture more",
             };
-            _autoButton = MakeButton(AutoLabel, Color.FromArgb(64, 64, 64), new Rectangle(S(270), S(8), S(104), S(28)));
-            var done = MakeButton("Done", Color.FromArgb(64, 132, 214), new Rectangle(S(380), S(8), S(72), S(28)));
-            var cancel = MakeButton("Cancel", Color.FromArgb(64, 64, 64), new Rectangle(S(458), S(8), S(72), S(28)));
+            _autoButton = MakeButton(AutoLabel, Plain, new Rectangle(S(270), S(8), S(104), S(28)));
+            var done = MakeButton("Done", Accent, new Rectangle(S(380), S(8), S(72), S(28)));
+            var cancel = MakeButton("Cancel", Plain, new Rectangle(S(458), S(8), S(72), S(28)));
             _autoButton.Click += (_, _) => SetAuto(!_auto);
             done.Click += (_, _) => Done?.Invoke();
             cancel.Click += (_, _) => Cancelled?.Invoke();
             Controls.AddRange([_status, _autoButton, done, cancel]);
-
-            var size = new Size(S(538), S(44));
-            Size = size;
-            Region = Region.FromHrgn(CreateRoundRectRgn(0, 0, size.Width + 1, size.Height + 1, S(12), S(12)));
-            Location = Place(area, size, S(10));
+            Layout(area, new Size(S(538), S(44)));
         }
 
         public event Action? Done;
         public event Action? Cancelled;
         public event Action<bool>? AutoScrollToggled;
-
-        protected override bool ShowWithoutActivation => true;
 
         private void SetAuto(bool on)
         {
@@ -373,22 +289,6 @@ internal sealed class ScrollingCapture
             _auto = false;
             _autoButton.Text = AutoLabel;
             _status.Text = message;
-        }
-
-        protected override CreateParams CreateParams
-        {
-            get
-            {
-                var cp = base.CreateParams;
-                cp.ExStyle |= WS_EX_TOOLWINDOW | WS_EX_TOPMOST;
-                return cp;
-            }
-        }
-
-        protected override void OnHandleCreated(EventArgs e)
-        {
-            base.OnHandleCreated(e);
-            ExcludeFromCapture(this);
         }
 
         public void ShowProgress(StitchResult result, int height)
@@ -413,43 +313,5 @@ internal sealed class ScrollingCapture
             else if (e.KeyCode == Keys.Enter)
                 Done?.Invoke();
         }
-
-        private Button MakeButton(string text, Color color, Rectangle bounds)
-        {
-            var button = new Button
-            {
-                Text = text,
-                Bounds = bounds,
-                FlatStyle = FlatStyle.Flat,
-                BackColor = color,
-                ForeColor = Color.White,
-                Font = _font,
-                TabStop = false,
-            };
-            button.FlatAppearance.BorderSize = 0;
-            return button;
-        }
-
-        /// <summary>Below the area if there's room on its monitor, else above, else inside along the bottom.</summary>
-        private static Point Place(Rectangle area, Size size, int gap)
-        {
-            var monitor = Screen.FromRectangle(area).WorkingArea;
-            int x = Math.Clamp(area.X + (area.Width - size.Width) / 2, monitor.Left, Math.Max(monitor.Left, monitor.Right - size.Width));
-            if (area.Bottom + gap + size.Height <= monitor.Bottom)
-                return new Point(x, area.Bottom + gap);
-            if (area.Top - gap - size.Height >= monitor.Top)
-                return new Point(x, area.Top - gap - size.Height);
-            return new Point(x, Math.Min(area.Bottom, monitor.Bottom) - gap - size.Height);
-        }
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing)
-                _font.Dispose();
-            base.Dispose(disposing);
-        }
-
-        [DllImport("gdi32.dll")]
-        private static extern IntPtr CreateRoundRectRgn(int left, int top, int right, int bottom, int widthEllipse, int heightEllipse);
     }
 }

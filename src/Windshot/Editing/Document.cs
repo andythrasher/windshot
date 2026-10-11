@@ -32,6 +32,12 @@ internal sealed class Document : IDisposable
 
     public CanvasBitmap Image { get; }
 
+    /// <summary>For a recording: the frame being shown, drawn in place of <see cref="Image"/> (its first frame). Owned by the editor.</summary>
+    public CanvasBitmap? Frame { get; set; }
+
+    /// <summary>The bottom layer as shown now: the current frame of a recording, or the screenshot.</summary>
+    public CanvasBitmap Base => Frame ?? Image;
+
     /// <summary>Device pixels per DIP on the monitor the capture came from.</summary>
     public double SourceScale { get; }
 
@@ -139,7 +145,8 @@ internal sealed class Document : IDisposable
     /// beneath them as their input, like adjustment layers.
     /// </summary>
     /// <param name="skip">An annotation the editor is showing some other way, e.g. text being typed.</param>
-    public void Render(CanvasDrawingSession ds, Annotation? skip = null)
+    /// <param name="frame">For exporting a recording: the frame to draw, instead of <see cref="Base"/>.</param>
+    public void Render(CanvasDrawingSession ds, Annotation? skip = null, CanvasBitmap? frame = null)
     {
         NumberSteps();
 
@@ -155,7 +162,7 @@ internal sealed class Document : IDisposable
             DrawBackdrop(ds, Backdrop, card);
 
         using var context = new LayerContext(ds, card, CornerRadius);
-        var scene = Compose(context, fills, fillsInCard, skip);
+        var scene = Compose(context, frame ?? Base, fills, fillsInCard, skip);
         // Everything past the crop is hidden, on screen as in the export (which would only
         // trim it at the canvas edge, leaving it on the beautify backdrop).
         using (CropOverride is Rect cropRect ? ds.CreateLayer(1, cropRect) : null)
@@ -163,7 +170,7 @@ internal sealed class Document : IDisposable
     }
 
     /// <summary>The layer stack as one image, built bottom-up from command lists and effects.</summary>
-    private ICanvasImage Compose(LayerContext context, List<(Rect Band, Windows.UI.Color Color)> fills, bool fillsInCard, Annotation? skip)
+    private ICanvasImage Compose(LayerContext context, CanvasBitmap image, List<(Rect Band, Windows.UI.Color Color)> fills, bool fillsInCard, Annotation? skip)
     {
         var bottom = context.NewList();
         using (var s = bottom.CreateDrawingSession())
@@ -176,7 +183,7 @@ internal sealed class Document : IDisposable
                 if (fillsInCard)
                     DrawFills(s, fills);
                 if (ImageVisible)
-                    s.DrawImage(Image, ImageBounds, ImageBounds, ImageOpacity, ImageInterpolation);
+                    s.DrawImage(image, ImageBounds, image.Bounds, ImageOpacity, ImageInterpolation);
             }
         }
 

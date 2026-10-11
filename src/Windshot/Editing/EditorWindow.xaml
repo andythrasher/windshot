@@ -16,6 +16,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!-- Icon-only, like Snipping Tool; labels live in the tooltips. When the window is too
@@ -246,6 +247,16 @@
                 Visibility="Collapsed"
                 Click="FillButton_Click"
                 ToolTipService.ToolTip="Fill (F): fill the shape with its color. Also handy for covering something up." />
+            <!-- For recordings, with nothing selected: the sound, and what Save and Copy make. -->
+            <AppBarElementContainer x:Name="VideoOptionsContainer" Visibility="Collapsed" VerticalContentAlignment="Center">
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="8,0,4,0">
+                    <ToggleButton x:Name="SoundButton" VerticalAlignment="Center" ToolTipService.ToolTip="Include the recorded sound in the video" />
+                    <TextBlock Text="Save as" Margin="12,0,0,0" VerticalAlignment="Center" />
+                    <ComboBox x:Name="VideoFormatPicker" Width="104" VerticalAlignment="Center" ToolTipService.ToolTip="What Save and Copy make: an MP4 video (with sound), or an animated GIF (no sound, smaller and lower in quality)" />
+                    <TextBlock Text="Size" Margin="12,0,0,0" VerticalAlignment="Center" />
+                    <ComboBox x:Name="VideoSizePicker" Width="128" VerticalAlignment="Center" ToolTipService.ToolTip="The largest size to export at. GIFs are also kept to 960 pixels wide." />
+                </StackPanel>
+            </AppBarElementContainer>
             <AppBarElementContainer x:Name="HintContainer" Visibility="Collapsed" VerticalContentAlignment="Center">
                 <TextBlock x:Name="OptionsHint" Margin="12,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
             </AppBarElementContainer>
@@ -349,6 +360,62 @@
                     </Grid>
                 </Grid>
             </Border>
+
+            <!-- While a recording exports: progress, and a way out. -->
+            <Border
+                x:Name="ExportOverlay"
+                Grid.ColumnSpan="2"
+                Visibility="Collapsed"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Padding="24,20"
+                MinWidth="320"
+                CornerRadius="8"
+                Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1">
+                <StackPanel Spacing="12">
+                    <TextBlock x:Name="ExportLabel" Text="Exporting…" Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                    <ProgressBar x:Name="ExportProgress" Maximum="1" />
+                    <Button x:Name="CancelExportButton" Content="Cancel" HorizontalAlignment="Right" MinWidth="96" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- For recordings: play, the time, and the strip to scrub and trim. -->
+        <Grid
+            x:Name="Timeline"
+            Grid.Row="3"
+            Visibility="Collapsed"
+            Padding="12,6,16,12"
+            ColumnSpacing="10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Button
+                x:Name="PlayButton"
+                Width="40"
+                Height="40"
+                Padding="0"
+                VerticalAlignment="Center"
+                ToolTipService.ToolTip="Play or pause (Space)" />
+            <TextBlock
+                x:Name="TimeLabel"
+                Grid.Column="1"
+                MinWidth="104"
+                VerticalAlignment="Center"
+                FontFamily="Segoe UI Variable Text"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                ToolTipService.ToolTip="Where you are, and how long the trimmed video is" />
+            <local:CursorHost x:Name="TimelineHost" Grid.Column="2" Background="Transparent">
+            <canvas:CanvasControl
+                x:Name="TimelineCanvas"
+                Height="52"
+                ClearColor="Transparent"
+                ToolTipService.ToolTip="Click or drag to move through the video. Drag the ends of the strip to trim it." />
+            </local:CursorHost>
         </Grid>
     </Grid>
 </Window>

@@ -147,6 +147,23 @@
                         </StackPanel>
                     </Grid>
                 </Border>
+                <Border Style="{StaticResource Card}">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Record video" />
+                            <TextBlock Style="{StaticResource Description}" Text="Record an area or window, with the PC's sound. Press it again to stop." />
+                            <TextBlock x:Name="RecordProblem" Style="{StaticResource Problem}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                            <Button x:Name="RecordShortcut" Style="{StaticResource ShortcutButton}" />
+                            <Button x:Name="RecordReset" ToolTipService.ToolTip="Reset to the default" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
 
                 <TextBlock Text="Make it yours" Style="{StaticResource Section}" />
                 <Border Style="{StaticResource Card}">

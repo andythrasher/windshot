@@ -64,9 +64,10 @@ public partial class App : Application
 
         Settings.Load();
         _hotkeys = new HotkeyWindow();
-        _tray = new TrayIcon(StartCapture, StartTextCapture, StartScrollingCapture, OpenSettings, Quit);
+        _tray = new TrayIcon(StartCapture, StartTextCapture, StartScrollingCapture, StartRecording, OpenSettings, Quit);
         string hotkeys = ApplyHotkeys().Summary;
         WatchSettingsFile(dispatcher);
+        ScreenRecording.CleanUp();
         int pins = PinStore.RestoreAll(OpenEditor);
         Autostart.Repair();
         Log.Write($"Started{(AppPackage.IsPackaged ? " (Store package)" : "")}{(atSignIn ? " at sign-in" : "")}; {hotkeys}" + (pins > 0 ? $"; restored {pins} pins" : ""));
@@ -89,7 +90,7 @@ public partial class App : Application
     }
 
     /// <summary>Which shortcuts registered. An empty shortcut is off, which isn't a failure.</summary>
-    internal sealed record HotkeyStatus(bool Capture, bool CopyText, bool ScrollingCapture, string Summary);
+    internal sealed record HotkeyStatus(bool Capture, bool CopyText, bool ScrollingCapture, bool Record, string Summary);
 
     internal static App Instance => (App)Current;
 
@@ -102,11 +103,12 @@ public partial class App : Application
         bool capture = Register(keys.Capture, StartCapture);
         bool copyText = Register(keys.CopyText, StartTextCapture);
         bool scrolling = Register(keys.ScrollingCapture, StartScrollingCapture);
+        bool record = Register(keys.Record, StartRecording);
         string? Label(string shortcut, bool ok) => ok ? shortcut : null;
-        _tray!.SetShortcuts(Label(keys.Capture, capture), Label(keys.CopyText, copyText), Label(keys.ScrollingCapture, scrolling));
+        _tray!.SetShortcuts(Label(keys.Capture, capture), Label(keys.CopyText, copyText), Label(keys.ScrollingCapture, scrolling), Label(keys.Record, record));
         string Describe(string shortcut, bool ok) => ok ? (shortcut is "" ? "off" : shortcut) : $"'{shortcut}' unavailable";
-        return new HotkeyStatus(capture, copyText, scrolling,
-            $"hotkeys capture={Describe(keys.Capture, capture)} text={Describe(keys.CopyText, copyText)} scrolling={Describe(keys.ScrollingCapture, scrolling)}");
+        return new HotkeyStatus(capture, copyText, scrolling, record,
+            $"hotkeys capture={Describe(keys.Capture, capture)} text={Describe(keys.CopyText, copyText)} scrolling={Describe(keys.ScrollingCapture, scrolling)} record={Describe(keys.Record, record)}");
     }
 
     /// <summary>Lets go of every hotkey, so the settings window can record any combination (call ApplyHotkeys after).</summary>
@@ -148,7 +150,7 @@ public partial class App : Application
         var before = Settings.Current.Hotkeys;
         Settings.Load();
         var after = Settings.Current.Hotkeys;
-        if (before.Capture != after.Capture || before.CopyText != after.CopyText || before.ScrollingCapture != after.ScrollingCapture)
+        if (before.Capture != after.Capture || before.CopyText != after.CopyText || before.ScrollingCapture != after.ScrollingCapture || before.Record != after.Record)
             Log.Write($"Settings reloaded; {ApplyHotkeys().Summary}");
         else
             Log.Write("Settings reloaded");
@@ -224,6 +226,19 @@ public partial class App : Application
         catch (Exception ex)
         {
             Log.Write($"Scrolling capture failed: {ex}");
+        }
+    }
+
+    /// <summary>Pick an area and record it; while recording, stop and open the recording.</summary>
+    private void StartRecording()
+    {
+        try
+        {
+            ScreenRecording.Begin(OpenEditor, recording => _tray?.SetRecording(recording));
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Recording failed: {ex}");
         }
     }
 

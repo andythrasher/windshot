@@ -34,7 +34,7 @@ Windshot
 
 ### Short description (1,000 max; shown on some surfaces)
 
-Fast screenshots for Windows 11, with an editor where every arrow, box and blur stays editable. Layers, scrolling capture, text copying and pins. No account, and nothing leaves your PC.
+Fast screenshots and screen recordings for Windows 11, with an editor where every arrow, box and blur stays editable. Layers, video trimming, GIFs, scrolling capture, text copying and pins. No account, and nothing leaves your PC.
 
 ### Description (10,000 max)
 
@@ -60,6 +60,11 @@ LAYERS
 • Select several at once to recolor, fade, move or delete them together.
 • Blur and spotlight work like adjustment layers on everything beneath them.
 
+RECORD VIDEO
+• Press Ctrl+Shift+5, select an area or click a window, and record it with the sound your PC plays.
+• Annotate the recording in the same editor: arrows, text, steps, blur and beautify sit on every frame.
+• Trim it by dragging the ends of the timeline, then save or copy it as an MP4 video or an animated GIF.
+
 SCROLLING CAPTURE
 • Capture a whole web page or long document in one tall image.
 • Scroll it yourself, or let auto-scroll do it.
@@ -78,12 +83,18 @@ Every feature is free, with no limits and no purchases.
 
 PRIVATE BY DESIGN
 • No account, no analytics, no ads.
-• Windshot makes no network connections of its own. Your captures go only where you copy, save or pin them.
+• Windshot makes no network connections of its own. Your captures and recordings go only where you copy, save or pin them.
 • Open source under the MIT License, so anyone can check: github.com/andythrasher/windshot
 
 Windshot lives in the notification area and starts in a blink. It can start with Windows, and every shortcut can be changed in Settings.
 
 ### What's new in this version
+
+1.3:
+• Record video: Ctrl+Shift+5 records an area or a window, with the sound your PC plays.
+• Recordings open in the editor, with a timeline to play, scrub and trim them. Everything you draw shows on every frame.
+• Save or copy as an MP4 video or an animated GIF, at the size you choose. GIFs keep small by storing only what changes.
+• New Video settings: frame rate, the mouse pointer, and where videos are saved (Videos\Screen Recordings to start).
 
 1.2.2:
 • A welcome window when you start Windshot: where to find it, your shortcuts, the editor theme and Start with Windows, plus a button to try a capture. Turn it off with its checkbox or in Settings.
@@ -134,10 +145,12 @@ Windshot lives in the notification area and starts in a blink. It can start with
 13. Insert pictures as layers, and give anything an outline, shadow or rounded corners
 14. Save straight to your Screenshots folder in one click
 15. Free and open source (MIT License), with the code on GitHub
+16. Record an area or window with the PC's sound, then annotate and trim it
+17. Save or copy recordings as MP4 video or small animated GIFs
 
 ### Search terms (7 max, 30 characters each)
 
-screenshot · snipping tool · screen capture · annotate screenshot · scrolling screenshot · copy text from screen · screenshot editor
+screenshot · screen recorder · snipping tool · screen capture · annotate screenshot · scrolling screenshot · gif recorder
 
 ### Screenshots (1–10; 3840×2160 PNG)
 
@@ -189,6 +202,7 @@ Windshot runs in the notification area. Launched from Start, it shows a welcome 
 - Press Ctrl+Shift+2, or left-click the notification-area icon, or launch Windshot from Start again, to start a capture. Drag a region (or click a window) and the editor opens.
 - In the editor, use the toolbar to annotate; Ctrl+C copies, Ctrl+S saves, Ctrl+P pins.
 - Ctrl+Shift+3 copies text from a region. Ctrl+Shift+4 starts a scrolling capture; press it again (or Done) to finish.
+- Ctrl+Shift+5 records video: the first time, Windows asks whether Windshot may turn off the screenshot border (either answer works). Select an area, let it record a few seconds, then press Stop (or Ctrl+Shift+5 again). The recording opens in the editor: Space plays it, dragging the ends of the timeline trims it, and Save writes an MP4 to Videos\Screen Recordings.
 - Right-click the notification-area icon for Settings, Start with Windows and Quit.
 
 No account, sign-in or test credentials are needed.

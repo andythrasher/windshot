@@ -164,6 +164,8 @@ public sealed partial class EditorWindow : Window
         BuildBackdropControls();
         InitializeLayers();
         SizeToCapture(capture);
+        if (capture.Video is { } video)
+            InitializeVideo(video);
         if (File.Exists(AppIcon.FilePath))
             AppWindow.SetIcon(AppIcon.FilePath);
         // Start in Select so a stray click doesn't draw something.
@@ -171,6 +173,7 @@ public sealed partial class EditorWindow : Window
         Closed += (_, _) =>
         {
             SavePreferences();
+            EndVideo();
             _document.Dispose();
         };
     }
@@ -209,7 +212,8 @@ public sealed partial class EditorWindow : Window
         // rescales the window, which would undo a size set first.
         AppWindow.Move(new PointInt32(workArea.X, workArea.Y));
         int chromeWidth = (int)(2 * ViewPadding * capture.Scale + 120);
-        int chromeHeight = (int)((2 * ViewPadding + 122) * capture.Scale);
+        // A recording also has the timeline along the bottom.
+        int chromeHeight = (int)((2 * ViewPadding + 122 + (capture.Video is null ? 0 : 72)) * capture.Scale);
         // The minimum keeps the whole toolbar visible.
         int width = Math.Clamp(capture.Width + chromeWidth, (int)(1060 * capture.Scale), (int)(workArea.Width * 0.85));
         int height = Math.Clamp(capture.Height + chromeHeight, (int)(360 * capture.Scale), (int)(workArea.Height * 0.85));
@@ -540,6 +544,7 @@ public sealed partial class EditorWindow : Window
     private void Commit(object? coalesceKey = null)
     {
         _history.Commit(_document, coalesceKey);
+        MarkChanged();
         SyncHistoryButtons();
         RefreshLayers();
     }
@@ -566,7 +571,10 @@ public sealed partial class EditorWindow : Window
         }
         CommitTextEdit();
         if (undo ? _history.Undo(_document) : _history.Redo(_document))
+        {
             Select(null); // the restored objects are copies; the old selection no longer exists
+            MarkChanged();
+        }
         SyncHistoryButtons();
         RefreshLayers();
     }
@@ -634,6 +642,11 @@ public sealed partial class EditorWindow : Window
             case VirtualKey.L when !ctrl: SetLayersOpen(!_layersOpen); break;
             case VirtualKey.Delete or VirtualKey.Back when Selection.Count > 0: DeleteSelected(); break;
             case VirtualKey.Escape when Selection.Count > 0: Select(null); break;
+            // A recording: step through it a frame at a time, or jump to the ends of the trim.
+            case VirtualKey.Left when IsVideo && Selection.Count == 0: StepFrame(-1); break;
+            case VirtualKey.Right when IsVideo && Selection.Count == 0: StepFrame(+1); break;
+            case VirtualKey.Home when IsVideo: Pause(); SeekTo(_trimStart); break;
+            case VirtualKey.End when IsVideo: Pause(); SeekTo(_trimEnd); break;
             default: handled = false; break;
         }
         e.Handled = handled;
@@ -805,6 +818,7 @@ public sealed partial class EditorWindow : Window
         {
             CommitTextEdit();
             _pan = (e.Pointer.PointerId, point.Position.ToVector2());
+            _spacePanned = true;
             CanvasHost.CapturePointer(e.Pointer);
             CanvasHost.Cursor = PanningCursor;
             e.Handled = true;
@@ -1319,6 +1333,7 @@ public sealed partial class EditorWindow : Window
         if (!_spaceHeld)
         {
             _spaceHeld = true;
+            _spacePanned = false;
             if (_pan is null)
                 CanvasHost.Cursor = PanCursor;
         }
@@ -1331,6 +1346,9 @@ public sealed partial class EditorWindow : Window
             return;
         _spaceHeld = false;
         UpdateCursor(null);
+        // In a recording, Space on its own plays and pauses; held while dragging, it still pans.
+        if (!_spacePanned)
+            TogglePlayback();
         e.Handled = true;
     }
 
@@ -1534,6 +1552,11 @@ public sealed partial class EditorWindow : Window
     {
         try
         {
+            if (IsVideo)
+            {
+                await CopyVideoAsync();
+                return;
+            }
             FinishEditing();
             var png = await _document.EncodePngAsync();
             if (!Shell.ClipboardWriter.TrySetPng(png))
@@ -1572,10 +1595,12 @@ public sealed partial class EditorWindow : Window
         try
         {
             FinishEditing();
-            var size = _document.Image.SizeInPixels;
+            // For a recording, the frame being shown.
+            var image = _document.Base;
+            var size = image.SizeInPixels;
             // Reports its own failures as the message.
             ShowMessage(await TextRecognizer.CopyToClipboardAsync(
-                _document.Image.GetPixelBytes(), (int)size.Width, (int)size.Height, _document.SourceScale));
+                image.GetPixelBytes(), (int)size.Width, (int)size.Height, _document.SourceScale));
         }
         catch (Exception ex)
         {
@@ -1590,6 +1615,8 @@ public sealed partial class EditorWindow : Window
     /// </summary>
     private async void Pin_Click(object sender, RoutedEventArgs e)
     {
+        if (IsVideo)
+            return; // a pin is a still image
         try
         {
             FinishEditing();
@@ -1806,6 +1833,11 @@ public sealed partial class EditorWindow : Window
 
     private void Save(bool ask)
     {
+        if (IsVideo)
+        {
+            _ = SaveVideoAsync(ask);
+            return;
+        }
         if (ask)
             SaveAs();
         else
@@ -1841,12 +1873,12 @@ public sealed partial class EditorWindow : Window
         }
     }
 
-    /// <summary><paramref name="name"/>.png in the folder, or with " 2", " 3"… added if that's taken (two saves in one second).</summary>
-    private static string UniquePath(string folder, string name)
+    /// <summary><paramref name="name"/> in the folder, or with " 2", " 3"… added if that's taken (two saves in one second).</summary>
+    private static string UniquePath(string folder, string name, string extension = ".png")
     {
-        string path = Path.Combine(folder, name + ".png");
+        string path = Path.Combine(folder, name + extension);
         for (int n = 2; File.Exists(path); n++)
-            path = Path.Combine(folder, $"{name} {n}.png");
+            path = Path.Combine(folder, $"{name} {n}{extension}");
         return path;
     }
 

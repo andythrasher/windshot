@@ -12,7 +12,11 @@ namespace Windshot.Capture;
 /// <param name="Scale">Device pixels per DIP on the monitor the region came from.</param>
 /// <param name="DesktopBounds">Where the region was on screen, in physical pixels.</param>
 /// <param name="IsScrolling">Stitched from a scrolling capture, so likely much taller than the screen.</param>
-internal sealed record CapturedImage(byte[] Pixels, int Width, int Height, double Scale, Rectangle DesktopBounds, bool IsScrolling = false);
+internal sealed record CapturedImage(byte[] Pixels, int Width, int Height, double Scale, Rectangle DesktopBounds, bool IsScrolling = false)
+{
+    /// <summary>Set for a recording: these pixels are its first frame.</summary>
+    public RecordedVideo? Video { get; init; }
+}
 
 /// <summary>A frozen copy of the entire virtual desktop, in physical pixels.</summary>
 internal sealed class ScreenSnapshot : IDisposable

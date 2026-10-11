@@ -98,6 +98,20 @@ the scrolling part of a window (not its sidebar or toolbar) gives the cleanest r
 captures open at the top, fitted to the window's width; there the wheel scrolls and
 Ctrl+wheel zooms.
 
+**Ctrl+Shift+5** records a video: select an area (or click a window), and everything there is
+recorded, with the sound the PC plays, until you press Stop on the small bar beside it, or the
+shortcut again (Cancel or Esc throws it away). The bar's sound switch mutes the recording. The
+outline and bar are kept out of the recording, and so is Windows' yellow border (the Store app
+asks once for permission to leave it off). Recordings go straight into the editor, where a
+timeline along the bottom plays, scrubs and trims them: drag the ends of the strip (what's
+trimmed is dimmed, not deleted); Space plays and pauses, the arrow keys step a frame, Home and End
+jump to the ends. Everything you draw sits on every frame, and beautify and crop apply throughout.
+With nothing selected, the options bar has the sound switch, the format Save and Copy make (MP4,
+or an animated GIF) and a size limit. Save puts videos in *Videos\Screen Recordings* (Settings
+has its own folder, frame rate and pointer settings), and Copy copies the video as a file, which
+pastes into chats, emails and folders. Closing an unsaved recording asks first. While editing, the
+recording waits in `%LOCALAPPDATA%\Windshot\Recordings`, and it's deleted when the editor closes.
+
 **Layers** (L, or the toolbar's Layers button) opens a panel listing every object, topmost
 first, with the screenshot at the bottom. Click a layer to select it, drag to restack it (or
 Ctrl+] and Ctrl+[, with Shift for top and bottom), use the eye to hide it (hidden layers aren't
@@ -133,7 +147,7 @@ Changes apply immediately.
 Everything is stored in `%LOCALAPPDATA%\Windshot\settings.json` (linked from the window), which is
 also hand-editable; comments and trailing commas are fine, and changes apply when you save.
 
-- `Hotkeys`: `Capture`, `CopyText` and `ScrollingCapture`, written like `"Ctrl+Shift+2"`, `"Alt+S"` or `"PrintScreen"`
+- `Hotkeys`: `Capture`, `CopyText`, `ScrollingCapture` and `Record`, written like `"Ctrl+Shift+2"`, `"Alt+S"` or `"PrintScreen"`
   (for Print Screen, first turn off "Use the Print screen key to open screen capture" in
   Windows Settings → Accessibility → Keyboard).
 - `ShowWelcome` (default `true`): the welcome window when Windshot is started by hand.
@@ -141,6 +155,8 @@ also hand-editable; comments and trailing commas are fine, and changes apply whe
 - `Editor`: per-tool sizes (1–10), colors (`"#RRGGBB"`), pixelate and text background, and
   `CloseAfterSaveOrCopy` (default `true`).
   Saved automatically when an editor closes.
+- `Video`: `FrameRate` (30 or 60), `Cursor`, `Sound`, `Folder` (empty: Videos\Screen Recordings),
+  `Format` (`"MP4"` or `"GIF"`) and `MaxHeight` (0 keeps the recording's size).
 - `Beautify`: `OnByDefault`, `Preset` (Sky, Sunset, Grape, Mint, Peach, Night, Graphite,
   Paper) and `Padding`.
 - `Clipboard`: `KeepOutOfHistory` (default `false`) leaves copies out of Win+V history and
@@ -179,6 +195,15 @@ same icons by `tools/make-cursors.ps1`.
 - **Physical pixels everywhere on the capture side.** The process is Per-Monitor-V2 DPI aware,
   the desktop is snapshotted once, and each monitor gets its own overlay window in its own
   pixel space, which keeps mixed-DPI setups from breaking.
+- **Video with Windows' own media stack, no ffmpeg.** Recording uses Windows.Graphics.Capture
+  (GPU frames, cropped by Win2D) and WASAPI loopback for the sound, into `MediaStreamSource` →
+  `MediaTranscoder` (the hardware H.264 encoder). The editor plays recordings with `MediaPlayer`'s
+  frame server, which copies each frame into the bottom layer; export reads frames exactly with
+  Media Foundation's source reader and draws the document over each (`Editing/VideoExport.cs`).
+  The release build is trimmed, which removes .NET's built-in COM interop, so WASAPI and Media
+  Foundation are called through their vtables (`Video/Com.cs`). GIFs come from our own encoder
+  (`Video/GifWriter.cs`), which stores only what changed between frames. `spikes/VideoSpike` is
+  the experiment that proved the approach; `docs/video-plan.md` has the plan and what it found.
 - **WinUI 3 + Win2D for the editor; WinForms for tray, hotkey and overlay.** WinForms windows
   appear instantly. It's referenced via `FrameworkReference` rather than `UseWindowsForms`,
   because the latter pulls in WPF's XAML compiler, which breaks the WinUI build.
