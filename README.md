@@ -107,7 +107,11 @@ timeline along the bottom plays, scrubs and trims them: drag the ends of the str
 trimmed is dimmed, not deleted); Space plays and pauses, the arrow keys step a frame, Home and End
 jump to the ends. Everything you draw sits on every frame, and beautify and crop apply throughout.
 Each layer can show for just part of the recording: select it, and its bar appears under the
-strip; drag its ends to set when it appears and goes, or drag the bar to move it. New layers
+strip; drag its ends to set when it appears and goes, or drag the bar to move it. Its ends snap to
+other layers' starts and ends (ticks in the lane mark them) and to where the playhead was, with a
+guide line; the trim handles snap the same way, so you can play to a moment, pause, and trim to it.
+A light band along the top of the strip shows where the other layers are, brighter where they
+overlap. New layers
 start at the playhead. The options bar's **Animate** menu sets how a layer comes in and goes out: at
 once, or Quick or Slow with a fade, a pop (it grows in with a little overshoot), a wipe right or
 left, a wipe in from the edges or out from the center, or a radial wipe clockwise or

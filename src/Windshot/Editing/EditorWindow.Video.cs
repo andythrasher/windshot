@@ -115,6 +115,8 @@ public sealed partial class EditorWindow
         TimelineCanvas.PointerCaptureLost += (_, _) =>
         {
             _timelineDrag = TimelineDrag.None;
+            _snapGuide = null;
+            TimelineCanvas.Invalidate();
             Canvas.Invalidate();
         };
         TimelineCanvas.SizeChanged += (_, _) => TimelineCanvas.Invalidate();
@@ -340,6 +342,8 @@ public sealed partial class EditorWindow
             }
         }
 
+        DrawCoverage(ds, strip);
+
         // Trimmed away: dimmed.
         float start = XAt(_trimStart), end = XAt(_trimEnd);
         var dim = Color.FromArgb(170, 0, 0, 0);
@@ -366,6 +370,44 @@ public sealed partial class EditorWindow
         float bottom = (float)Lane.Bottom + 1;
         ds.DrawLine(head, (float)strip.Y - 1, head, bottom, Color.FromArgb(160, 0, 0, 0), 4);
         ds.DrawLine(head, (float)strip.Y - 1, head, bottom, Color.FromArgb(255, 255, 255, 255), 2);
+
+        // Where a dragged edge has snapped.
+        if (_snapGuide is { } snap)
+        {
+            float x = XAt(snap);
+            ds.DrawLine(x, (float)strip.Y, x, bottom, accent, 2);
+        }
+    }
+
+    /// <summary>
+    /// Along the top of the strip, where the other layers show: a thin band, brighter where
+    /// several overlap, so you can see what's there without a row for every layer.
+    /// </summary>
+    private void DrawCoverage(CanvasDrawingSession ds, Rect strip)
+    {
+        var others = _document.Annotations.Where(a => a.Visible && a != TimedLayer).ToList();
+        if (others.Count == 0)
+            return;
+        var band = new Rect(strip.X + 6, strip.Y + 7, strip.Width - 12, 5);
+        ds.FillRoundedRectangle(band, 2.5f, 2.5f, Color.FromArgb(170, 0, 0, 0));
+        foreach (var layer in others)
+        {
+            float x0 = Math.Max((float)band.X, XAt(layer.Start)), x1 = Math.Min((float)band.Right, XAt(layer.End ?? _length));
+            if (x1 > x0)
+                ds.FillRoundedRectangle(new Rect(x0, band.Y, x1 - x0, band.Height), 2.5f, 2.5f, Color.FromArgb(120, 255, 255, 255)); // overlaps stack brighter
+        }
+    }
+
+    /// <summary>In the lane, small ticks where other layers start and end: what the selected layer's bar snaps to.</summary>
+    private void DrawSnapTicks(CanvasDrawingSession ds, Rect lane, Annotation layer, Color color)
+    {
+        foreach (var t in SnapTargets(layer).Skip(1).Distinct())
+        {
+            if (t <= TimeSpan.Zero || t >= _length)
+                continue; // the ends of the lane need no marks
+            float x = XAt(t);
+            ds.DrawLine(x, (float)(lane.Y + 4), x, (float)(lane.Bottom - 4), color, 2);
+        }
     }
 
     /// <summary>The selected layer's bar: when it shows, with its fades as ramps at the ends.</summary>
@@ -387,6 +429,7 @@ public sealed partial class EditorWindow
             ds.DrawText(_group.Count > 0 ? "Select one layer to set when it shows" : "Select a layer to set when it shows", lane, muted, small);
             return;
         }
+        DrawSnapTicks(ds, lane, layer, muted);
 
         var end = layer.End ?? _length;
         float x0 = XAt(layer.Start), x1 = Math.Max(x0 + 2, XAt(end));
@@ -455,6 +498,7 @@ public sealed partial class EditorWindow
         if (_timelineDrag == TimelineDrag.LayerMove)
             _layerGrab = TimeAt(p.X) - TimedLayer!.Start;
         _layerTimingChanged = false;
+        _snapPlayhead = PlayheadTime ?? _position; // before pausing, which can move it
         Pause();
         TimelineCanvas.CapturePointer(e.Pointer);
         DragTimeline(p.X);
@@ -487,6 +531,7 @@ public sealed partial class EditorWindow
             Commit();
         _layerTimingChanged = false;
         _timelineDrag = TimelineDrag.None;
+        _snapGuide = null;
         TimelineCanvas.ReleasePointerCapture(e.Pointer);
         Canvas.Invalidate(); // a scrub has ended: the selection shows in full again
     }
@@ -498,15 +543,16 @@ public sealed partial class EditorWindow
     {
         var t = TimeAt(x);
         var layer = TimedLayer;
+        _snapGuide = null;
         switch (_timelineDrag)
         {
             case TimelineDrag.TrimStart:
-                _trimStart = Clamp(t, TimeSpan.Zero, _trimEnd - MinTrimLength);
+                _trimStart = Clamp(Snap(t, SnapTargets(null)), TimeSpan.Zero, _trimEnd - MinTrimLength);
                 MarkChanged();
                 SeekTo(_trimStart);
                 break;
             case TimelineDrag.TrimEnd:
-                _trimEnd = Clamp(t, _trimStart + MinTrimLength, _length);
+                _trimEnd = Clamp(Snap(t, SnapTargets(null)), _trimStart + MinTrimLength, _length);
                 MarkChanged();
                 SeekTo(_trimEnd);
                 break;
@@ -514,21 +560,31 @@ public sealed partial class EditorWindow
                 SeekTo(Clamp(t, _trimStart, _trimEnd));
                 break;
             case TimelineDrag.LayerStart when layer is not null:
-                layer.Start = Clamp(t, TimeSpan.Zero, (layer.End ?? _length) - MinLayerLength);
+                layer.Start = Clamp(Snap(t, SnapTargets(layer)), TimeSpan.Zero, (layer.End ?? _length) - MinLayerLength);
                 if (layer.Start < FrameStep)
                     layer.Start = TimeSpan.Zero; // snaps to the very start
                 _layerTimingChanged = true;
                 SeekTo(layer.Start);
                 break;
             case TimelineDrag.LayerEnd when layer is not null:
-                var end = Clamp(t, layer.Start + MinLayerLength, _length);
+                var end = Clamp(Snap(t, SnapTargets(layer)), layer.Start + MinLayerLength, _length);
                 layer.End = end > _length - FrameStep ? null : end; // to the end, wherever that is
                 _layerTimingChanged = true;
                 SeekTo((layer.End ?? _length) - FrameStep);
                 break;
             case TimelineDrag.LayerMove when layer is not null:
                 var length = (layer.End ?? _length) - layer.Start;
-                var start = Clamp(t - _layerGrab, TimeSpan.Zero, _length - length);
+                var start = t - _layerGrab;
+                // Either end can snap; the nearer one wins.
+                var targets = SnapTargets(layer).ToList();
+                var byStart = Snap(start, targets, show: false);
+                var byEnd = Snap(start + length, targets, show: false) - length;
+                bool startSnaps = byStart != start, endSnaps = byEnd != start;
+                if (startSnaps && (!endSnaps || (byStart - start).Duration() <= (byEnd - start).Duration()))
+                    (start, _snapGuide) = (byStart, byStart);
+                else if (endSnaps)
+                    (start, _snapGuide) = (byEnd, byEnd + length);
+                start = Clamp(start, TimeSpan.Zero, _length - length);
                 bool toEnd = layer.End is null && start + length >= _length - FrameStep;
                 layer.Start = start;
                 layer.End = toEnd ? null : start + length;
@@ -537,6 +593,43 @@ public sealed partial class EditorWindow
                 break;
         }
         Canvas.Invalidate();
+        TimelineCanvas.Invalidate();
+    }
+
+    /// <summary>How close (in DIPs) a dragged edge must come to something to snap to it.</summary>
+    private const float SnapReach = 8;
+
+    /// <summary>Where the playhead was when the drag began: something to line up with.</summary>
+    private TimeSpan _snapPlayhead;
+
+    /// <summary>While dragging, where an edge has snapped, drawn as a guide line.</summary>
+    private TimeSpan? _snapGuide;
+
+    /// <summary>What a dragged edge can snap to: where the playhead was, and the other layers' starts and ends.</summary>
+    private IEnumerable<TimeSpan> SnapTargets(Annotation? dragging)
+    {
+        yield return _snapPlayhead;
+        foreach (var other in _document.Annotations.Where(a => a.Visible && a != dragging))
+        {
+            yield return other.Start;
+            yield return other.End ?? _length;
+        }
+    }
+
+    /// <summary>The nearest target within <see cref="SnapReach"/> of <paramref name="t"/>, or <paramref name="t"/> itself.</summary>
+    private TimeSpan Snap(TimeSpan t, IEnumerable<TimeSpan> targets, bool show = true)
+    {
+        float x = XAt(t), best = SnapReach + 1;
+        var snapped = t;
+        foreach (var target in targets)
+        {
+            float distance = Math.Abs(XAt(target) - x);
+            if (distance <= SnapReach && distance < best)
+                (best, snapped) = (distance, target);
+        }
+        if (show && snapped != t)
+            _snapGuide = snapped;
+        return snapped;
     }
 
     // ---- Transitions and motion --------------------------------------------------------
