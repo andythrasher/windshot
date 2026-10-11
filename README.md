@@ -109,7 +109,8 @@ jump to the ends. Everything you draw sits on every frame, and beautify and crop
 Each layer can show for just part of the recording: select it, and its bar appears under the
 strip; drag its ends to set when it appears and goes, or drag the bar to move it. Its ends snap to
 other layers' starts and ends (ticks in the lane mark them) and to where the playhead was, with a
-guide line; the trim handles snap the same way, so you can play to a moment, pause, and trim to it.
+guide line (while you drag, a dashed line marks where the playhead was); the trim handles snap
+the same way, so you can play to a moment, pause, and trim to it, and the playhead goes back there.
 A light band along the top of the strip shows where the other layers are, brighter where they
 overlap. New layers
 start at the playhead. The options bar's **Animate** menu sets how a layer comes in and goes out: at

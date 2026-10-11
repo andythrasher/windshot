@@ -371,6 +371,16 @@ public sealed partial class EditorWindow
         ds.DrawLine(head, (float)strip.Y - 1, head, bottom, Color.FromArgb(160, 0, 0, 0), 4);
         ds.DrawLine(head, (float)strip.Y - 1, head, bottom, Color.FromArgb(255, 255, 255, 255), 2);
 
+        // Dragging an edge moves the playhead with it (to show that frame); a dashed line keeps
+        // where it was, to line up with and snap to.
+        if (_timelineDrag is not (TimelineDrag.None or TimelineDrag.Scrub))
+        {
+            float anchor = XAt(Clamp(_snapPlayhead, TimeSpan.Zero, _length));
+            using var dashed = new CanvasStrokeStyle { DashStyle = CanvasDashStyle.Dash };
+            ds.DrawLine(anchor, (float)strip.Y - 1, anchor, bottom, Color.FromArgb(160, 0, 0, 0), 4);
+            ds.DrawLine(anchor, (float)strip.Y - 1, anchor, bottom, Color.FromArgb(255, 255, 255, 255), 2, dashed);
+        }
+
         // Where a dragged edge has snapped.
         if (_snapGuide is { } snap)
         {
@@ -525,7 +535,11 @@ public sealed partial class EditorWindow
     private void Timeline_PointerReleased(object sender, PointerRoutedEventArgs e)
     {
         if (_timelineDrag is TimelineDrag.TrimStart or TimelineDrag.TrimEnd)
+        {
             Log.Write($"Trimmed to {_trimStart.TotalSeconds:F2}–{_trimEnd.TotalSeconds:F2} s");
+            // Back to where the playhead was, inside what's kept.
+            SeekTo(Clamp(_snapPlayhead, _trimStart, _trimEnd));
+        }
         // A layer's time is part of the document, so it's undoable.
         if (_layerTimingChanged)
             Commit();
