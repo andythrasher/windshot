@@ -72,6 +72,14 @@ internal sealed unsafe class MediaReader : IDisposable
     }
 
     /// <summary>The next sample's bytes and time, or null at the end. For video, rows are top-down BGRA, tightly packed.</summary>
+    /// <summary>
+    /// Hands out the same array for every frame, overwriting the last one, instead of a new one
+    /// each time: for a caller done with each frame before reading the next (exporting), it saves
+    /// allocating a whole frame (33 MB at 4K) per frame.
+    /// </summary>
+    public bool ReuseBuffer { get; set; }
+    private byte[]? _reused;
+
     public (byte[] Data, TimeSpan Time)? Read()
     {
         while (true)
@@ -193,7 +201,9 @@ internal sealed unsafe class MediaReader : IDisposable
     private byte[] CopyRows(byte* top, int pitch)
     {
         int row = Width * 4;
-        var pixels = new byte[row * Height];
+        var pixels = ReuseBuffer && _reused?.Length == row * Height ? _reused : new byte[row * Height];
+        if (ReuseBuffer)
+            _reused = pixels;
         for (int y = 0; y < Height; y++)
             new ReadOnlySpan<byte>(top + (long)y * pitch, row).CopyTo(pixels.AsSpan(y * row, row));
         // RGB32's fourth byte is padding, usually 0. Win2D would read that as transparent (so

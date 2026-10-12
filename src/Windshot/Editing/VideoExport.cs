@@ -33,7 +33,7 @@ internal static class VideoExport
         float scale = (float)(width / bounds.Width);
         var transform = Matrix3x2.CreateTranslation(-(float)bounds.X, -(float)bounds.Y) * Matrix3x2.CreateScale(scale);
 
-        using var reader = new MediaReader(video.Path, audio: false);
+        using var reader = new MediaReader(video.Path, audio: false) { ReuseBuffer = true }; // each frame is drawn before the next is read
         var targets = new BlockingCollection<CanvasRenderTarget>();
         var all = new List<CanvasRenderTarget>();
         for (int i = 0; i < (options.Gif ? 1 : 8); i++)

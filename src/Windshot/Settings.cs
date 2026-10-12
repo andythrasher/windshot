@@ -265,6 +265,7 @@ internal sealed class Settings
         Saving.Folder ??= "";
         Video ??= new VideoSettings();
         Video.Folder ??= "";
+        Video.Format = Video.Format?.ToUpperInvariant() == "GIF" ? "GIF" : "MP4";
         Video.FrameRate = Video.FrameRate >= 45 ? 60 : 30;
         Hotkeys.Record ??= "";
 
