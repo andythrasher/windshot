@@ -470,6 +470,10 @@ internal sealed class SelectionOverlay : Form
             case Keys.Escape:
                 Cancelled?.Invoke();
                 break;
+            // The whole monitor under the pointer, even when windows cover all of its desktop.
+            case Keys.Enter or Keys.F when e.Modifiers == Keys.None && _dragStart is null:
+                Selected?.Invoke(this, Screen.FromPoint(Cursor.Position).Bounds, null);
+                break;
             case Keys.C when e.Modifiers == Keys.None:
                 CopyColor();
                 break;
@@ -513,7 +517,8 @@ internal sealed class SelectionOverlay : Form
         base.Dispose(disposing);
     }
 
-    private static double GetMonitorScale(Rectangle bounds)
+    /// <summary>Device pixels per DIP on the monitor showing most of <paramref name="bounds"/>.</summary>
+    internal static double GetMonitorScale(Rectangle bounds)
     {
         var center = new POINT { X = bounds.X + bounds.Width / 2, Y = bounds.Y + bounds.Height / 2 };
         var monitor = MonitorFromPoint(center, MONITOR_DEFAULTTONEAREST);

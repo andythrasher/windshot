@@ -14,6 +14,7 @@ public partial class App : Application
 {
     private static EventWaitHandle? _captureSignal;
     private static EventWaitHandle? _settingsSignal;
+    private static EventWaitHandle? _openSignal;
     /// <summary>Opens the settings window; in a second launch, asks the running copy to.</summary>
     private const string SettingsArgument = "--settings";
     private HotkeyWindow? _hotkeys;
@@ -42,9 +43,25 @@ public partial class App : Application
         bool atSignIn = Autostart.LaunchedAtSignIn(commandLine);
         _captureSignal = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\Windshot.Capture", out bool isFirstInstance);
         _settingsSignal = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\Windshot.Settings");
+        _openSignal = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\Windshot.Open");
+        var files = FilesIn(commandLine);
         if (!isFirstInstance)
         {
-            if (commandLine.Contains(SettingsArgument))
+            if (files.Count > 0)
+            {
+                // "Open with" while running: hand the files to the running copy.
+                try
+                {
+                    Directory.CreateDirectory(AppPackage.DataFolder);
+                    File.AppendAllLines(OpenRequests, files);
+                    _openSignal.Set();
+                }
+                catch (IOException ex)
+                {
+                    Log.Write($"Couldn't pass on the files to open: {ex.Message}");
+                }
+            }
+            else if (commandLine.Contains(SettingsArgument))
                 _settingsSignal.Set();
             // Launched at sign-in while already running: nothing to do (and no surprise capture).
             else if (!atSignIn)
@@ -58,20 +75,28 @@ public partial class App : Application
             (_, _) => dispatcher.TryEnqueue(StartCapture), null, Timeout.Infinite, executeOnlyOnce: false);
         ThreadPool.RegisterWaitForSingleObject(_settingsSignal,
             (_, _) => dispatcher.TryEnqueue(OpenSettings), null, Timeout.Infinite, executeOnlyOnce: false);
+        ThreadPool.RegisterWaitForSingleObject(_openSignal,
+            (_, _) => dispatcher.TryEnqueue(OpenRequested), null, Timeout.Infinite, executeOnlyOnce: false);
 
         // Stay alive with zero windows open; we only exit from the tray menu.
         DispatcherShutdownMode = DispatcherShutdownMode.OnExplicitShutdown;
 
         Settings.Load();
         _hotkeys = new HotkeyWindow();
-        _tray = new TrayIcon(StartCapture, StartTextCapture, StartScrollingCapture, StartRecording, OpenSettings, Quit);
+        _tray = new TrayIcon(StartCapture, StartTextCapture, StartScrollingCapture, StartRecording, StartDelayedCapture, CancelDelayedCapture, OpenFile, OpenSettings, Quit);
         string hotkeys = ApplyHotkeys().Summary;
         WatchSettingsFile(dispatcher);
         ScreenRecording.CleanUp();
         int pins = PinStore.RestoreAll(OpenEditor);
         Autostart.Repair();
         Log.Write($"Started{(AppPackage.IsPackaged ? " (Store package)" : "")}{(atSignIn ? " at sign-in" : "")}; {hotkeys}" + (pins > 0 ? $"; restored {pins} pins" : ""));
-        if (commandLine.Contains(SettingsArgument))
+        // Started to open files ("Open with"): just those, no welcome.
+        if (files.Count > 0)
+        {
+            foreach (var path in files)
+                _ = OpenPathAsync(path);
+        }
+        else if (commandLine.Contains(SettingsArgument))
             OpenSettings();
         else if (!atSignIn && Settings.Current.ShowWelcome && !commandLine.Contains(NoWelcomeArgument))
             _ = WelcomeAsync();
@@ -221,7 +246,7 @@ public partial class App : Application
     {
         try
         {
-            ScrollingCapture.Begin(OpenEditor);
+            ScrollingCapture.Begin(OpenCapture);
         }
         catch (Exception ex)
         {
@@ -246,11 +271,143 @@ public partial class App : Application
     {
         try
         {
-            CaptureSession.Begin(OpenEditor);
+            CaptureSession.Begin(OpenCapture);
         }
         catch (Exception ex)
         {
             Log.Write($"Capture failed: {ex}");
+        }
+    }
+
+    private System.Windows.Forms.Timer? _delay;
+
+    /// <summary>
+    /// Captures after a few seconds, for menus and hover states that a keypress would close: a
+    /// countdown by the tray, then the usual overlay, over the screen as it is then.
+    /// </summary>
+    private void StartDelayedCapture(int seconds)
+    {
+        CancelDelayedCapture();
+        Settings.Current.Capture.Delay = seconds;
+        Settings.Save();
+        var work = Monitors.Primary?.WorkingArea ?? System.Windows.Forms.Screen.PrimaryScreen!.WorkingArea;
+        double scale = SelectionOverlay.GetMonitorScale(work);
+        // Bottom right, by the tray, out of the way of what's being set up.
+        var corner = new System.Drawing.Rectangle(work.Right - (int)(260 * scale), work.Bottom - (int)(90 * scale), (int)(240 * scale), (int)(70 * scale));
+        int left = seconds;
+        Hud.Show($"Capturing in {left}…", corner, scale);
+        _tray?.SetDelaying(true);
+        _delay = new System.Windows.Forms.Timer { Interval = 1000 };
+        _delay.Tick += (_, _) =>
+        {
+            if (--left > 0)
+            {
+                Hud.Show($"Capturing in {left}…", corner, scale);
+                return;
+            }
+            CancelDelayedCapture();
+            // Give the countdown a moment to leave the screen before it's captured.
+            var go = new System.Windows.Forms.Timer { Interval = 150 };
+            go.Tick += (_, _) =>
+            {
+                go.Dispose();
+                StartCapture();
+            };
+            go.Start();
+        };
+        _delay.Start();
+    }
+
+    private void CancelDelayedCapture()
+    {
+        _delay?.Dispose();
+        _delay = null;
+        Hud.Hide();
+        _tray?.SetDelaying(false);
+    }
+
+    /// <summary>The tray's "Open image or video…".</summary>
+    private void OpenFile()
+    {
+        var images = string.Join(";", OpenedFile.ImageTypes.Select(t => "*" + t));
+        var videos = string.Join(";", OpenedFile.VideoTypes.Select(t => "*" + t));
+        using var dialog = new System.Windows.Forms.OpenFileDialog
+        {
+            Title = "Open an image or video in Windshot",
+            Filter = $"Images and videos|{images};{videos}|Images|{images}|Videos|{videos}",
+            Multiselect = true,
+        };
+        if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+        {
+            foreach (var path in dialog.FileNames)
+                _ = OpenPathAsync(path);
+        }
+    }
+
+    /// <summary>Opens a file in a new editor; says so if it can't.</summary>
+    private static async Task OpenPathAsync(string path)
+    {
+        try
+        {
+            var image = await OpenedFile.LoadAsync(path);
+            Log.Write($"Opened {path} ({image.Width}x{image.Height}{(image.Video is { } v ? $", {v.Length.TotalSeconds:F1} s video" : "")})");
+            OpenEditor(image);
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Couldn't open {path}: {ex}");
+            var work = Monitors.Primary?.WorkingArea ?? System.Windows.Forms.Screen.PrimaryScreen!.WorkingArea;
+            Hud.Show(ex is InvalidDataException ? ex.Message : $"Couldn't open {Path.GetFileName(path)}", work, SelectionOverlay.GetMonitorScale(work));
+        }
+    }
+
+    /// <summary>Files given on the command line ("Open with", or a script), that Windshot can open.</summary>
+    private static List<string> FilesIn(string[] commandLine) =>
+        commandLine.Skip(1).Where(arg => !arg.StartsWith("--") && OpenedFile.CanOpen(arg) && File.Exists(arg)).Select(Path.GetFullPath).ToList();
+
+    /// <summary>Where a second launch leaves the files it was given, for the running copy to open.</summary>
+    private static string OpenRequests => Path.Combine(AppPackage.DataFolder, "open-requests.txt");
+
+    private static void OpenRequested()
+    {
+        try
+        {
+            if (!File.Exists(OpenRequests))
+                return;
+            var paths = File.ReadAllLines(OpenRequests);
+            File.Delete(OpenRequests);
+            foreach (var path in paths.Where(p => p.Length > 0).Distinct())
+                _ = OpenPathAsync(path);
+        }
+        catch (IOException ex)
+        {
+            Log.Write($"Couldn't read the files to open: {ex.Message}");
+        }
+    }
+
+    /// <summary>A new screenshot: copied right away if that's turned on, then into the editor.</summary>
+    private static void OpenCapture(CapturedImage image)
+    {
+        if (Settings.Current.Capture.CopyRightAway)
+            _ = CopyCaptureAsync(image);
+        OpenEditor(image);
+    }
+
+    private static async Task CopyCaptureAsync(CapturedImage image)
+    {
+        try
+        {
+            using var bitmap = Microsoft.Graphics.Canvas.CanvasBitmap.CreateFromBytes(Microsoft.Graphics.Canvas.CanvasDevice.GetSharedDevice(), image.Pixels,
+                image.Width, image.Height, Windows.Graphics.DirectX.DirectXPixelFormat.B8G8R8A8UIntNormalized, 96, Microsoft.Graphics.Canvas.CanvasAlphaMode.Premultiplied);
+            var png = new Windows.Storage.Streams.InMemoryRandomAccessStream();
+            await bitmap.SaveAsync(png, Microsoft.Graphics.Canvas.CanvasBitmapFileFormat.Png);
+            png.Seek(0);
+            if (!ClipboardWriter.TrySetPng(png))
+                Hud.Show("Couldn't copy: the clipboard is busy", image.DesktopBounds, image.Scale);
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Copying the capture failed: {ex}");
         }
     }
 

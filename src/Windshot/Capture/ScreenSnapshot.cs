@@ -16,6 +16,9 @@ internal sealed record CapturedImage(byte[] Pixels, int Width, int Height, doubl
 {
     /// <summary>Set for a recording: these pixels are its first frame.</summary>
     public RecordedVideo? Video { get; init; }
+
+    /// <summary>For a picture opened from disk: where it came from (it names the editor).</summary>
+    public string? SourcePath { get; init; }
 }
 
 /// <summary>A frozen copy of the entire virtual desktop, in physical pixels.</summary>

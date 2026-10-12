@@ -9,9 +9,10 @@
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
   xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap desktop rescap">
+  IgnorableNamespaces="uap uap3 desktop rescap">
 
   <Identity
     Name="AndyThrasher.Windshot"
@@ -49,6 +50,22 @@
         <desktop:Extension Category="windows.startupTask">
           <desktop:StartupTask TaskId="WindshotStartup" Enabled="false" DisplayName="Windshot" />
         </desktop:Extension>
+        <!-- "Open with > Windshot" for pictures and videos; the path arrives on the command line. -->
+        <uap3:Extension Category="windows.fileTypeAssociation">
+          <uap3:FileTypeAssociation Name="windshot.media" Parameters="&quot;%1&quot;">
+            <uap:DisplayName>Image or video</uap:DisplayName>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.png</uap:FileType>
+              <uap:FileType>.jpg</uap:FileType>
+              <uap:FileType>.jpeg</uap:FileType>
+              <uap:FileType>.bmp</uap:FileType>
+              <uap:FileType>.gif</uap:FileType>
+              <uap:FileType>.webp</uap:FileType>
+              <uap:FileType>.mp4</uap:FileType>
+              <uap:FileType>.mov</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap3:FileTypeAssociation>
+        </uap3:Extension>
       </Extensions>
     </Application>
   </Applications>
@@ -56,5 +73,7 @@
   <Capabilities>
     <!-- A regular desktop app: global hotkeys, screen capture and the tray need full trust. -->
     <rescap:Capability Name="runFullTrust" />
+    <!-- Only when the user turns the microphone on for a recording. -->
+    <DeviceCapability Name="microphone" />
   </Capabilities>
 </Package>

@@ -66,7 +66,10 @@ public sealed partial class EditorWindow
     {
         _video = video;
         _length = _trimEnd = _document.Length = video.Length;
-        Title = "Windshot recording";
+        // A fresh recording is only here until it's saved; an opened video is already a file.
+        _unsaved = video.Temporary;
+        // An opened video goes by its file name; a fresh recording has none yet.
+        Title = video.Temporary ? "Windshot recording" : $"{Path.GetFileName(video.Path)} - Windshot";
         Timeline.Visibility = Visibility.Visible;
         ZoomToolButton.Visibility = Visibility.Visible;
         PinButton.Visibility = Visibility.Collapsed;
@@ -78,7 +81,7 @@ public sealed partial class EditorWindow
             if (button.Tag is "Blur")
                 ToolTipService.SetToolTip(button, "Blur (B). In a video it stays where you put it: if what it hides moves, it won't follow.");
         }
-        ImageLayerName.Text = "Recording";
+        ImageLayerName.Text = video.Temporary ? "Recording" : "Video";
         ImageLayerIcon.Content = Shell.FluentIcons.Create("video", filled: false);
 
         var size = _document.Image.SizeInPixels;
@@ -1018,8 +1021,8 @@ public sealed partial class EditorWindow
         var dialog = new ContentDialog
         {
             XamlRoot = Content.XamlRoot,
-            Title = "Save this recording?",
-            Content = "If you close without saving, the recording is gone.",
+            Title = _video!.Temporary ? "Save this recording?" : "Save your changes?",
+            Content = _video.Temporary ? "If you close without saving, the recording is gone." : "If you close without saving, your changes are lost. The original video stays as it is.",
             PrimaryButtonText = "Save",
             SecondaryButtonText = "Don't save",
             CloseButtonText = "Cancel",
@@ -1068,6 +1071,9 @@ public sealed partial class EditorWindow
         foreach (var thumbnail in _thumbnails)
             thumbnail.Dispose();
         _thumbnails.Clear();
+        // A video that was opened is the user's own file: it stays.
+        if (!_video.Temporary)
+            return;
         try
         {
             File.Delete(_video.Path);

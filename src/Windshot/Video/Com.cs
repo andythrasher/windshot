@@ -84,6 +84,8 @@ internal static class MF
     public static readonly Guid Subtype = new("f7e34c9a-42e8-4714-b74b-cb29d72c35e5");
     public static readonly Guid FrameSize = new("1652c33d-d6b2-4012-b834-72030849a37d");
     public static readonly Guid DefaultStride = new("644b4e48-1e02-4516-b0eb-c01ca9d49ac6");
+    public static readonly Guid FrameRate = new("c459a2e8-3d2c-4e44-b132-fee5156c7bb0");
+    public static readonly Guid Duration = new("6c990d33-bb8e-477a-8598-0d5d96fcd88a");
     public static readonly Guid SamplesPerSecond = new("5faeeae7-0290-4c31-9e8a-c534f68d9dba");
     public static readonly Guid NumChannels = new("37e48bf5-645e-4c5b-89de-ada9e29b696a");
     public static readonly Guid BitsPerSample = new("f2deb57f-40fa-4764-aa33-ed4f2d1ff669");

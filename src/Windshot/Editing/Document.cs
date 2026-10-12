@@ -489,14 +489,20 @@ internal sealed class Document : IDisposable
     }
 
     /// <summary>Renders the full canvas to a PNG. Without a backdrop, area outside the image is transparent.</summary>
-    public async Task<Windows.Storage.Streams.InMemoryRandomAccessStream> EncodePngAsync()
+    public Task<Windows.Storage.Streams.InMemoryRandomAccessStream> EncodePngAsync() => EncodeAsync(jpeg: false);
+
+    /// <summary>
+    /// Renders the full canvas to a PNG, or a JPEG (much smaller for photos, but no transparency:
+    /// what would be transparent is white).
+    /// </summary>
+    public async Task<Windows.Storage.Streams.InMemoryRandomAccessStream> EncodeAsync(bool jpeg)
     {
         var bounds = Bounds;
         using var target = new CanvasRenderTarget(CanvasDevice.GetSharedDevice(),
             (float)bounds.Width, (float)bounds.Height, 96);
         using (var ds = target.CreateDrawingSession())
         {
-            ds.Clear(Microsoft.UI.Colors.Transparent);
+            ds.Clear(jpeg ? Microsoft.UI.Colors.White : Microsoft.UI.Colors.Transparent);
             ds.Transform = Matrix3x2.CreateTranslation(-(float)bounds.X, -(float)bounds.Y);
             // Exports are 1:1, so copy pixels exactly regardless of the editor's zoom.
             var interpolation = ImageInterpolation;
@@ -506,7 +512,10 @@ internal sealed class Document : IDisposable
         }
 
         var stream = new Windows.Storage.Streams.InMemoryRandomAccessStream();
-        await target.SaveAsync(stream, CanvasBitmapFileFormat.Png);
+        if (jpeg)
+            await target.SaveAsync(stream, CanvasBitmapFileFormat.Jpeg, 0.92f);
+        else
+            await target.SaveAsync(stream, CanvasBitmapFileFormat.Png);
         stream.Seek(0);
         return stream;
     }

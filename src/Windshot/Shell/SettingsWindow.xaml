@@ -167,6 +167,19 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Copy captures right away" />
+                            <TextBlock Style="{StaticResource Description}" Text="Each capture goes to the clipboard as soon as you take it, ready to paste; the editor still opens." />
+                        </StackPanel>
+                        <ToggleSwitch x:Name="CopyRightAway" Grid.Column="1" MinWidth="0" OnContent="" OffContent="" />
+                    </Grid>
+                </Border>
+                <Border Style="{StaticResource Card}">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="Close the editor after copying or saving" />
                             <TextBlock Style="{StaticResource Description}" Text="Turn off to keep editing after Copy or Save." />
                         </StackPanel>
@@ -245,6 +258,32 @@
                             <TextBlock Style="{StaticResource Description}" Text="Include the pointer in recordings." />
                         </StackPanel>
                         <ToggleSwitch x:Name="VideoCursor" Grid.Column="1" MinWidth="0" OnContent="" OffContent="" />
+                    </Grid>
+                </Border>
+                <Border Style="{StaticResource Card}">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Countdown before recording" />
+                            <TextBlock Style="{StaticResource Description}" Text="A moment to get ready after you pick the area." />
+                        </StackPanel>
+                        <ComboBox x:Name="VideoCountdown" Grid.Column="1" MinWidth="168" VerticalAlignment="Center" />
+                    </Grid>
+                </Border>
+                <Border Style="{StaticResource Card}">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Record the microphone" />
+                            <TextBlock Style="{StaticResource Description}" Text="Mixed with the sound your PC plays, for narrating as you go. The recording bar switches it on and off too." />
+                        </StackPanel>
+                        <ToggleSwitch x:Name="VideoMicrophone" Grid.Column="1" MinWidth="0" OnContent="" OffContent="" />
                     </Grid>
                 </Border>
                 <Border Style="{StaticResource Card}">

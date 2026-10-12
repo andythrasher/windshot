@@ -15,6 +15,22 @@ internal sealed unsafe class MediaReader : IDisposable
     public int Stride { get; }
     public int SampleRate { get; }
     public int Channels { get; }
+    /// <summary>Video frames per second, or 0 if the file doesn't say.</summary>
+    public double FrameRate { get; }
+
+    /// <summary>How long the file is, or zero if it doesn't say.</summary>
+    public TimeSpan Duration
+    {
+        get
+        {
+            // A PROPVARIANT holding VT_UI8 (100-ns units), from the media source as a whole.
+            var variant = stackalloc byte[24];
+            new Span<byte>(variant, 24).Clear();
+            var key = MF.Duration;
+            int hr = ((delegate* unmanaged[Stdcall]<IntPtr, uint, Guid*, byte*, int>)Com.Slot(_reader, 12))(_reader, 0xFFFFFFFF, &key, variant);
+            return hr >= 0 && *(ushort*)variant == 21 ? TimeSpan.FromTicks((long)*(ulong*)(variant + 8)) : TimeSpan.Zero;
+        }
+    }
 
     static MediaReader() => Com.Check(Com.MFStartup(MF.Version, 0), "MFStartup");
 
@@ -52,6 +68,16 @@ internal sealed unsafe class MediaReader : IDisposable
             Width = (int)(size >> 32);
             Height = (int)(size & 0xFFFFFFFF);
             Stride = Com.TryGetInt32(current, MF.DefaultStride, out int stride) ? stride : Width * 4;
+            try
+            {
+                ulong rate = Com.GetUInt64(current, MF.FrameRate);
+                uint numerator = (uint)(rate >> 32), denominator = (uint)rate;
+                FrameRate = denominator > 0 ? numerator / (double)denominator : 0;
+            }
+            catch (System.Runtime.InteropServices.COMException)
+            {
+                // Not given: the caller assumes a usual rate.
+            }
         }
         Com.Release(current);
     }

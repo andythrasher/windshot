@@ -63,6 +63,13 @@ internal sealed class Hud : Form
         timer.Start();
     }
 
+    /// <summary>Takes the message down at once, e.g. before a screenshot it shouldn't be in.</summary>
+    public static void Hide()
+    {
+        _current?.Close();
+        _current = null;
+    }
+
     protected override bool ShowWithoutActivation => true;
 
     protected override CreateParams CreateParams

@@ -42,6 +42,12 @@ internal sealed class Settings
     {
         /// <summary>Show the magnifier (with the color under the cursor) on the capture overlay. M toggles it.</summary>
         public bool ShowMagnifier { get; set; } = true;
+
+        /// <summary>Copy each capture to the clipboard as it's taken (the editor still opens).</summary>
+        public bool CopyRightAway { get; set; }
+
+        /// <summary>Seconds Delayed capture waits before the overlay (3, 5 or 10), from the tray menu.</summary>
+        public int Delay { get; set; } = 5;
     }
     public BeautifySettings Beautify { get; set; } = new();
     public ClipboardSettings Clipboard { get; set; } = new();
@@ -84,6 +90,12 @@ internal sealed class Settings
 
         /// <summary>Largest height to export at (0 keeps the recording's size), e.g. 1080 or 720.</summary>
         public int MaxHeight { get; set; }
+
+        /// <summary>Seconds of countdown before recording starts (0 starts at once).</summary>
+        public int Countdown { get; set; } = 3;
+
+        /// <summary>Record the microphone too (mixed with the PC's sound); the recording bar's switch, remembered.</summary>
+        public bool Microphone { get; set; }
 
         public static string DefaultFolder =>
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "Screen Recordings");
@@ -266,6 +278,7 @@ internal sealed class Settings
         Video ??= new VideoSettings();
         Video.Folder ??= "";
         Video.Format = Video.Format?.ToUpperInvariant() == "GIF" ? "GIF" : "MP4";
+        Video.Countdown = Math.Clamp(Video.Countdown, 0, 10);
         Video.FrameRate = Video.FrameRate >= 45 ? 60 : 30;
         Hotkeys.Record ??= "";
 

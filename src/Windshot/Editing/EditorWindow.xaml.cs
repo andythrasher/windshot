@@ -168,6 +168,11 @@ public sealed partial class EditorWindow : Window
         SizeToCapture(capture);
         if (capture.Video is { } video)
             InitializeVideo(video);
+        else if (capture.SourcePath is { } source)
+        {
+            Title = $"{Path.GetFileName(source)} - Windshot";
+            ImageLayerName.Text = "Picture";
+        }
         if (File.Exists(AppIcon.FilePath))
             AppWindow.SetIcon(AppIcon.FilePath);
         // Start in Select so a stray click doesn't draw something.
@@ -1950,13 +1955,15 @@ public sealed partial class EditorWindow : Window
                 SuggestedFileName = $"Windshot {DateTime.Now:yyyy-MM-dd HHmmss}",
             };
             picker.FileTypeChoices.Add("PNG image", new List<string> { ".png" });
+            picker.FileTypeChoices.Add("JPEG image (smaller for photos; no transparency)", new List<string> { ".jpg", ".jpeg" });
             WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
 
             file = await picker.PickSaveFileAsync();
             if (file is null)
                 return;
 
-            using var png = await _document.EncodePngAsync();
+            bool jpeg = file.FileType.Equals(".jpg", StringComparison.OrdinalIgnoreCase) || file.FileType.Equals(".jpeg", StringComparison.OrdinalIgnoreCase);
+            using var png = await _document.EncodeAsync(jpeg);
             using (var output = await file.OpenAsync(Windows.Storage.FileAccessMode.ReadWrite))
             {
                 output.Size = 0;

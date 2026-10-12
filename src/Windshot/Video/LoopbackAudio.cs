@@ -38,11 +38,14 @@ internal sealed unsafe class LoopbackAudio : IDisposable
     public long SilenceFrames { get; private set; }
     public long SoundFrames { get; private set; }
 
-    public LoopbackAudio()
+    /// <param name="microphone">The default microphone, instead of what the speakers play.</param>
+    public LoopbackAudio(bool microphone = false)
     {
+        IsMicrophone = microphone;
         Com.Check(Com.CoCreateInstance(ClsidEnumerator, IntPtr.Zero, 23, IidEnumerator, out var enumerator), "Creating the device enumerator");
         IntPtr device;
-        Com.Check(((delegate* unmanaged[Stdcall]<IntPtr, int, int, IntPtr*, int>)Com.Slot(enumerator, 4))(enumerator, 0, 0, &device), "GetDefaultAudioEndpoint");
+        // eRender (speakers) or eCapture (microphones), for the default console role.
+        Com.Check(((delegate* unmanaged[Stdcall]<IntPtr, int, int, IntPtr*, int>)Com.Slot(enumerator, 4))(enumerator, microphone ? 1 : 0, 0, &device), "GetDefaultAudioEndpoint");
         Com.Release(enumerator);
         IntPtr client;
         var iid = IidAudioClient;
@@ -60,13 +63,29 @@ internal sealed unsafe class LoopbackAudio : IDisposable
         _sourceFloat = tag == 3 || (tag == 0xFFFE && (*(Guid*)(format + 24)).ToString().StartsWith("00000003"));
 
         Com.Check(((delegate* unmanaged[Stdcall]<IntPtr, int, uint, long, long, IntPtr, IntPtr, int>)Com.Slot(_client, 3))(
-            _client, 0, StreamFlagsLoopback, 10_000_000, 0, format, IntPtr.Zero), "IAudioClient.Initialize");
+            _client, 0, microphone ? 0u : StreamFlagsLoopback, 10_000_000, 0, format, IntPtr.Zero), "IAudioClient.Initialize");
         Com.CoTaskMemFree(format);
 
         IntPtr capture;
         var iidCapture = IidCaptureClient;
         Com.Check(((delegate* unmanaged[Stdcall]<IntPtr, Guid*, IntPtr*, int>)Com.Slot(_client, 14))(_client, &iidCapture, &capture), "GetService");
         _capture = capture;
+    }
+
+    /// <summary>The microphone rather than the speakers.</summary>
+    public bool IsMicrophone { get; }
+
+    private volatile bool _paused;
+
+    /// <summary>Stops taking sound until <see cref="Resume"/>; the pause leaves no gap in the recording.</summary>
+    public void Pause() => _paused = true;
+
+    /// <summary>Carries on after a pause of <paramref name="gapTicks"/>, which the timeline skips.</summary>
+    public void Resume(long gapTicks)
+    {
+        // The clock moves on first, so nothing pads the pause with silence.
+        Interlocked.Add(ref _startTicks, gapTicks);
+        _paused = false;
     }
 
     public string Describe => $"{SampleRate} Hz, {Channels} ch, {_sourceBits}-bit {(_sourceFloat ? "float" : "int")}";
@@ -134,7 +153,7 @@ internal sealed unsafe class LoopbackAudio : IDisposable
                 any = true;
             }
             // Nothing playing: keep the audio moving with silence, a little behind real time.
-            if (!any)
+            if (!any && !_paused)
                 PadTo(FrameAt(NowTicks) - SampleRate / 20);
             Thread.Sleep(10);
         }
@@ -142,6 +161,8 @@ internal sealed unsafe class LoopbackAudio : IDisposable
 
     private void Take(byte* data, int frames, bool silent, long qpcTicks)
     {
+        if (_paused)
+            return; // dropped: the pause is cut out
         long at = FrameAt(qpcTicks);
         if (at < 0)
         {
@@ -177,6 +198,19 @@ internal sealed unsafe class LoopbackAudio : IDisposable
             else if (_sourceBits == 16)
             {
                 Buffer.MemoryCopy(data, output, pcm.Length, pcm.Length);
+            }
+            else if (_sourceBits == 32)
+            {
+                // 32-bit integer (some microphones): keep the top 16 bits.
+                int* input = (int*)data;
+                for (int i = 0; i < count; i++)
+                    output[i] = (short)(input[i] >> 16);
+            }
+            else if (_sourceBits == 24)
+            {
+                // Packed 24-bit integer: the top two bytes of each sample.
+                for (int i = 0; i < count; i++)
+                    output[i] = (short)(data[i * 3 + 1] | data[i * 3 + 2] << 8);
             }
             else
             {

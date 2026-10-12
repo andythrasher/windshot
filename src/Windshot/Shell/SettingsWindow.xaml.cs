@@ -74,6 +74,7 @@ public sealed partial class SettingsWindow : Window
             WelcomeWindow.Refresh();
         };
         ShowMagnifier.Toggled += (_, _) => Save(s => s.Capture.ShowMagnifier = ShowMagnifier.IsOn);
+        CopyRightAway.Toggled += (_, _) => Save(s => s.Capture.CopyRightAway = CopyRightAway.IsOn);
         CloseAfterExport.Toggled += (_, _) => Save(s => s.Editor.CloseAfterSaveOrCopy = CloseAfterExport.IsOn);
         KeepOutOfHistory.Toggled += (_, _) => Save(s => s.Clipboard.KeepOutOfHistory = KeepOutOfHistory.IsOn);
         BeautifyByDefault.Toggled += (_, _) => Save(s => s.Beautify.OnByDefault = BeautifyByDefault.IsOn);
@@ -98,6 +99,14 @@ public sealed partial class SettingsWindow : Window
                 Save(s => s.Video.FrameRate = VideoFrameRate.SelectedIndex == 1 ? 60 : 30);
         };
         VideoCursor.Toggled += (_, _) => Save(s => s.Video.Cursor = VideoCursor.IsOn);
+        foreach (int seconds in Countdowns)
+            VideoCountdown.Items.Add(seconds == 0 ? "None" : $"{seconds} seconds");
+        VideoCountdown.SelectionChanged += (_, _) =>
+        {
+            if (VideoCountdown.SelectedIndex >= 0)
+                Save(s => s.Video.Countdown = Countdowns[VideoCountdown.SelectedIndex]);
+        };
+        VideoMicrophone.Toggled += (_, _) => Save(s => s.Video.Microphone = VideoMicrophone.IsOn);
         OpenFile.Click += (_, _) => App.OpenSettingsFile();
 
         Load();
@@ -140,6 +149,7 @@ public sealed partial class SettingsWindow : Window
         _ = LoadStartWithWindowsAsync();
         ShowWelcome.IsOn = s.ShowWelcome;
         ShowMagnifier.IsOn = s.Capture.ShowMagnifier;
+        CopyRightAway.IsOn = s.Capture.CopyRightAway;
         CloseAfterExport.IsOn = s.Editor.CloseAfterSaveOrCopy;
         KeepOutOfHistory.IsOn = s.Clipboard.KeepOutOfHistory;
         BeautifyByDefault.IsOn = s.Beautify.OnByDefault;
@@ -151,6 +161,8 @@ public sealed partial class SettingsWindow : Window
         _videoFolder.Show();
         VideoFrameRate.SelectedIndex = s.Video.FrameRate >= 60 ? 1 : 0;
         VideoCursor.IsOn = s.Video.Cursor;
+        VideoCountdown.SelectedIndex = Math.Max(0, Array.IndexOf(Countdowns, Countdowns.OrderBy(c => Math.Abs(c - s.Video.Countdown)).First()));
+        VideoMicrophone.IsOn = s.Video.Microphone;
         WindowTheme.SelectedIndex = Array.IndexOf(Themes.All, Themes.Find(s.Appearance.Window));
         ColorSet.SelectedIndex = Array.IndexOf(Themes.All, Themes.Find(s.Appearance.Colors));
         _loading = false;
@@ -274,6 +286,9 @@ public sealed partial class SettingsWindow : Window
         StartWithWindows.IsOn = on;
         _loading = false;
     }
+
+    /// <summary>The countdowns on offer, in seconds.</summary>
+    private static readonly int[] Countdowns = [0, 3, 5];
 
     private void Save(Action<Settings> change)
     {

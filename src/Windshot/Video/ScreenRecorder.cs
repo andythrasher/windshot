@@ -37,10 +37,12 @@ internal sealed partial class ScreenRecorder : IDisposable
     /// <summary>Video pixels per screen pixel: 1, unless the area was too big to encode as it is.</summary>
     public double Scale { get; }
     private readonly System.Drawing.Size _source;
-    public bool HasAudio => _audio is not null;
+    public bool HasAudio => _audio is not null || _microphone is not null;
 
     /// <param name="area">In physical desktop pixels, on one monitor.</param>
-    public ScreenRecorder(System.Drawing.Rectangle area, int fps, bool sound, string path)
+    /// <param name="sound">Record the PC's sound (otherwise silence, until switched on).</param>
+    /// <param name="microphone">Record the microphone too.</param>
+    public ScreenRecorder(System.Drawing.Rectangle area, int fps, bool sound, bool microphone, string path)
     {
         Path = path;
         // H.264 encoders stop at about 4K (4096 wide, or 4096x2304 in all): bigger areas, like a
@@ -58,24 +60,61 @@ internal sealed partial class ScreenRecorder : IDisposable
         _crop = new Rect(area.X - info.Monitor.Left, area.Y - info.Monitor.Top, _source.Width, _source.Height);
         Monitor = monitor;
 
-        if (sound)
+        // The PC's sound is always taken (muted while its switch is off, so it can be switched
+        // on mid-recording); the microphone only when asked for, so it isn't in use otherwise.
+        try
         {
-            try
-            {
-                _audio = new LoopbackAudio();
-            }
-            catch (Exception ex)
-            {
-                // No speakers, or no audio service: record without sound.
-                Log.Write($"No system sound to record: {ex.Message}");
-            }
+            _audio = new LoopbackAudio { Muted = !sound };
         }
-        _writer = new Mp4Writer(Width, Height, fps, _audio?.Chunks, _audio?.SampleRate ?? 0, _audio?.Channels ?? 0);
+        catch (Exception ex)
+        {
+            // No speakers, or no audio service.
+            Log.Write($"No system sound to record: {ex.Message}");
+        }
+        if (microphone)
+            _microphone = OpenMicrophone();
+        BlockingCollection<AudioChunk>? chunks = null;
+        int rate = 0, channels = 0;
+        if (_audio is not null)
+        {
+            // Mixed, so the microphone can join later.
+            _mixer = new AudioMixer(_audio);
+            if (_microphone is not null)
+                _mixer.Add(_microphone);
+            (chunks, rate, channels) = (_mixer.Chunks, _mixer.SampleRate, _mixer.Channels);
+        }
+        else if (_microphone is not null)
+        {
+            (chunks, rate, channels) = (_microphone.Chunks, _microphone.SampleRate, _microphone.Channels);
+        }
+        _writer = new Mp4Writer(Width, Height, fps, chunks, rate, channels);
     }
 
     private IntPtr Monitor { get; }
 
-    /// <summary>Records silence instead of the sound while set.</summary>
+    private readonly AudioMixer? _mixer;
+    private LoopbackAudio? _microphone;
+
+    /// <summary>Why the microphone couldn't be used, if it couldn't (e.g. turned off in Windows' privacy settings).</summary>
+    public string? MicrophoneProblem { get; private set; }
+
+    private LoopbackAudio? OpenMicrophone()
+    {
+        try
+        {
+            return new LoopbackAudio(microphone: true);
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"No microphone to record: {ex.Message}");
+            MicrophoneProblem = ex.HResult == unchecked((int)0x80070005)
+                ? "Windows isn't letting Windshot use the microphone. Allow it in Settings > Privacy & security > Microphone."
+                : "No microphone found";
+            return null;
+        }
+    }
+
+    /// <summary>Records silence instead of the PC's sound while set.</summary>
     public bool Muted
     {
         get => _audio?.Muted ?? true;
@@ -86,7 +125,64 @@ internal sealed partial class ScreenRecorder : IDisposable
         }
     }
 
-    public TimeSpan Elapsed => _startTicks == 0 ? TimeSpan.Zero : TimeSpan.FromTicks(LoopbackAudio.NowTicks - _startTicks);
+    public bool HasMicrophone => _microphone is not null;
+
+    /// <summary>Whether the PC's sound can be recorded (there are speakers to listen to).</summary>
+    public bool HasSystemSound => _audio is not null;
+
+    /// <summary>Whether the microphone can be switched on: it's on, or it can join the mix.</summary>
+    public bool CanUseMicrophone => _microphone is not null || _mixer is not null;
+
+    /// <summary>
+    /// Records the microphone (or silence instead, while muted). Turned on mid-recording, it
+    /// joins from then on; false if there's no microphone to use (see <see cref="MicrophoneProblem"/>).
+    /// </summary>
+    public bool SetMicrophone(bool on)
+    {
+        if (_microphone is null)
+        {
+            if (!on)
+                return true;
+            // Only into a mix with the PC's sound, which fixed the track's format at the start.
+            if (_mixer is null || _startTicks == 0 || (_microphone = OpenMicrophone()) is null)
+                return false;
+            _microphone.Start(_startTicks);
+            if (_pausedAt != 0)
+                _microphone.Pause();
+            _mixer.Add(_microphone);
+        }
+        _microphone.Muted = !on;
+        return true;
+    }
+
+    /// <summary>When the recording was paused (QPC ticks), or 0 while it's running.</summary>
+    private long _pausedAt;
+
+    public bool Paused => _pausedAt != 0;
+
+    /// <summary>Stops recording until <see cref="Resume"/>; the paused time is left out of the video.</summary>
+    public void Pause()
+    {
+        if (_pausedAt != 0 || _startTicks == 0)
+            return;
+        _pausedAt = LoopbackAudio.NowTicks;
+        _audio?.Pause();
+        _microphone?.Pause();
+    }
+
+    public void Resume()
+    {
+        if (_pausedAt == 0)
+            return;
+        long gap = LoopbackAudio.NowTicks - _pausedAt;
+        _audio?.Resume(gap);
+        _microphone?.Resume(gap);
+        Interlocked.Add(ref _startTicks, gap);
+        _pausedAt = 0;
+    }
+
+    /// <summary>How much has been recorded: the time since starting, less any pauses.</summary>
+    public TimeSpan Elapsed => _startTicks == 0 ? TimeSpan.Zero : TimeSpan.FromTicks((_pausedAt != 0 ? _pausedAt : LoopbackAudio.NowTicks) - _startTicks);
 
     public async Task StartAsync(bool cursor)
     {
@@ -127,6 +223,8 @@ internal sealed partial class ScreenRecorder : IDisposable
         await _writer.StartAsync(Path);
         _startTicks = LoopbackAudio.NowTicks;
         _audio?.Start(_startTicks);
+        _microphone?.Start(_startTicks);
+        _mixer?.Start();
         _session.StartCapture();
     }
 
@@ -156,8 +254,9 @@ internal sealed partial class ScreenRecorder : IDisposable
         EndCapture();
         HoldLastFrame(length);
         _audio?.Stop(_startTicks + length.Ticks);
+        _microphone?.Stop(_startTicks + length.Ticks);
         await _writer.FinishAsync();
-        Log.Write($"Recorded {length.TotalSeconds:F1} s at {Width}x{Height}{(Scale < 1 ? $" (scaled from {_source.Width}x{_source.Height})" : "")}: {_kept} frames kept, {_dropped} dropped{(_audio is null ? ", no sound" : "")}");
+        Log.Write($"Recorded {length.TotalSeconds:F1} s at {Width}x{Height}{(Scale < 1 ? $" (scaled from {_source.Width}x{_source.Height})" : "")}: {_kept} frames kept, {_dropped} dropped{(_audio is null ? ", no sound" : "")}{(_microphone is not null ? ", with the microphone" : "")}");
         return length;
     }
 
@@ -192,6 +291,7 @@ internal sealed partial class ScreenRecorder : IDisposable
     {
         EndCapture();
         _audio?.Stop(LoopbackAudio.NowTicks);
+        _microphone?.Stop(LoopbackAudio.NowTicks);
         await _writer.CancelAsync();
     }
 
@@ -211,7 +311,8 @@ internal sealed partial class ScreenRecorder : IDisposable
             if (frame is null)
                 return;
             var time = TimeSpan.FromTicks(frame.SystemRelativeTime.Ticks - _startTicks);
-            if (time < TimeSpan.Zero)
+            // Paused: nothing goes in (and frames from before a resume are behind the new start).
+            if (_pausedAt != 0 || time < TimeSpan.Zero)
                 return;
             // Frames keep to a grid of 1/fps slots, so arrival jitter can't halve the rate.
             long slot = (long)Math.Round(time / _interval);
@@ -247,6 +348,7 @@ internal sealed partial class ScreenRecorder : IDisposable
     {
         EndCapture();
         _audio?.Dispose();
+        _microphone?.Dispose();
         foreach (var target in _targets)
             target.Dispose();
     }

@@ -40,9 +40,10 @@ internal sealed class ScreenRecording
         _recordingChanged = recordingChanged;
         var video = Settings.Current.Video;
         Directory.CreateDirectory(Folder);
-        _recorder = new ScreenRecorder(area, video.FrameRate, video.Sound, Path.Combine(Folder, $"Recording {DateTime.Now:yyyy-MM-dd HHmmss}.mp4"));
+        _recorder = new ScreenRecorder(area, video.FrameRate, video.Sound, video.Microphone, Path.Combine(Folder, $"Recording {DateTime.Now:yyyy-MM-dd HHmmss}.mp4"));
         _frame = new AreaFrame(area, scale, Color.FromArgb(232, 64, 64));
-        _panel = new RecordPanel(area, scale, soundOn: video.Sound && _recorder.HasAudio, hasSound: _recorder.HasAudio);
+        _panel = new RecordPanel(area, scale, soundOn: video.Sound && _recorder.HasSystemSound, hasSound: _recorder.HasSystemSound,
+            micOn: _recorder.HasMicrophone, canUseMic: _recorder.CanUseMicrophone);
         _panel.Stop += () => _ = FinishAsync();
         _panel.Cancelled += () => _ = CancelAsync();
         _panel.SoundToggled += on =>
@@ -52,8 +53,35 @@ internal sealed class ScreenRecording
             Settings.Save();
             Log.Write($"Recording sound {(on ? "on" : "off")}");
         };
-        _clock.Tick += (_, _) => _panel.ShowTime(_recorder.Elapsed);
+        _panel.MicToggled += on =>
+        {
+            if (!_recorder.SetMicrophone(on))
+            {
+                _panel.ShowMic(false);
+                Shell.Hud.Show(_recorder.MicrophoneProblem ?? "Couldn't use the microphone", _area, _scale);
+                return;
+            }
+            Settings.Current.Video.Microphone = on;
+            Settings.Save();
+            Log.Write($"Recording microphone {(on ? "on" : "off")}");
+        };
+        _panel.PauseToggled += () =>
+        {
+            if (_ended || !_started)
+                return;
+            if (_recorder.Paused)
+                _recorder.Resume();
+            else
+                _recorder.Pause();
+            _panel.ShowPaused(_recorder.Paused);
+            _frame.ShowPaused(_recorder.Paused);
+            Log.Write(_recorder.Paused ? "Recording paused" : "Recording resumed");
+        };
+        _clock.Tick += (_, _) => _panel.ShowTime(_recorder.Elapsed, _recorder.Paused);
     }
+
+    /// <summary>Recording has actually begun (after any countdown).</summary>
+    private bool _started;
 
     /// <summary>Set while Windows asks about recording without its border, so a second press doesn't ask twice.</summary>
     private static bool _asking;
@@ -109,7 +137,7 @@ internal sealed class ScreenRecording
                 _current = null;
                 Shell.Hud.Show("Couldn't start recording", area, scale);
             }
-        }, hint: "Select an area to record, or click a window");
+        }, hint: "Select an area to record, click a window, or press Enter for the whole screen");
     }
 
     private async Task StartAsync()
@@ -122,12 +150,35 @@ internal sealed class ScreenRecording
         {
             // Let the selection overlay finish disappearing first.
             await Task.Delay(150);
+            // A moment to get ready (move the pointer into place, say), counted down in the area.
+            int countdown = Settings.Current.Video.Countdown;
+            if (countdown > 0)
+            {
+                using var badge = new CountdownBadge(_area, _scale);
+                for (int n = countdown; n > 0; n--)
+                {
+                    badge.ShowNumber(n);
+                    _panel.ShowCountdown(n);
+                    await Task.Delay(1000);
+                    if (_ended)
+                        return; // stopped or cancelled before it began: nothing to keep
+                }
+                badge.Close();
+                await Task.Delay(60); // off the screen before the first frame
+            }
             await _recorder.StartAsync(Settings.Current.Video.Cursor);
             // Stopped or cancelled meanwhile: that finishes (or throws away) what was started.
             if (_ended)
                 return;
+            _started = true;
             _clock.Start();
+            _panel.ShowTime(TimeSpan.Zero, paused: false);
             _recordingChanged(true);
+            if (Settings.Current.Video.Microphone && !_recorder.HasMicrophone)
+            {
+                _panel.ShowMic(false);
+                Shell.Hud.Show(_recorder.MicrophoneProblem ?? "Couldn't use the microphone", _area, _scale);
+            }
         }
         catch (Exception ex)
         {
@@ -258,16 +309,20 @@ internal sealed class ScreenRecording
         }
     }
 
-    /// <summary>The time, the sound switch, Stop and Cancel, beside the area.</summary>
+    /// <summary>The time, the sound and microphone switches, Pause, Stop and Cancel, beside the area.</summary>
     private sealed class RecordPanel : FloatingPanel
     {
         private readonly Label _time;
         private readonly Button _sound;
+        private readonly Button _mic;
+        private readonly Button _pause;
         private bool _soundOn;
+        private bool _micOn;
 
-        public RecordPanel(Rectangle area, double scale, bool soundOn, bool hasSound) : base(scale)
+        public RecordPanel(Rectangle area, double scale, bool soundOn, bool hasSound, bool micOn, bool canUseMic) : base(scale)
         {
             _soundOn = soundOn;
+            _micOn = micOn;
             _time = new Label
             {
                 ForeColor = Color.White,
@@ -276,39 +331,69 @@ internal sealed class ScreenRecording
                 Bounds = new Rectangle(S(14), 0, S(96), S(44)),
                 Text = "● 0:00",
             };
-            _sound = MakeButton("", Plain, new Rectangle(S(112), S(8), S(112), S(28)));
+            _sound = MakeButton("", Plain, new Rectangle(S(112), S(8), S(104), S(28)));
             _sound.Enabled = hasSound;
+            _mic = MakeButton("", Plain, new Rectangle(S(222), S(8), S(84), S(28)));
+            _mic.Enabled = canUseMic;
+            _pause = MakeButton("Pause", Plain, new Rectangle(S(312), S(8), S(80), S(28)));
+            _pause.Enabled = false; // until recording begins
             ShowSound();
-            var stop = MakeButton("Stop", Color.FromArgb(200, 48, 48), new Rectangle(S(230), S(8), S(72), S(28)));
-            var cancel = MakeButton("Cancel", Plain, new Rectangle(S(308), S(8), S(72), S(28)));
+            ShowMic(micOn);
+            var stop = MakeButton("Stop", Color.FromArgb(200, 48, 48), new Rectangle(S(398), S(8), S(72), S(28)));
+            var cancel = MakeButton("Cancel", Plain, new Rectangle(S(476), S(8), S(72), S(28)));
             _sound.Click += (_, _) =>
             {
                 _soundOn = !_soundOn;
                 ShowSound();
                 SoundToggled?.Invoke(_soundOn);
             };
+            _mic.Click += (_, _) =>
+            {
+                ShowMic(!_micOn);
+                MicToggled?.Invoke(_micOn);
+            };
+            _pause.Click += (_, _) => PauseToggled?.Invoke();
             stop.Click += (_, _) => Stop?.Invoke();
             cancel.Click += (_, _) => Cancelled?.Invoke();
-            Controls.AddRange([_time, _sound, stop, cancel]);
-            Layout(area, new Size(S(388), S(44)));
+            Controls.AddRange([_time, _sound, _mic, _pause, stop, cancel]);
+            Layout(area, new Size(S(556), S(44)));
         }
 
         public event Action? Stop;
         public event Action? Cancelled;
         public event Action<bool>? SoundToggled;
+        public event Action<bool>? MicToggled;
+        public event Action? PauseToggled;
 
         public bool SoundOn => _soundOn;
 
         private void ShowSound() => _sound.Text = _sound.Enabled ? (_soundOn ? "Sound on" : "Sound off") : "No sound";
 
-        public void ShowTime(TimeSpan elapsed)
+        public void ShowMic(bool on)
+        {
+            _micOn = on;
+            _mic.Text = _mic.Enabled ? (on ? "Mic on" : "Mic off") : "No mic";
+        }
+
+        public void ShowPaused(bool paused) => _pause.Text = paused ? "Resume" : "Pause";
+
+        public void ShowCountdown(int seconds)
         {
             if (IsDisposed)
                 return;
-            // The dot blinks, like a recording light.
-            string dot = elapsed.Milliseconds < 500 ? "●" : "○";
+            _time.Text = $"Starts in {seconds}";
+            _time.ForeColor = Color.White;
+        }
+
+        public void ShowTime(TimeSpan elapsed, bool paused)
+        {
+            if (IsDisposed)
+                return;
+            _pause.Enabled = true;
+            // The dot blinks, like a recording light; paused, it shows the pause sign instead.
+            string dot = paused ? "❚❚" : elapsed.Milliseconds < 500 ? "●" : "○";
             _time.Text = $"{dot} {(int)elapsed.TotalMinutes}:{elapsed.Seconds:00}";
-            _time.ForeColor = Color.FromArgb(255, 110, 110);
+            _time.ForeColor = paused ? Color.FromArgb(255, 200, 90) : Color.FromArgb(255, 110, 110);
         }
 
         protected override void OnKeyDown(KeyEventArgs e)
@@ -322,4 +407,5 @@ internal sealed class ScreenRecording
 }
 
 /// <summary>A finished recording, waiting in <see cref="ScreenRecording.Folder"/> while it's edited.</summary>
-internal sealed record RecordedVideo(string Path, TimeSpan Length, bool HasAudio, int FrameRate);
+/// <param name="Temporary">Windshot's own working copy, deleted when the editor closes; false for a video the user opened.</param>
+internal sealed record RecordedVideo(string Path, TimeSpan Length, bool HasAudio, int FrameRate, bool Temporary = true);

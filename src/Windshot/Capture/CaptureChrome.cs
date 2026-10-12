@@ -29,6 +29,15 @@ internal sealed class AreaFrame : Form
 {
     private static readonly Color Key = Color.FromArgb(255, 0, 255);
     private readonly Color _outline;
+    private bool _paused;
+
+    /// <summary>While paused, the outline turns amber.</summary>
+    public void ShowPaused(bool paused)
+    {
+        _paused = paused;
+        Invalidate();
+    }
+
     private readonly int _thickness;
 
     public AreaFrame(Rectangle area, double scale, Color outline)
@@ -67,7 +76,7 @@ internal sealed class AreaFrame : Form
 
     protected override void OnPaint(PaintEventArgs e)
     {
-        using var pen = new Pen(_outline, _thickness) { Alignment = System.Drawing.Drawing2D.PenAlignment.Inset };
+        using var pen = new Pen(_paused ? Color.FromArgb(240, 180, 40) : _outline, _thickness) { Alignment = System.Drawing.Drawing2D.PenAlignment.Inset };
         e.Graphics.DrawRectangle(pen, 0, 0, ClientSize.Width - 1, ClientSize.Height - 1);
     }
 }
@@ -162,4 +171,72 @@ internal abstract class FloatingPanel : Form
 
     [DllImport("gdi32.dll")]
     private static extern IntPtr CreateRoundRectRgn(int left, int top, int right, int bottom, int widthEllipse, int heightEllipse);
+}
+
+/// <summary>The countdown before recording: a big number in the middle of the area.</summary>
+internal sealed class CountdownBadge : Form
+{
+    private readonly Font _font;
+    private string _text = "";
+
+    public CountdownBadge(Rectangle area, double scale)
+    {
+        int side = (int)Math.Round(132 * scale);
+        _font = new Font("Segoe UI Semibold", (float)(72 * scale), FontStyle.Regular, GraphicsUnit.Pixel);
+        FormBorderStyle = FormBorderStyle.None;
+        StartPosition = FormStartPosition.Manual;
+        AutoScaleMode = AutoScaleMode.None;
+        ShowInTaskbar = false;
+        TopMost = true;
+        BackColor = Color.FromArgb(32, 32, 32);
+        Opacity = 0.88;
+        Bounds = new Rectangle(area.X + (area.Width - side) / 2, area.Y + (area.Height - side) / 2, side, side);
+        var shape = CreateRoundRectRgn(0, 0, side + 1, side + 1, side / 3, side / 3);
+        Region = Region.FromHrgn(shape);
+        DeleteObject(shape);
+    }
+
+    public void ShowNumber(int n)
+    {
+        _text = n.ToString();
+        if (!Visible)
+            Show();
+        Invalidate();
+        Update();
+    }
+
+    protected override bool ShowWithoutActivation => true;
+
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            var cp = base.CreateParams;
+            cp.ExStyle |= CaptureChrome.WS_EX_TOOLWINDOW | CaptureChrome.WS_EX_TRANSPARENT | CaptureChrome.WS_EX_NOACTIVATE | CaptureChrome.WS_EX_TOPMOST;
+            return cp;
+        }
+    }
+
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        CaptureChrome.ExcludeFromCapture(this);
+    }
+
+    protected override void OnPaint(PaintEventArgs e) =>
+        TextRenderer.DrawText(e.Graphics, _text, _font, ClientRectangle, Color.White,
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+            _font.Dispose();
+        base.Dispose(disposing);
+    }
+
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr CreateRoundRectRgn(int left, int top, int right, int bottom, int widthEllipse, int heightEllipse);
+
+    [DllImport("gdi32.dll")]
+    private static extern bool DeleteObject(IntPtr obj);
 }
