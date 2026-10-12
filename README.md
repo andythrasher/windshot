@@ -50,10 +50,15 @@ starts" box (or Settings) turns that off, and `--no-welcome` skips it for script
 start also turns on Start with Windows. Tick **Start with Windows** in the tray menu to have it there (with your
 pins) after signing in. That's the usual per-user startup entry, so it also shows in Task
 Manager's Startup apps, and turning it off there is reflected in the menu. **Ctrl+Shift+2** captures: drag a region, or click to capture the
-window under the cursor (click the desktop for the whole monitor). On Windows 11, window
+window under the cursor (click the desktop, or press **Enter**, for the whole monitor). On Windows 11, window
 captures keep the window's rounded corners: what showed through them is made transparent, and
 stays transparent when copied (as PNG), saved or pinned. Left-clicking the tray icon,
-or launching the exe again while it's running, does the same.
+or launching the exe again while it's running, does the same. **Capture after a delay** in the tray menu
+(3, 5 or 10 seconds) counts down by the tray first, for menus and hover states a keypress would
+close. With **Copy captures right away** on (Settings), each capture is on the clipboard as soon as
+it's taken. **Open image or video…** in the tray menu (or Explorer's **Open with > Windshot**) opens a
+file in the editor; an opened video is edited where it is, and saving makes a new file. Save as
+(Ctrl+Shift+S) offers PNG or JPEG.
 
 While capturing, a magnifier follows the cursor with the color under it. **C** copies that
 color as hex, **R** toggles a smart ruler (measures the same-colored run through the cursor,
@@ -98,9 +103,12 @@ the scrolling part of a window (not its sidebar or toolbar) gives the cleanest r
 captures open at the top, fitted to the window's width; there the wheel scrolls and
 Ctrl+wheel zooms.
 
-**Ctrl+Shift+5** records a video: select an area (or click a window), and everything there is
+**Ctrl+Shift+5** records a video: select an area (or click a window, or press Enter for the whole
+screen), and after a short countdown (3 seconds; Settings can make it 5, or none) everything there is
 recorded, with the sound the PC plays, until you press Stop on the small bar beside it, or the
-shortcut again (Cancel or Esc throws it away). The bar's sound switch mutes the recording. The
+shortcut again (Cancel or Esc throws it away). The bar's Sound switch mutes the PC's sound, Mic
+adds the microphone (mixed in; it can be switched on partway through, and Settings can start
+with it on), and Pause leaves out everything until Resume (the outline turns amber). The
 outline and bar are kept out of the recording, and so is Windows' yellow border (the Store app
 asks once for permission to leave it off). Recordings go straight into the editor, where a
 timeline along the bottom plays, scrubs and trims them: drag the ends of the strip (what's
@@ -162,8 +170,10 @@ of being retried at every start.
 Tray menu → **Settings…** (or `Windshot.exe --settings`) opens the settings window: click a
 shortcut and press new keys to change it (Esc cancels, Backspace turns it off; shortcuts need
 Ctrl, Alt or Win unless they're a function key or Print Screen, and ones already taken are
-refused), plus Start with Windows, the magnifier, closing after copy or save, keeping copies
-out of clipboard history, and Beautify.
+refused), plus Start with Windows, the magnifier, copying captures right away, closing after copy
+or save, keeping copies
+out of clipboard history, Beautify, and for video the frame rate, pointer, countdown, microphone
+and folder.
 Changes apply immediately.
 
 Everything is stored in `%LOCALAPPDATA%\Windshot\settings.json` (linked from the window), which is
@@ -173,12 +183,14 @@ also hand-editable; comments and trailing commas are fine, and changes apply whe
   (for Print Screen, first turn off "Use the Print screen key to open screen capture" in
   Windows Settings → Accessibility → Keyboard).
 - `ShowWelcome` (default `true`): the welcome window when Windshot is started by hand.
-- `Capture`: `ShowMagnifier` (default `true`).
+- `Capture`: `ShowMagnifier` (default `true`), `CopyRightAway` (copy each capture as it's taken) and `Delay`
+  (the seconds Capture after a delay last used).
 - `Editor`: per-tool sizes (1–10), colors (`"#RRGGBB"`), pixelate and text background, and
   `CloseAfterSaveOrCopy` (default `true`).
   Saved automatically when an editor closes.
 - `Video`: `FrameRate` (30 or 60), `Cursor`, `Sound`, `Folder` (empty: Videos\Screen Recordings),
-  `Format` (`"MP4"` or `"GIF"`) and `MaxHeight` (0 keeps the recording's size).
+  `Format` (`"MP4"` or `"GIF"`), `MaxHeight` (0 keeps the recording's size), `Countdown` (seconds, 0
+  for none) and `Microphone`.
 - `Beautify`: `OnByDefault`, `Preset` (Sky, Sunset, Grape, Mint, Peach, Night, Graphite,
   Paper) and `Padding`.
 - `Clipboard`: `KeepOutOfHistory` (default `false`) leaves copies out of Win+V history and

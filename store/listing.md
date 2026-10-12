@@ -44,6 +44,8 @@ CAPTURE
 • Press Ctrl+Shift+2 (or any shortcut you like, including Print Screen), then drag a region or click a window.
 • Window captures keep Windows 11's rounded corners, with transparent edges when copied or saved.
 • A magnifier and color picker help you land on the exact pixel. Press C to copy a color as hex.
+• Press Enter for the whole screen, or capture after a 3, 5 or 10 second delay to catch menus and hover states.
+• Open any image or video from your PC in the editor, too.
 
 EDIT
 • Arrows, shapes (rectangles, ellipses, triangles and polygons, outlined or filled), text, numbered steps, highlighter, spotlight, blur and pixelate.
@@ -61,7 +63,8 @@ LAYERS
 • Blur and spotlight work like adjustment layers on everything beneath them.
 
 RECORD VIDEO
-• Press Ctrl+Shift+5, select an area or click a window, and record it with the sound your PC plays.
+• Press Ctrl+Shift+5, select an area or click a window, and record it with the sound your PC plays and, if you like, your microphone.
+• A short countdown before it starts, and Pause when you need a moment.
 • Annotate the recording in the same editor: arrows, text, steps, blur and beautify sit on every frame.
 • Trim it by dragging the ends of the timeline, then save or copy it as an MP4 video or an animated GIF.
 • Choose when each annotation shows, fade, pop or wipe it in and out, or give it a slow zoom or pan.
@@ -98,6 +101,13 @@ Windshot lives in the notification area and starts in a blink. It can start with
 • New ways for annotations to come in and go out: pop, wipes (right, left, in from the edges, out from the center) and radial wipes, with sharp or feathered edges. New highlights wipe on like a pen stroke.
 • Transitions and motion are together in a new Animate menu on the options bar.
 • The timeline snaps: layer bars line up with each other and with the playhead, and so do the trim handles. A band along the top shows where your other layers are.
+• Record your microphone along with the PC's sound, to narrate as you go.
+• Pause and resume a recording; recordings start after a short countdown.
+• Open images and videos from your PC (tray menu, or Open with in File Explorer).
+• Capture after a delay, press Enter to capture the whole screen, and save as JPEG.
+• Optionally copy each capture to the clipboard as soon as it's taken.
+• Fixed: saved videos and GIFs could look sheared at most recording sizes, and recordings that ended on a still screen were cut short.
+• Fixed: switching sound off in the recording bar left every later recording silent.
 
 1.4:
 • Choose when each annotation shows in a recording: select it, then drag the ends of its bar under the timeline, or drag the bar to move it.
@@ -217,6 +227,8 @@ Windshot runs in the notification area. Launched from Start, it shows a welcome 
 - In the editor, use the toolbar to annotate; Ctrl+C copies, Ctrl+S saves, Ctrl+P pins.
 - Ctrl+Shift+3 copies text from a region. Ctrl+Shift+4 starts a scrolling capture; press it again (or Done) to finish.
 - Ctrl+Shift+5 records video: the first time, Windows asks whether Windshot may turn off the screenshot border (either answer works). Select an area, let it record a few seconds, then press Stop (or Ctrl+Shift+5 again). The recording opens in the editor: Space plays it, dragging the ends of the timeline trims it, and Save writes an MP4 to Videos\Screen Recordings.
+- The microphone capability is only used when the user switches on Mic in the recording bar (or "Record the microphone" in Settings); it is off by default. Windows asks for permission the first time.
+- The file type association adds "Open with > Windshot" for pictures and videos; the file opens in the editor.
 - Right-click the notification-area icon for Settings, Start with Windows and Quit.
 
 No account, sign-in or test credentials are needed.
