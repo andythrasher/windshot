@@ -34,21 +34,28 @@ internal sealed partial class ScreenRecorder : IDisposable
     public string Path { get; }
     public int Width { get; }
     public int Height { get; }
+    /// <summary>Video pixels per screen pixel: 1, unless the area was too big to encode as it is.</summary>
+    public double Scale { get; }
+    private readonly System.Drawing.Size _source;
     public bool HasAudio => _audio is not null;
 
     /// <param name="area">In physical desktop pixels, on one monitor.</param>
     public ScreenRecorder(System.Drawing.Rectangle area, int fps, bool sound, string path)
     {
         Path = path;
+        // H.264 encoders stop at about 4K (4096 wide, or 4096x2304 in all): bigger areas, like a
+        // whole 5K or super-ultrawide monitor, are scaled down to fit rather than failing.
+        Scale = Math.Min(1, Math.Min(Math.Min(4096.0 / area.Width, 4096.0 / area.Height), Math.Sqrt(4096.0 * 2304 / ((double)area.Width * area.Height))));
         // H.264 needs even sizes.
-        Width = area.Width & ~1;
-        Height = area.Height & ~1;
+        Width = (int)(area.Width * Scale) & ~1;
+        Height = (int)(area.Height * Scale) & ~1;
+        _source = new System.Drawing.Size((int)Math.Round(Width / Scale), (int)Math.Round(Height / Scale));
         _interval = TimeSpan.FromSeconds(1.0 / fps);
 
         var monitor = MonitorFromPoint(new POINT { X = area.X + area.Width / 2, Y = area.Y + area.Height / 2 }, 2);
         var info = new MONITORINFO { Size = Marshal.SizeOf<MONITORINFO>() };
         GetMonitorInfoW(monitor, ref info);
-        _crop = new Rect(area.X - info.Monitor.Left, area.Y - info.Monitor.Top, Width, Height);
+        _crop = new Rect(area.X - info.Monitor.Left, area.Y - info.Monitor.Top, _source.Width, _source.Height);
         Monitor = monitor;
 
         if (sound)
@@ -150,7 +157,7 @@ internal sealed partial class ScreenRecorder : IDisposable
         HoldLastFrame(length);
         _audio?.Stop(_startTicks + length.Ticks);
         await _writer.FinishAsync();
-        Log.Write($"Recorded {length.TotalSeconds:F1} s at {Width}x{Height}: {_kept} frames kept, {_dropped} dropped{(_audio is null ? ", no sound" : "")}");
+        Log.Write($"Recorded {length.TotalSeconds:F1} s at {Width}x{Height}{(Scale < 1 ? $" (scaled from {_source.Width}x{_source.Height})" : "")}: {_kept} frames kept, {_dropped} dropped{(_audio is null ? ", no sound" : "")}");
         return length;
     }
 
@@ -217,7 +224,7 @@ internal sealed partial class ScreenRecorder : IDisposable
             }
             using (var bitmap = CanvasBitmap.CreateFromDirect3D11Surface(_device, frame.Surface))
             using (var ds = target.CreateDrawingSession())
-                ds.DrawImage(bitmap, new Rect(0, 0, Width, Height), _crop, 1, CanvasImageInterpolation.NearestNeighbor);
+                ds.DrawImage(bitmap, new Rect(0, 0, Width, Height), _crop, 1, Scale < 1 ? CanvasImageInterpolation.HighQualityCubic : CanvasImageInterpolation.NearestNeighbor);
             if (_writer.AddFrame(target, time, () => _free.Add(target), wait: false))
             {
                 _lastSlot = slot;

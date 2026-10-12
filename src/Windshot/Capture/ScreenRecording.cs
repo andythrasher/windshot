@@ -155,7 +155,8 @@ internal sealed class ScreenRecording
             }
             var first = await Task.Run(() => FirstFrame(_recorder.Path));
             var video = new RecordedVideo(_recorder.Path, length, _recorder.HasAudio, Settings.Current.Video.FrameRate);
-            _onRecorded(new CapturedImage(first.Pixels, first.Width, first.Height, _scale, _area) { Video = video });
+            // Scaled down to encode, the video has fewer pixels per DIP than the screen did.
+            _onRecorded(new CapturedImage(first.Pixels, first.Width, first.Height, _scale * _recorder.Scale, _area) { Video = video });
         }
         catch (Exception ex)
         {
