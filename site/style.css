@@ -141,6 +141,7 @@ section > .wrap > p.sub { margin: 0 0 28px; color: var(--muted); }
 .shots figcaption h3 { margin: 0 0 2px; font-size: 18px; }
 .shots figcaption p { margin: 0; color: var(--muted); font-size: 15.5px; }
 .shots .wide figcaption h3 { font-size: 20px; }
+.tutorial { display: block; width: 100%; height: auto; border-radius: 12px; box-shadow: var(--shadow); background: #000; }
 
 .closing { text-align: center; }
 section > .closing > p.sub { margin-bottom: 20px; }

@@ -182,15 +182,20 @@ In `store/screenshots`, made by `tools/screenshots` from a fictional demo app. U
 order; the headline is in each image, and the caption (optional, 200 characters) adds detail:
 
 1. `01-annotate.png`: Arrows, shapes, text, numbered steps, highlighter and blur, all still editable.
-2. `02-shapes.png`: Rectangles, ellipses, triangles and polygons, outlined or filled, and 24 stickers.
-3. `03-capture.png`: Drag a region or click a window. A magnifier and color picker help you land on the exact pixel.
-4. `04-layers.png`: Restack, hide, rename and fade annotations in the layers panel.
-5. `05-scrolling.png`: Scrolling capture stitches a long page into one image.
-6. `06-beautify.png`: A gradient backdrop with rounded corners and a shadow, ready to share.
-7. `07-themes.png`: Eight editor themes, matching color sets and fonts for text.
-8. `08-pin.png`: Float a capture above your other windows while you work.
-9. `09-settings.png`: Change any shortcut, including Print Screen, and start with Windows.
-10. `10-pictures.png`: Paste or drop in a picture, and give it, or anything else, an outline, a soft shadow and rounded corners.
+2. `11-video.png`: Record an area with your PC's sound and microphone, then annotate it. Choose when each annotation shows, and fade, pop or wipe it in and out.
+3. `12-zoom.png`: Mark an area, and the video eases in to it and back out, annotations and all.
+4. `02-shapes.png`: Rectangles, ellipses, triangles and polygons, outlined or filled, and 24 stickers.
+5. `03-capture.png`: Drag a region or click a window. A magnifier and color picker help you land on the exact pixel.
+6. `04-layers.png`: Restack, hide, rename and fade annotations in the layers panel.
+7. `05-scrolling.png`: Scrolling capture stitches a long page into one image.
+8. `10-pictures.png`: Paste or drop in a picture, and give it, or anything else, an outline, a soft shadow and rounded corners.
+9. `06-beautify.png`: A gradient backdrop with rounded corners and a shadow, ready to share.
+10. `07-themes.png`: Eight editor themes, matching color sets and fonts for text.
+
+Not uploaded (the Store takes ten), kept as alternates: `08-pin.png` (Float a capture above your
+other windows while you work) and `09-settings.png` (Change any shortcut, including Print Screen,
+and start with Windows). `11-video` and `12-zoom` come from `tools/screenshots/run-video.ps1`.
+
 ### Store logos
 
 Partner Center can use the package's logos. Optionally upload a 1:1 box art at 1080×1080 or
