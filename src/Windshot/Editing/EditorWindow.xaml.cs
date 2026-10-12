@@ -172,13 +172,21 @@ public sealed partial class EditorWindow : Window
             AppWindow.SetIcon(AppIcon.FilePath);
         // Start in Select so a stray click doesn't draw something.
         SetTool(Tool.Select);
+        Open.Add(this);
         Closed += (_, _) =>
         {
+            Open.Remove(this);
             SavePreferences();
             EndVideo();
             _document.Dispose();
         };
     }
+
+    /// <summary>Editors that are open, so quitting can ask before losing work in them.</summary>
+    internal static List<EditorWindow> Open { get; } = new();
+
+    /// <summary>A recording that hasn't been saved or copied, or one being saved right now.</summary>
+    internal bool HasUnsavedVideo => IsVideo && (_unsaved || _export is not null);
 
     private float Unit => (float)_document.SourceScale;
 

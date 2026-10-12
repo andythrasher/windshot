@@ -46,10 +46,10 @@ internal abstract class Annotation
     // ---- In a recording ----------------------------------------------------------------
 
     /// <summary>In a recording: when the layer appears, on the recording's clock (not the trim's).</summary>
-    public TimeSpan Start { get; set; }
+    public TimeSpan From { get; set; }
 
     /// <summary>In a recording: when it goes, or null to stay to the end.</summary>
-    public TimeSpan? End { get; set; }
+    public TimeSpan? Until { get; set; }
 
     /// <summary>How long it takes to come in; None appears at once.</summary>
     public FadeLength FadeIn { get; set; }
@@ -72,10 +72,10 @@ internal abstract class Annotation
     /// </summary>
     public (float In, float Out) TransitionAt(TimeSpan time, TimeSpan length)
     {
-        var end = End ?? length;
-        double span = (end - Start).TotalSeconds;
+        var end = Until ?? length;
+        double span = (end - From).TotalSeconds;
         double fadeIn = Math.Min(FadeIn.Seconds(), span / 2), fadeOut = Math.Min(FadeOut.Seconds(), span / 2);
-        double comeIn = fadeIn > 0 ? Math.Clamp((time - Start).TotalSeconds / fadeIn, 0, 1) : 1;
+        double comeIn = fadeIn > 0 ? Math.Clamp((time - From).TotalSeconds / fadeIn, 0, 1) : 1;
         double goOut = fadeOut > 0 ? Math.Clamp(1 - (end - time).TotalSeconds / fadeOut, 0, 1) : 0;
         return ((float)comeIn, (float)goOut);
     }
@@ -87,14 +87,14 @@ internal abstract class Annotation
     /// </summary>
     public float ShownAt(TimeSpan time, TimeSpan length)
     {
-        var end = End ?? length;
-        if (time < Start || time > end)
+        var end = Until ?? length;
+        if (time < From || time > end)
             return 0;
-        double span = (end - Start).TotalSeconds;
+        double span = (end - From).TotalSeconds;
         double fadeIn = Math.Min(FadeIn.Seconds(), span / 2), fadeOut = Math.Min(FadeOut.Seconds(), span / 2);
         double shown = 1;
         if (fadeIn > 0)
-            shown = Math.Min(shown, (time - Start).TotalSeconds / fadeIn);
+            shown = Math.Min(shown, (time - From).TotalSeconds / fadeIn);
         if (fadeOut > 0)
             shown = Math.Min(shown, (end - time).TotalSeconds / fadeOut);
         shown = Math.Clamp(shown, 0, 1);
@@ -110,13 +110,13 @@ internal abstract class Annotation
     /// <summary>How far through its time the layer is at <paramref name="time"/>, 0 to 1, eased at both ends.</summary>
     public float ProgressAt(TimeSpan time, TimeSpan length)
     {
-        double span = ((End ?? length) - Start).TotalSeconds;
-        double p = span <= 0 ? 0 : Math.Clamp((time - Start).TotalSeconds / span, 0, 1);
+        double span = ((Until ?? length) - From).TotalSeconds;
+        double p = span <= 0 ? 0 : Math.Clamp((time - From).TotalSeconds / span, 0, 1);
         return (float)(p * p * (3 - 2 * p));
     }
 
     /// <summary>Whether the layer covers the whole recording, with no fades or motion: as on a screenshot.</summary>
-    public bool Always => Start <= TimeSpan.Zero && End is null && FadeIn == FadeLength.None && FadeOut == FadeLength.None && Motion == LayerMotion.None;
+    public bool Always => From <= TimeSpan.Zero && Until is null && FadeIn == FadeLength.None && FadeOut == FadeLength.None && Motion == LayerMotion.None;
 
     /// <summary>A name given in the layers panel; null shows the default one.</summary>
     public string? Name { get; set; }

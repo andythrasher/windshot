@@ -409,7 +409,7 @@ public sealed partial class EditorWindow
         ds.FillRoundedRectangle(band, 2.5f, 2.5f, Color.FromArgb(170, 0, 0, 0));
         foreach (var layer in others)
         {
-            float x0 = Math.Max((float)band.X, XAt(layer.Start)), x1 = Math.Min((float)band.Right, XAt(layer.End ?? _length));
+            float x0 = Math.Max((float)band.X, XAt(layer.From)), x1 = Math.Min((float)band.Right, XAt(layer.Until ?? _length));
             if (x1 > x0)
                 ds.FillRoundedRectangle(new Rect(x0, band.Y, x1 - x0, band.Height), 2.5f, 2.5f, Color.FromArgb(120, 255, 255, 255)); // overlaps stack brighter
         }
@@ -448,15 +448,15 @@ public sealed partial class EditorWindow
         }
         DrawSnapTicks(ds, lane, layer, muted);
 
-        var end = layer.End ?? _length;
-        float x0 = XAt(layer.Start), x1 = Math.Max(x0 + 2, XAt(end));
+        var end = layer.Until ?? _length;
+        float x0 = XAt(layer.From), x1 = Math.Max(x0 + 2, XAt(end));
         var bar = new Rect(x0, lane.Y + 1, x1 - x0, lane.Height - 2);
         using var shape = CanvasGeometry.CreateRoundedRectangle(sender, bar, 4, 4);
         using (ds.CreateLayer(1, shape))
         {
             ds.FillRectangle(bar, Color.FromArgb(150, accent.R, accent.G, accent.B));
             // Fades: the bar ramps up and down across them.
-            double span = Math.Max(0.001, (end - layer.Start).TotalSeconds);
+            double span = Math.Max(0.001, (end - layer.From).TotalSeconds);
             float fadeIn = (float)(bar.Width * Math.Min(layer.FadeIn.Seconds(), span / 2) / span);
             float fadeOut = (float)(bar.Width * Math.Min(layer.FadeOut.Seconds(), span / 2) / span);
             if (fadeIn > 0)
@@ -473,7 +473,7 @@ public sealed partial class EditorWindow
         if (text.Width > 60)
         {
             using (ds.CreateLayer(1, text))
-                ds.DrawText($"{LayerName(layer)} · {Format(layer.Start)}–{Format(end)}", text,
+                ds.DrawText($"{LayerName(layer)} · {Format(layer.From)}–{Format(end)}", text,
                     dark ? Color.FromArgb(255, 255, 255, 255) : Color.FromArgb(255, 20, 20, 20), small);
         }
     }
@@ -491,7 +491,7 @@ public sealed partial class EditorWindow
         {
             if (TimedLayer is not { } layer)
                 return TimelineDrag.None;
-            float x0 = XAt(layer.Start), x1 = XAt(layer.End ?? _length);
+            float x0 = XAt(layer.From), x1 = XAt(layer.Until ?? _length);
             if (Math.Abs(p.X - x0) <= 7)
                 return TimelineDrag.LayerStart;
             if (Math.Abs(p.X - x1) <= 7)
@@ -513,7 +513,7 @@ public sealed partial class EditorWindow
         if (_timelineDrag == TimelineDrag.None)
             return;
         if (_timelineDrag == TimelineDrag.LayerMove)
-            _layerGrab = TimeAt(p.X) - TimedLayer!.Start;
+            _layerGrab = TimeAt(p.X) - TimedLayer!.From;
         _layerTimingChanged = false;
         _snapPlayhead = PlayheadTime ?? _position; // before pausing, which can move it
         Pause();
@@ -581,20 +581,20 @@ public sealed partial class EditorWindow
                 SeekTo(Clamp(t, _trimStart, _trimEnd));
                 break;
             case TimelineDrag.LayerStart when layer is not null:
-                layer.Start = Clamp(Snap(t, SnapTargets(layer)), TimeSpan.Zero, (layer.End ?? _length) - MinLayerLength);
-                if (layer.Start < FrameStep)
-                    layer.Start = TimeSpan.Zero; // snaps to the very start
+                layer.From = Clamp(Snap(t, SnapTargets(layer)), TimeSpan.Zero, (layer.Until ?? _length) - MinLayerLength);
+                if (layer.From < FrameStep)
+                    layer.From = TimeSpan.Zero; // snaps to the very start
                 _layerTimingChanged = true;
-                SeekTo(layer.Start);
+                SeekTo(layer.From);
                 break;
             case TimelineDrag.LayerEnd when layer is not null:
-                var end = Clamp(Snap(t, SnapTargets(layer)), layer.Start + MinLayerLength, _length);
-                layer.End = end > _length - FrameStep ? null : end; // to the end, wherever that is
+                var end = Clamp(Snap(t, SnapTargets(layer)), layer.From + MinLayerLength, _length);
+                layer.Until = end > _length - FrameStep ? null : end; // to the end, wherever that is
                 _layerTimingChanged = true;
-                SeekTo((layer.End ?? _length) - FrameStep);
+                SeekTo((layer.Until ?? _length) - FrameStep);
                 break;
             case TimelineDrag.LayerMove when layer is not null:
-                var length = (layer.End ?? _length) - layer.Start;
+                var length = (layer.Until ?? _length) - layer.From;
                 var start = t - _layerGrab;
                 // Either end can snap; the nearer one wins.
                 var targets = SnapTargets(layer).ToList();
@@ -606,11 +606,11 @@ public sealed partial class EditorWindow
                 else if (endSnaps)
                     (start, _snapGuide) = (byEnd, byEnd + length);
                 start = Clamp(start, TimeSpan.Zero, _length - length);
-                bool toEnd = layer.End is null && start + length >= _length - FrameStep;
-                layer.Start = start;
-                layer.End = toEnd ? null : start + length;
+                bool toEnd = layer.Until is null && start + length >= _length - FrameStep;
+                layer.From = start;
+                layer.Until = toEnd ? null : start + length;
                 _layerTimingChanged = true;
-                SeekTo(layer.Start);
+                SeekTo(layer.From);
                 break;
         }
         Canvas.Invalidate();
@@ -632,8 +632,8 @@ public sealed partial class EditorWindow
         yield return _snapPlayhead;
         foreach (var other in _document.Annotations.Where(a => a.Visible && a != dragging))
         {
-            yield return other.Start;
-            yield return other.End ?? _length;
+            yield return other.From;
+            yield return other.Until ?? _length;
         }
     }
 
@@ -696,8 +696,8 @@ public sealed partial class EditorWindow
         {
             foreach (var layer in Selection)
             {
-                layer.Start = TimeSpan.Zero;
-                layer.End = null;
+                layer.From = TimeSpan.Zero;
+                layer.Until = null;
             }
             Commit();
             TimelineCanvas.Invalidate();
@@ -809,11 +809,11 @@ public sealed partial class EditorWindow
     private void ShowSelectedLayer()
     {
         // (Within its time counts, even at the very start of a fade: a new layer stays where it was put.)
-        if (!IsVideo || TimedLayer is not { } layer || (_position >= layer.Start && _position <= (layer.End ?? _length)))
+        if (!IsVideo || TimedLayer is not { } layer || (_position >= layer.From && _position <= (layer.Until ?? _length)))
             return;
         Pause();
-        var into = TimeSpan.FromSeconds(Math.Min(1, ((layer.End ?? _length) - layer.Start).TotalSeconds / 2));
-        SeekTo(Clamp(layer.Start + into, _trimStart, _trimEnd));
+        var into = TimeSpan.FromSeconds(Math.Min(1, ((layer.Until ?? _length) - layer.From).TotalSeconds / 2));
+        SeekTo(Clamp(layer.From + into, _trimStart, _trimEnd));
     }
 
     // ---- Video options -----------------------------------------------------------------

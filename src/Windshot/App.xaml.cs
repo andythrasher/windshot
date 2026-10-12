@@ -269,6 +269,17 @@ public partial class App : Application
 
     private void Quit()
     {
+        // Quitting closes everything at once; recordings that aren't saved yet would be lost
+        // without the question closing their editor asks, so ask here.
+        int unsaved = Editing.EditorWindow.Open.Count(editor => editor.HasUnsavedVideo) + (ScreenRecording.IsRecording ? 1 : 0);
+        if (unsaved > 0)
+        {
+            string what = unsaved == 1 ? "A recording hasn't been saved. If you quit, it's gone." : $"{unsaved} recordings haven't been saved. If you quit, they're gone.";
+            var answer = System.Windows.Forms.MessageBox.Show(what, "Quit Windshot?", System.Windows.Forms.MessageBoxButtons.OKCancel,
+                System.Windows.Forms.MessageBoxIcon.Warning, System.Windows.Forms.MessageBoxDefaultButton.Button2);
+            if (answer != System.Windows.Forms.DialogResult.OK)
+                return;
+        }
         // Pins stay for next time; only closing one yourself removes it.
         PinWindow.AppExiting = true;
         _settingsWatcher?.Dispose();

@@ -14,6 +14,9 @@ internal sealed class ScreenRecording
 {
     private static ScreenRecording? _current;
 
+    /// <summary>Whether a recording is under way (or starting).</summary>
+    public static bool IsRecording => _current is not null;
+
     private readonly Rectangle _area;
     private readonly double _scale;
     private readonly Action<CapturedImage> _onRecorded;

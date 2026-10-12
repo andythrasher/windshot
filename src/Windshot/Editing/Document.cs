@@ -45,7 +45,7 @@ internal sealed class Document : IDisposable
     public float ShownAt(Annotation annotation, TimeSpan? time) => time is { } t ? annotation.ShownAt(t, Length) : 1;
 
     /// <summary>Whether a layer is within its time in a recording (always, in a screenshot), however far into a transition.</summary>
-    public bool InTime(Annotation annotation, TimeSpan? time) => time is not { } t || (t >= annotation.Start && t <= (annotation.End ?? Length));
+    public bool InTime(Annotation annotation, TimeSpan? time) => time is not { } t || (t >= annotation.From && t <= (annotation.Until ?? Length));
 
     /// <summary>Whether a layer is partway through coming in or going out at <paramref name="time"/>.</summary>
     public bool MidTransition(Annotation annotation, TimeSpan? time) =>

@@ -144,10 +144,10 @@ public sealed partial class EditorWindow
         // In a recording, a new layer starts where the playhead is and lasts to the end.
         if (IsVideo)
         {
-            annotation.Start = _position > _trimStart + FrameStep ? _position : TimeSpan.Zero;
+            annotation.From = _position > _trimStart + FrameStep ? _position : TimeSpan.Zero;
             // A zoom is a moment, not the rest of the video: a few seconds, to start with.
-            if (annotation is ZoomAnnotation && annotation.Start + ZoomLength < _length - FrameStep)
-                annotation.End = annotation.Start + ZoomLength;
+            if (annotation is ZoomAnnotation && annotation.From + ZoomLength < _length - FrameStep)
+                annotation.Until = annotation.From + ZoomLength;
             // A highlight is drawn on, left to right, like a pen stroke.
             if (annotation is HighlighterAnnotation)
                 (annotation.InStyle, annotation.FadeIn) = (Transition.WipeRight, FadeLength.Slow);

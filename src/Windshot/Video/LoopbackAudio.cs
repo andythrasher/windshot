@@ -95,6 +95,26 @@ internal sealed unsafe class LoopbackAudio : IDisposable
 
     private void Run()
     {
+        try
+        {
+            Capture();
+        }
+        catch (Exception ex)
+        {
+            // E.g. the speakers were unplugged, or Bluetooth headphones went away
+            // (AUDCLNT_E_DEVICE_INVALIDATED). An exception here would end the app, losing the
+            // recording: carry on with silence instead, so the video and its timing are kept.
+            Log.Write($"Recording sound stopped: {ex.Message}");
+            while (!_stopping)
+            {
+                PadTo(FrameAt(NowTicks) - SampleRate / 20);
+                Thread.Sleep(10);
+            }
+        }
+    }
+
+    private void Capture()
+    {
         while (!_stopping)
         {
             bool any = false;
