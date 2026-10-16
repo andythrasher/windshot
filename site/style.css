@@ -205,3 +205,21 @@ footer.site a { color: var(--muted); }
   header.site { flex-wrap: wrap; row-gap: 10px; }
   header.site nav { flex-wrap: wrap; gap: 6px 16px; }
 }
+
+/* Comparison article. */
+.doc h3 { font-size: 18px; margin: 24px 0 4px; }
+.doc-shot { margin: 28px 0; }
+.doc-shot a { display: block; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+.doc-shot img { display: block; width: 100%; height: auto; }
+.doc-shot figcaption { color: var(--muted); font-size: 15px; padding-top: 8px; }
+.table-scroll { overflow-x: auto; margin: 12px 0 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); }
+.compare { width: 100%; border-collapse: collapse; font-size: 15px; line-height: 1.4; }
+.compare th, .compare td { padding: 9px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+.compare tbody tr:last-child > * { border-bottom: 0; }
+.compare thead th { font-weight: 650; white-space: nowrap; }
+.compare thead th:nth-child(2), .compare td:nth-child(2) { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.compare tbody th { font-weight: 500; color: var(--muted); min-width: 150px; }
+.compare td.yes { color: var(--text); }
+.compare td.no { color: var(--muted); }
+.fine { color: var(--muted); font-size: 14px; }
+.doc-cta { margin: 20px 0 8px; }
