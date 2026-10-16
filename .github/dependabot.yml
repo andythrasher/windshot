@@ -1,0 +1,19 @@
+# Opens a pull request when a NuGet package Windshot uses has an update. Nothing changes until
+# a pull request is merged. See docs/maintenance.md for what to test before merging.
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: /src/Windshot
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    groups:
+      # The Windows App SDK parts are released together and should move together.
+      windows-app-sdk:
+        patterns:
+          - "Microsoft.WindowsAppSDK.*"
+      others:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "Dependencies"
